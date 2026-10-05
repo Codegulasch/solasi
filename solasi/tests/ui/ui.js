@@ -1,12 +1,12 @@
 const {JSDOM}=require("jsdom");const fs=require("fs");const path=require("path");const APP=path.join(__dirname,"..","..","app");
 const html=fs.readFileSync(path.join(APP,"static","index.html"),"utf8");
 const cfg=JSON.parse(require("child_process").execSync(`python3 -c "import json,controller;print(json.dumps(controller.DEFAULT_CONFIG))"`,{cwd:APP,env:{...process.env,SOLASI_DATA:require("os").tmpdir()}}).toString());
-cfg.grid.entity="sensor.grid";const saved=[];let replayBody=null;const calls=[];
+cfg.grid.entity="sensor.grid";const saved=[];let replayBody=null;const calls=[];let failDevice=false;
 const status={safety:{state:"active",reason:"",since:null},pv_w:3000,bat_w:-1100,house_w:1380,connected:true,enabled:true,dry_run:true,surplus_enabled:true,surplus_dry_run:true,meter_ok:true,grid_w:400,net_balance:400,net_dis:400,t_target:390,eco_active:false,avg_soc:60,blocked_w:0,want:"Entladen",surplus_w:1620,
  units:[{name:"Speicher A",pv:540,soc:80,set:0,real:0,plan:280,force:false,available:false,mode:"self_consumption",dir:"discharge"},{name:"Speicher B",soc:40,set:0,real:0,plan:110,force:true,available:true,mode:"third_party_control",dir:"discharge"}],
  slots:[{name:"Wallbox",ent:"switch.wb",num:"number.wb",state:"on",own_w:1380,num_v:6}],
  events:[{ts:"12:00:01",level:"test",msg:"Test: Speicher A: 0 W → 280 W"},{ts:"12:00:00",level:"error",msg:"<b>x</b>"}]};
-const ents=[{id:"sensor.grid",name:"Netz",domain:"sensor"},{id:"number.a",name:"A",domain:"number"},{id:"switch.wb",name:"WB",domain:"switch"},{id:"select.m",name:"M",domain:"select"}];
+const ents=[{id:"sensor.grid",name:"Netz",domain:"sensor"},{id:"sensor.extra_a",name:"Irgendein Sensor A",domain:"sensor"},{id:"sensor.extra_b",name:"Irgendein Sensor B",domain:"sensor"},{id:"number.a",name:"A",domain:"number"},{id:"switch.wb",name:"WB",domain:"switch"},{id:"select.m",name:"M",domain:"select"}];
 const errors=[];
 const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"http://localhost/",
  beforeParse(w){
@@ -24,7 +24,7 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
       "api/resume":()=>{calls.push("resume");status.safety={state:"active",reason:"",since:null};return {ok:true}},
       "api/entity_options":()=>({options:["third_party_control","self_consumption"]}),
       "api/watchdog":()=>({state:"manuell",detail:"Automatisch nicht möglich (HTTP 403). Den Text unten als Automation einfügen.",json:'{"id": "solasi_waechter", "alias": "SOLASI Wächter"}',managed:false}),
-      "api/device_sensors":()=>[{id:"sensor.dev_charge",name:"Batterie Ladeleistung",state:"140",unit:"W"},{id:"sensor.dev_solar",name:"Solarleistung",state:"540",unit:"W"}],
+      "api/device_sensors":()=>{if(failDevice)throw new Error("simuliert");return [{id:"sensor.dev_charge",name:"Batterie Ladeleistung",state:"140",unit:"W"},{id:"sensor.dev_solar",name:"Solarleistung",state:"540",unit:"W"}]},
       "api/learn":()=>({value:210,nights:[200,220,210],used:231,enabled:true}),
       "api/notify/services":()=>["persistent_notification","notify.mobile_app_pixel"],
       "api/notify/test":()=>({ok:true}),
@@ -44,7 +44,7 @@ const w=dom.window,d=w.document;
  ok(d.querySelectorAll("#p-units .f").length>10,"Anlage-Formular gerendert (einfacher Modus)");
  const simpleCount=d.querySelectorAll("#p-units .f").length;
  ok(d.querySelectorAll("#p-surplus details.fsec").length===4,"Überschuss: Quelle + 3 Verbraucher-Slots als einklappbare Gruppen");
- ok(d.querySelectorAll("#dl-sensor option").length===1&&d.querySelectorAll("#dl-switchy option").length===1,"Entitätslisten gefüllt");
+ ok(d.querySelectorAll("#dl-sensor option").length===3&&d.querySelectorAll("#dl-switchy option").length===1,"Entitätslisten gefüllt");
  ok(d.querySelector("#p-status").textContent.includes("390 W")&&d.querySelector("#p-status").textContent.includes("Abregelung"),"Status zeigt Sollwert + Abregelung");
  ok(d.querySelector(".headline").textContent.includes("Im Test: Die Speicher versorgen dein Haus mit 390 W"),"Überschrift in Klartext");
  const fl=d.querySelector(".flow svg").textContent;
@@ -178,5 +178,27 @@ const w=dom.window,d=w.document;
  ok(cfg.units[0].driver==="limit"&&cfg.units[0].can_charge===false&&cfg.units[0].curtail===false,"Typwechsel setzt passende Voreinstellungen");
  const drvSel3=d.getElementById("f_units_0_driver");drvSel3.value="script";drvSel3.dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,100));
  ok(d.getElementById("f_units_0_script")!==null&&d.querySelector("#p-units .drvdesc").textContent.includes("power_w"),"Skript: Skriptfeld und Hinweis auf power_w");
+ // --- Vorschlagslisten beim ersten Einrichten (Fehlerbild: ab "Beim Stoppen" kamen keine Entitäten) ---
+ cfg.units[1].driver="anker";cfg.units[1].num="";cfg.units[1].dir="";cfg.units[1].mode="";cfg.units[1].script="";
+ w.renderUnits();await new Promise(r=>setTimeout(r,60));      // frisches, leeres Formular: noch keine Entität bekannt (kurz warten, bis alle Eingabefelder bereit sind)
+ const nSens=ents.filter(e=>e.domain==="sensor").length;
+ ok(d.querySelectorAll("#dl-sens1 option").length===nSens&&nSens>=3,"Leeres Formular: sofort alle Sensoren als Vorschlag ("+nSens+")");
+ ok(d.getElementById("f_units_1_soc").getAttribute("list")==="dl-sens1"&&d.getElementById("f_units_1_pv").getAttribute("list")==="dl-sens1","Ladestand und PV nutzen diese Liste");
+ ok(d.getElementById("devsens1").textContent.includes("Erst Leistung"),"Hinweis, solange noch keine Leistung gewählt ist");
+ ok(d.querySelectorAll("#dl-fb1 option").length===0,"Rückfall-Vorschläge leer, solange kein Betriebsmodus gewählt ist");
+ // Nutzer tippt die Leistungs-Entität ein -> Gerätesensoren erscheinen ohne Neuladen
+ const numIn=d.getElementById("f_units_1_num");numIn.value="number.dev_geraet_2_leistung";numIn.dispatchEvent(new w.Event("input"));
+ await new Promise(r=>setTimeout(r,900));
+ ok(d.querySelector("#dl-sens1 option").value==="sensor.dev_charge"&&d.querySelectorAll("#dl-sens1 option").length===nSens+2,"Nach dem Eintippen: Gerätesensoren zuerst, übrige danach");
+ ok(d.getElementById("devsens1").textContent.includes("2 Sensoren gefunden"),"Sensorliste des Geräts erscheint ohne Neuladen");
+ // Nutzer wählt den Betriebsmodus -> Rückfall-Optionen erscheinen
+ const modeIn=d.getElementById("f_units_1_mode");modeIn.value="select.mode_b";modeIn.dispatchEvent(new w.Event("input"));
+ await new Promise(r=>setTimeout(r,900));
+ ok(d.querySelectorAll("#dl-fb1 option").length===2&&d.querySelector("#dl-fb1 option").value==="third_party_control","Nach Wahl des Betriebsmodus: dessen Optionen als Vorschlag für „Beim Stoppen“");
+ // Abfrage schlägt fehl -> trotzdem alle Sensoren wählbar
+ failDevice=true;cfg.units[1].num="number.dev_geraet_2_leistung";w.renderUnits();await new Promise(r=>setTimeout(r,400));
+ ok(d.querySelectorAll("#dl-sens1 option").length===nSens,"Abfrage schlägt fehl: weiterhin alle Sensoren als Vorschlag");
+ ok(d.getElementById("devsens1").textContent.includes("nicht verfügbar"),"Hinweis, dass die Geräteliste fehlt");
+ failDevice=false;
  process.exit(process.exitCode||0);
 })();

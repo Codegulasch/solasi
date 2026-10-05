@@ -29,7 +29,13 @@ for f in repository.yaml LICENSE README.md .gitignore; do
   [ -f "$f" ] || { [ -f "$src/$f" ] && cp "$src/$f" "$f" && echo "Neu angelegt: $f"; }
 done
 chmod +x tools/*.sh
-echo; echo "Eingespielt. Änderungen:"; git status --short || true
+echo; echo "Eingespielt."
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Änderungen:"; git status --short
+else
+  echo "ACHTUNG: Dieser Ordner ist kein Git-Repository (es fehlt das versteckte .git), hochladen geht so nicht."
+  echo "Hole dir eine Arbeitskopie:   gh repo clone DEIN-NAME/solasi solasi-git   und führe das Einspielen dort aus."
+fi
 ver="$(grep -m1 '^version:' solasi/config.yaml | sed -E 's/version:[[:space:]]*"?([^"]*)"?/\1/')"
 echo; echo "Nächste Schritte: mit  git diff  prüfen, dann veröffentlichen:"
-echo "  tools/release.sh ${ver} --all --push"
+echo "  bash tools/release.sh ${ver} --all --push"

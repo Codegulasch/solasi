@@ -1,5 +1,5 @@
 name: "SOLASI"
-version: "1.0.1"
+version: "1.0.2"
 slug: solasi
 description: "SOLASI – dein Energie-Regler: Nulleinspeisung für 1-2 Anker SOLIX 4 E5000 Pro mit Eco-Modus, Überschusssteuerung und Live-Oberfläche"
 url: "https://github.com/Codegulasch/solasi"

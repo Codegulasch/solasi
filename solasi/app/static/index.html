@@ -257,7 +257,7 @@ function unitFields(i,u){
   }
   if(d==="anker"||d==="signed"||d==="modal"){
     h+=field(p+"fallback_mode","Beim Stoppen: Modus setzen auf","text",{list:"fb"+i,
-      hint:"Der Speicher bekommt diesen Modus, wenn du SOLASI stoppst oder etwas ausfällt, z. B. Eigenverbrauch. Die Vorschläge stammen aus dem Betriebsmodus oben."});
+      hint:"Der Speicher bekommt diesen Modus, wenn du SOLASI stoppst oder etwas ausfällt, z. B. Eigenverbrauch. Trage oben den Betriebsmodus ein, dann erscheinen hier seine Optionen als Vorschläge. Du kannst den Namen auch von Hand eintippen."});
   }else if(d==="limit"){
     h+=field(p+"fallback_value","Beim Stoppen: Ausgangslimit setzen auf (W)","text",{hint:"Leer = Limit unverändert lassen."});
   }
@@ -293,20 +293,40 @@ function renderUnits(){
   });
   $("#p-units").innerHTML=h+advNote();
   cfg.units.forEach((u,i)=>{
-    if(u.mode)fetch("api/entity_options?entity="+encodeURIComponent(u.mode)).then(r=>r.json()).then(j=>{
-      const dl=document.getElementById("dl-fb"+i);if(dl)dl.innerHTML=(j.options||[]).map(o=>`<option value="${esc(o)}"></option>`).join("");}).catch(()=>{});
-    const anchor=u.num||u.dir||u.script;
-    if(anchor)fetch("api/device_sensors?entity="+encodeURIComponent(anchor)).then(r=>r.json()).then(list=>{
-      const dl=document.getElementById("dl-sens"+i);
-      const fmt=x=>`${x.name||x.id} · ${x.state}${x.unit?" "+x.unit:""}`;
-      const ids=new Set(list.map(x=>x.id));
-      if(dl)dl.innerHTML=list.map(x=>`<option value="${esc(x.id)}" label="${esc(fmt(x))}"></option>`).join("")+
-        (allSensors||[]).filter(e=>!ids.has(e.id)).map(e=>`<option value="${esc(e.id)}" label="${esc(e.name)}"></option>`).join("");
-      const box=document.getElementById("devsens"+i);
-      if(box)box.innerHTML=list.length?`<details><summary>${list.length} Sensoren gefunden, mit aktuellem Wert</summary>
-        <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px">${list.map(x=>`<tr style="border-bottom:1px solid var(--line)"><td style="padding:3px 6px 3px 0">${esc(x.name||x.id)}<div class="sub" style="font-size:11px">${esc(x.id)}</div></td><td style="text-align:right;white-space:nowrap"><b>${esc(x.state)}</b> ${esc(x.unit)}</td></tr>`).join("")}</table>
-        <div class="hint" style="margin-top:6px">Vergleiche die Werte mit der Hersteller-App, um den richtigen Sensor für Solar, Laden und Entladen zu finden.</div></details>`:"Keine passenden Sensoren gefunden. Du kannst trotzdem jeden Sensor von Hand wählen.";
-    }).catch(()=>{});});
+    setSensorList(i,[]);                 // sofort: alle Sensoren vorschlagen, auch beim ersten Einrichten
+    refreshDevice(i);refreshModeOptions(i);
+    for(const k of ["num","dir","script"]){const e=document.getElementById(`f_units_${i}_${k}`);if(e)e.addEventListener("input",()=>later("dev"+i,()=>refreshDevice(i)));}
+    const m=document.getElementById(`f_units_${i}_mode`);if(m)m.addEventListener("input",()=>later("mode"+i,()=>refreshModeOptions(i)));
+  });
+}
+// ---- Vorschlagslisten je Speicher: erst alle Sensoren, dann (wenn möglich) die des Geräts zuerst ----
+const timers={};
+function later(key,fn,ms=400){clearTimeout(timers[key]);timers[key]=setTimeout(fn,ms)}
+function setSensorList(i,list){
+  const dl=document.getElementById("dl-sens"+i);if(!dl)return;
+  const fmt=x=>`${x.name||x.id} · ${x.state}${x.unit?" "+x.unit:""}`;
+  const ids=new Set(list.map(x=>x.id));
+  dl.innerHTML=list.map(x=>`<option value="${esc(x.id)}" label="${esc(fmt(x))}"></option>`).join("")+
+    (allSensors||[]).filter(e=>!ids.has(e.id)).map(e=>`<option value="${esc(e.id)}" label="${esc(e.name)}"></option>`).join("");
+}
+async function refreshDevice(i){
+  const u=cfg.units[i],anchor=u.num||u.dir||u.script,box=document.getElementById("devsens"+i);
+  if(!anchor){if(box)box.textContent="Erst Leistung bzw. Modus wählen, dann erscheinen hier die Sensoren des Geräts.";return;}
+  if(box)box.textContent="lädt …";
+  try{
+    const list=await (await fetch("api/device_sensors?entity="+encodeURIComponent(anchor))).json();
+    if(!Array.isArray(list))throw new Error("keine Liste");
+    setSensorList(i,list);
+    if(box)box.innerHTML=list.length?`<details><summary>${list.length} Sensoren gefunden, mit aktuellem Wert</summary>
+      <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px">${list.map(x=>`<tr style="border-bottom:1px solid var(--line)"><td style="padding:3px 6px 3px 0">${esc(x.name||x.id)}<div class="sub" style="font-size:11px">${esc(x.id)}</div></td><td style="text-align:right;white-space:nowrap"><b>${esc(x.state)}</b> ${esc(x.unit)}</td></tr>`).join("")}</table>
+      <div class="hint" style="margin-top:6px">Vergleiche die Werte mit der Hersteller-App, um den richtigen Sensor für Solar, Laden und Entladen zu finden.</div></details>`:"Keine passenden Sensoren gefunden. Du kannst trotzdem jeden Sensor aus der Liste oder von Hand wählen.";
+  }catch(e){if(box)box.textContent="Die Sensorliste des Geräts ist nicht verfügbar. Alle Sensoren stehen trotzdem zur Auswahl.";}
+}
+async function refreshModeOptions(i){
+  const dl=document.getElementById("dl-fb"+i),mode=cfg.units[i].mode;if(!dl)return;
+  if(!mode){dl.innerHTML="";return;}
+  try{const j=await (await fetch("api/entity_options?entity="+encodeURIComponent(mode))).json();
+    dl.innerHTML=(j.options||[]).map(o=>`<option value="${esc(o)}"></option>`).join("");}catch(e){}
 }
 function renderControl(){
   advHidden=0;

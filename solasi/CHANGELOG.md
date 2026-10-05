@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.0.2
+- **Behoben: Beim ersten Einrichten fehlten die Vorschläge ab „Beim Stoppen: Modus setzen auf“.** Die Listen für Ladestand, Leistungs- und PV-Sensoren
+  und die Rückfall-Optionen wurden nur gefüllt, wenn beim Aufbau der Seite schon eine Leistungs-Entität bzw. ein Betriebsmodus eingetragen war. Jetzt stehen
+  sofort alle Sensoren zur Auswahl, und die Sensoren des Geräts rücken nach vorn, sobald du die Leistungs-Entität eintippst (ohne Neuladen). Die Rückfall-Optionen
+  erscheinen, sobald der Betriebsmodus gewählt ist. Schlägt die Geräte-Abfrage fehl, bleiben alle Sensoren wählbar.
+
 ## 1.0.1
 - **PV direkt ins Haus, auch bei leerem Speicher:** Liegt der Ladestand unter dem Minimum, darf der Speicher so viel abgeben, wie seine Module
   gerade liefern. Die Batterie wird dabei nicht entladen. Vorher blieb die PV in dem Fall ungenutzt, und das Haus zog aus dem Netz.
