@@ -1,0 +1,5 @@
+# Beschreibung des Add-on-Repositorys für Home Assistant.
+# TODO: "url" und "maintainer" auf deinen GitHub-Namen und dein Repository ändern.
+name: SOLASI Add-ons
+url: https://github.com/Codegulasch/solasi
+maintainer: Codegulasch

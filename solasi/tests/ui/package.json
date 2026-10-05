@@ -1,0 +1,7 @@
+{
+  "name": "solasi-ui-tests",
+  "private": true,
+  "description": "Oberflächen-Tests (jsdom) für die SOLASI-Weboberfläche und die Dashboard-Karte",
+  "scripts": { "test": "node run_all.js" },
+  "devDependencies": { "jsdom": "^26.0.0" }
+}

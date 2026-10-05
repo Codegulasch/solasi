@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOLASI</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23f59e0b'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%23fff7e0'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#fbf7f0;--card:#ffffff;--fg:#2b2a28;--muted:#7d766b;--line:#efe7da;--chip:#f6efe3;
+  --accent:#f59e0b;--accent-d:#d97706;--accent-soft:#fff3d6;
+  --ok:#1f9d63;--warn:#d97706;--bad:#e5484d;--test:#8b5cf6;--sun:#f59e0b;--bat:#14b8a6;--grid:#6366f1;--home:#64748b;
+  --shadow:0 1px 2px rgba(60,40,10,.05),0 6px 18px rgba(60,40,10,.06);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#15171b;--card:#1f2228;--fg:#f2eee7;--muted:#a59e92;--line:#2c3038;--chip:#292d35;
+  --accent:#fbbf24;--accent-d:#f59e0b;--accent-soft:#3a2f14;
+  --ok:#4ade99;--warn:#fbbf24;--bad:#ff7b7f;--test:#b79cff;--sun:#fbbf24;--bat:#2dd4bf;--grid:#8b8dff;--home:#94a3b8;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 18px 0}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand svg{width:34px;height:34px;flex:none}
+.brand b{font-size:21px;letter-spacing:-.01em}
+.brand small{display:block;color:var(--muted);font-size:12px;margin-top:-3px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:600;background:var(--chip);color:var(--muted)}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--bad)}
+.pill.ok i{background:var(--ok)}.pill.ok{color:var(--ok)}
+.pill.test{color:var(--test)}.pill.test i{background:var(--test)}
+.pill.live{color:var(--ok)}.pill.live i{background:var(--ok)}
+.pill.off{color:var(--warn)}.pill.off i{background:var(--warn)}
+.pill.stop{color:var(--bad)}.pill.stop i{background:var(--bad)}
+button.kill{background:var(--bad);color:#fff;border:0;border-radius:999px;padding:6px 15px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:var(--shadow)}
+button.kill:hover{filter:brightness(1.1)}
+button.kill.resume{background:var(--ok)}
+.toggles{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.tg{display:flex;align-items:center;gap:8px;background:var(--chip);border-radius:999px;padding:6px 13px 6px 10px;cursor:pointer;user-select:none;font-size:13px;font-weight:500;transition:background .15s}
+.tg:hover{background:color-mix(in srgb,var(--chip) 70%,var(--accent) 12%)}
+.tg input{display:none}
+.tg i{width:32px;height:18px;border-radius:9px;background:#b9b2a5;position:relative;transition:.18s;flex:none}
+.tg i:after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.tg input:checked+i{background:var(--ok)}
+.tg input:checked+i:after{left:16px}
+.tg.test input:checked+i{background:var(--test)}
+nav{display:flex;gap:2px;margin-top:8px;overflow-x:auto}
+nav button{border:0;background:none;color:var(--muted);padding:10px 15px;cursor:pointer;font:inherit;font-weight:500;white-space:nowrap;border-bottom:3px solid transparent}
+nav button:hover{color:var(--fg)}
+nav button.act{color:var(--fg);border-bottom-color:var(--accent);font-weight:650}
+main{max-width:1080px;margin:0 auto;padding:18px}
+.page{display:none}.page.act{display:block}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 6px;font-size:12.5px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.06em}
+.big{font-size:34px;font-weight:750;line-height:1.1;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:13.5px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}
+.tag{display:inline-block;background:var(--chip);border-radius:8px;padding:2px 9px;font-size:12px;margin:3px 5px 0 0;font-weight:500}
+.tag.ok{color:var(--ok)}.tag.warn{color:var(--warn)}.tag.bad{color:var(--bad)}.tag.test{color:var(--test)}
+.hero{background:linear-gradient(135deg,var(--accent-soft),var(--card) 70%);border-radius:20px;padding:18px 20px;margin-bottom:14px;border:1px solid var(--line);box-shadow:var(--shadow)}
+.hero .headline{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.hero .sub{margin-top:2px}
+.banner{border-radius:14px;padding:11px 15px;margin-bottom:12px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+.banner.test{background:color-mix(in srgb,var(--test) 13%,transparent);color:var(--test)}
+.banner.off{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
+.banner.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.flow{padding:6px 8px 0}
+.flow svg{width:100%;height:auto;display:block;max-height:330px}
+.flow text{font-family:inherit}
+.node-label{fill:var(--muted);font-size:13px;font-weight:600}
+.node-val{fill:var(--fg);font-size:17px;font-weight:750}
+.node-sub{fill:var(--muted);font-size:11.5px}
+.line{stroke:var(--line);stroke-width:4;stroke-linecap:round;fill:none}
+.line.active{stroke-width:4;stroke-dasharray:3 11;animation:dash 1s linear infinite}
+.line.rev{animation-direction:reverse}
+@keyframes dash{to{stroke-dashoffset:-28}}
+@media (prefers-reduced-motion:reduce){.line.active{animation:none}}
+.bat{display:flex;align-items:center;gap:14px;margin:4px 0 10px}
+.bat svg{width:62px;height:34px;flex:none}
+.welcome{text-align:center;padding:30px 20px}
+.welcome h2{margin:6px 0 4px;font-size:24px}
+.steps{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:20px 0;text-align:left}
+.step{background:var(--chip);border-radius:14px;padding:13px 15px}
+.step b{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;margin-bottom:6px;font-size:14px}
+.subnav{display:flex;gap:6px;padding:6px 0 8px;overflow-x:auto}
+.subnav:empty{display:none}
+.subnav button{border:1px solid var(--line);background:var(--card);color:var(--muted);padding:5px 14px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+.subnav button.act{background:var(--accent-soft);color:var(--fg);border-color:var(--accent);font-weight:650}
+details.fsec{border:1px solid var(--line);border-radius:18px;background:var(--card);margin:0 0 14px;box-shadow:var(--shadow)}
+details.fsec>summary{cursor:pointer;list-style:none;padding:13px 18px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+details.fsec>summary::-webkit-details-marker{display:none}
+details.fsec>summary::before{content:"▸";color:var(--accent);transition:transform .15s}
+details.fsec[open]>summary::before{transform:rotate(90deg)}
+details.fsec>summary .sub{font-weight:400;font-size:12.5px;margin-left:auto}
+details.fsec>.fbody{padding:0 18px 8px;border-top:1px solid var(--line)}
+.drvdesc{background:var(--accent-soft);border-radius:12px;padding:9px 12px;font-size:13px;margin:8px 0 2px}
+.advnote{text-align:center;color:var(--muted);font-size:13px;margin:4px 0 16px}
+fieldset{border:1px solid var(--line);border-radius:18px;background:var(--card);margin:0 0 14px;padding:10px 18px 8px;box-shadow:var(--shadow)}
+legend{padding:0 10px;font-weight:700;font-size:15px}
+.f{display:grid;grid-template-columns:minmax(180px,1.1fr) minmax(160px,1fr);gap:3px 16px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}
+.f:last-child{border:0}
+.f label{font-size:14px;font-weight:500}
+.f .hint{grid-column:1/-1;color:var(--muted);font-size:12.5px;margin-top:-1px}
+@media(max-width:620px){.f{grid-template-columns:1fr}.toggles{margin-left:0}}
+input[type=text],input[type=number],select{width:100%;padding:8px 11px;border-radius:11px;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent)}
+.savebar{position:sticky;bottom:12px;background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:10px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;margin-top:6px;box-shadow:var(--shadow)}
+button.primary{background:var(--accent);color:#2b1c00;border:0;border-radius:12px;padding:10px 22px;font:inherit;font-weight:700;cursor:pointer;transition:transform .1s,background .15s}
+button.primary:hover{background:var(--accent-d);color:#fff}
+button.primary:active{transform:scale(.98)}
+button.primary:disabled{opacity:.5}
+.log{font:13px/1.55 ui-monospace,"SF Mono",Consolas,monospace}
+.log div{padding:5px 0;border-bottom:1px solid var(--line);display:flex;gap:12px}
+.log .t{color:var(--muted);flex:none}
+.log .error{color:var(--bad)}.log .test{color:var(--test)}.log .act{color:var(--ok)}
+.msg{font-size:13px;color:var(--muted)}
+details.slot{margin-bottom:14px}
+details.slot>summary{cursor:pointer;font-weight:700;padding:10px 16px;background:var(--card);border:1px solid var(--line);border-radius:14px;list-style:none;box-shadow:var(--shadow)}
+details.slot>summary::before{content:"▸";display:inline-block;margin-right:8px;transition:transform .15s;color:var(--accent)}
+details.slot[open]>summary::before{transform:rotate(90deg)}
+details.slot[open]>summary{margin-bottom:12px}
+.chart{width:100%;height:auto;display:block}
+.axis{fill:var(--muted);font-size:11px;font-family:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-bottom:6px;font-size:12.5px}
+.legend .lg{display:inline-flex;align-items:center;gap:6px}
+.legend .lg i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.legend .sub{margin-left:auto}
+#toast{position:fixed;left:50%;bottom:76px;transform:translate(-50%,20px);background:var(--fg);color:var(--bg);padding:10px 20px;border-radius:999px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:20}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#f97316"/></linearGradient></defs>
+        <g stroke="url(#lg)" stroke-width="4" stroke-linecap="round"><path d="M32 4v8M32 52v8M4 32h8M52 32h8M12 12l6 6M46 46l6 6M12 52l6-6M46 18l6-6"/></g>
+        <circle cx="32" cy="32" r="15" fill="url(#lg)"/><circle cx="32" cy="32" r="7" fill="#fff7e0"/></svg>
+      <div><b>SOLASI</b><small>Dein Energie-Regler</small></div>
+    </div>
+    <span class="pill" id="connpill"><i></i><span id="conntext">Verbinde …</span></span>
+    <span class="pill" id="modepill"><i></i><span id="modetext">–</span></span>
+    <button class="kill" id="killbtn" type="button" title="Stoppt SOLASI und gibt die Speicher an ihren eigenen Modus zurück">⛔ Not-Aus</button>
+    <div class="toggles">
+      <label class="tg" title="Zeigt zusätzliche Einstellungen für Fortgeschrittene"><input type="checkbox" id="q_expert"><i></i>Experte</label>
+      <label class="tg"><input type="checkbox" id="q_enabled"><i></i>Regelung</label>
+      <label class="tg test"><input type="checkbox" id="q_dry"><i></i>Testmodus</label>
+      <label class="tg"><input type="checkbox" id="q_sp"><i></i>Überschuss</label>
+      <label class="tg test"><input type="checkbox" id="q_spdry"><i></i>Überschuss-Test</label>
+    </div>
+  </div>
+  <nav id="nav">
+    <button data-g="status" class="act">☀️ Übersicht</button>
+    <button data-g="settings">⚙️ Einstellungen</button>
+    <button data-g="eval">📊 Auswertung</button>
+    <button data-g="system">🩺 System</button>
+  </nav>
+  <div id="subnav" class="subnav"></div>
+</header>
+<main>
+  <section class="page act" id="p-status"></section>
+  <section class="page" id="p-units"></section>
+  <section class="page" id="p-control"></section>
+  <section class="page" id="p-surplus"></section>
+  <section class="page" id="p-extras"></section>
+  <section class="page" id="p-stats"></section>
+  <section class="page" id="p-replay"></section>
+  <section class="page" id="p-selftest"></section>
+  <section class="page" id="p-card"></section>
+  <section class="page" id="p-log"><div class="card"><div class="log" id="log"></div></div></section>
+  <div class="savebar" id="savebar"><span class="msg" id="savemsg">Änderungen gelten erst nach „Speichern“.</span>
+    <button class="primary" id="save">Speichern</button></div>
+</main>
+<div id="toast"></div>
+<datalist id="dl-sensor"></datalist><datalist id="dl-number"></datalist><datalist id="dl-select"></datalist>
+<datalist id="dl-script"></datalist><datalist id="dl-fb0"></datalist><datalist id="dl-fb1"></datalist><datalist id="dl-sens0"></datalist><datalist id="dl-sens1"></datalist><datalist id="dl-notify"></datalist><datalist id="dl-switchy"></datalist><datalist id="dl-all"></datalist>
+
+<script>
+let cfg = null, dirty = false, lastStatus = null;
+const $ = s => document.querySelector(s);
+const SW = ["switch","input_boolean","light","fan","climate","script","automation"];
+let allSensors=[];
+
+// ---------- Hilfen ----------
+function get(path){return path.split(".").reduce((o,k)=>o==null?o:o[k],cfg)}
+function set(path,v){const ks=path.split(".");let o=cfg;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks.at(-1)]=v;markDirty()}
+function markDirty(){dirty=true;$("#savemsg").textContent="Du hast ungespeicherte Änderungen";}
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),2200)}
+
+let expert=false;try{expert=localStorage.getItem("solasi_expert")==="1"}catch(e){}
+let advHidden=0;
+function field(path,label,kind,o={}){
+  if(o.adv&&!expert){advHidden++;return "";}
+  const id="f_"+path.replace(/\./g,"_");
+  let inner="";
+  const v=get(path);
+  if(kind==="bool") inner=`<input type="checkbox" id="${id}" ${v?"checked":""}>`;
+  else if(kind==="select") inner=`<select id="${id}">${o.options.map(([val,t])=>`<option value="${val}" ${v===val?"selected":""}>${esc(t)}</option>`).join("")}</select>`;
+  else if(kind==="num") inner=`<input type="number" id="${id}" value="${esc(v)}" ${o.min!=null?`min="${o.min}"`:""} ${o.max!=null?`max="${o.max}"`:""} step="${o.step??1}">`;
+  else inner=`<input type="text" id="${id}" value="${esc(v)}" ${o.list?`list="dl-${o.list}"`:""} ${o.ph?`placeholder="${esc(o.ph)}"`:""} autocomplete="off">`;
+  setTimeout(()=>{const e=document.getElementById(id);if(!e)return;
+    e.addEventListener(kind==="bool"||kind==="select"?"change":"input",()=>{
+      let val=kind==="bool"?e.checked:kind==="num"?(e.value===""?0:parseFloat(e.value)):e.value.trim();
+      set(path,val);if(o.after)o.after(val);});},0);
+  return `<div class="f"><label for="${id}">${esc(label)}</label><div>${inner}</div>${o.hint?`<div class="hint">${esc(o.hint)}</div>`:""}</div>`;
+}
+const fs=(title,body,o={})=>body.trim()?`<details class="fsec" ${o.closed?"":"open"}><summary>${esc(title)}${o.sub?` <span class="sub">${esc(o.sub)}</span>`:""}</summary><div class="fbody">${body}</div></details>`:"";
+function advNote(){return advHidden?`<div class="advnote">${advHidden} weitere Einstellungen gibt es im Experten-Modus (Schalter oben).</div>`:""}
+
+// ---------- Speichertypen (Treiber) ----------
+const DRV={
+  anker:{label:"Anker SOLIX (Betrag + Richtung)",desc:"Eine Zahl für die Leistung und eine Auswahl für die Richtung. Für die offizielle Anker-Integration (Solarbank 4 E5000 Pro, Max AC).",charge:true,curtail:true},
+  signed:{label:"Eine Zahl mit Vorzeichen",desc:"Ein Wert steuert alles: positiv = Entladen, negativ = Laden (Vorzeichen umstellbar). Passt z. B. zu Marstek im Passiv-Modus.",charge:true,curtail:false},
+  modal:{label:"Modus + Leistungen",desc:"Eine Auswahl (Stop / Laden / Entladen) plus je eine Zahl für Entlade- und Ladeleistung. Passt z. B. zu Marstek über Modbus.",charge:true,curtail:true},
+  limit:{label:"Ausgangslimit (nur Entladen)",desc:"Eine Zahl begrenzt die Abgabe ins Haus, geladen wird nur über PV. Passt z. B. zu Wechselrichter-Limits (OpenDTU) und Speichern mit Ausgangslimit.",charge:false,curtail:false},
+  script:{label:"Eigenes Skript (für alles andere)",desc:"SOLASI ruft ein Home-Assistant-Skript auf und übergibt power_w (+ Entladen, − Laden), mode (discharge, charge oder idle) und unit. Damit lässt sich jedes System anbinden.",charge:true,curtail:false}
+};
+const isConf=u=>{const d=u.driver||"anker";return d==="anker"?!!(u.num&&u.dir):d==="modal"?!!(u.dir&&u.num):d==="script"?!!u.script:!!u.num};
+
+function unitFields(i,u){
+  const p=`units.${i}.`,d=u.driver||"anker",D=DRV[d]||DRV.anker;
+  let h=field(p+"name","Name","text");
+  h+=field(p+"driver","Speichertyp","select",{options:Object.entries(DRV).map(([k,v])=>[k,v.label]),
+    after:dd=>{set(p+"curtail",!!DRV[dd].curtail);set(p+"can_charge",DRV[dd].charge);renderUnits();}});
+  h+=`<div class="drvdesc">${esc(D.desc)}</div>`;
+  if(d==="anker"){
+    h+=field(p+"num","Leistung (number)","text",{list:"number",hint:"Die Entität „Leistungssteuerung“ des Speichers."})+
+       field(p+"dir","Leistungsfluss / Richtung (select)","text",{list:"select"})+
+       field(p+"mode","Betriebsmodus (select)","text",{list:"select",hint:"SOLASI setzt ihn vor dem Steuern auf „third_party_control“."})+
+       field(p+"dir_dis","Richtung „Entladen“ (leer = global)","text",{adv:true})+
+       field(p+"dir_chg","Richtung „Laden“ (leer = global)","text",{adv:true})+
+       field(p+"mode_option","Modus für externe Steuerung (leer = global)","text",{adv:true});
+  }else if(d==="signed"){
+    h+=field(p+"num","Leistung (number, mit Vorzeichen)","text",{list:"number"})+
+       field(p+"sign","Vorzeichen der Zahl","select",{options:[["discharge_positive","positiv = Entladen, negativ = Laden"],["charge_positive","positiv = Laden, negativ = Entladen"]]})+
+       field(p+"mode","Arbeitsmodus (select, optional)","text",{list:"select",hint:"Wird vor dem Steuern auf die Option unten gesetzt (z. B. Passiv)."})+
+       field(p+"mode_option","Option für den Arbeitsmodus","text");
+  }else if(d==="modal"){
+    h+=field(p+"dir","Modus Stop / Laden / Entladen (select)","text",{list:"select"})+
+       field(p+"num","Entladeleistung (number)","text",{list:"number"})+
+       field(p+"num_chg","Ladeleistung (number, optional)","text",{list:"number",hint:"Ohne diese Zahl wird der Speicher nicht aus dem Netz geladen."})+
+       field(p+"enable","Fernsteuerung (Schalter, optional)","text",{list:"switchy",hint:"Wird vor dem Steuern eingeschaltet (z. B. RS485-Steuerung)."})+
+       field(p+"mode","Arbeitsmodus (select, optional)","text",{list:"select"})+
+       field(p+"mode_option","Option für den Arbeitsmodus","text")+
+       field(p+"dir_dis","Option „Entladen“","text",{adv:true})+
+       field(p+"dir_chg","Option „Laden“","text",{adv:true})+
+       field(p+"dir_stop","Option „Stop“","text",{adv:true});
+  }else if(d==="limit"){
+    h+=field(p+"num","Ausgangslimit (number)","text",{list:"number"});
+  }else{
+    h+=field(p+"script","Skript","text",{list:"script",hint:"Das Skript erhält die Felder power_w, mode und unit."});
+  }
+  if(d==="anker"||d==="signed"||d==="modal"){
+    h+=field(p+"fallback_mode","Beim Stoppen: Modus setzen auf","text",{list:"fb"+i,
+      hint:"Der Speicher bekommt diesen Modus, wenn du SOLASI stoppst oder etwas ausfällt, z. B. Eigenverbrauch. Die Vorschläge stammen aus dem Betriebsmodus oben."});
+  }else if(d==="limit"){
+    h+=field(p+"fallback_value","Beim Stoppen: Ausgangslimit setzen auf (W)","text",{hint:"Leer = Limit unverändert lassen."});
+  }
+  const L="sens"+i;
+  h+=field(p+"soc","Ladestand SOC (%)","text",{list:L});
+  if(d==="anker"){
+    h+=field(p+"real_dis","Entladeleistung (Sensor, optional)","text",{list:L,hint:"Leistung, mit der der Speicher gerade abgibt (laut „Messart“ unten)."})+
+       field(p+"real_chg","Ladeleistung (Sensor, optional)","text",{list:L,hint:"Leistung, mit der der Speicher gerade lädt (laut „Messart“ unten)."});
+  }else{
+    h+=field(p+"power","Leistung (Sensor mit Vorzeichen, optional)","text",{list:L,hint:"Für Failsafe, Hausverbrauch, Statistik und Lernen."})+
+       field(p+"power_sign","Vorzeichen des Sensors","select",{options:[["discharge_positive","positiv = Entladen"],["charge_positive","positiv = Laden"]]});
+  }
+  h+=field(p+"pv","PV-Leistung der Module","text",{list:L,hint:"Die Solarleistung dieses Speichers. Wird gebraucht, damit die PV auch bei leerem Speicher direkt ins Haus gehen kann, und für den Hausverbrauch bei Messart „Batterie“."})+
+     field(p+"power_basis","Messart der Leistungssensoren","select",{options:[["","Automatisch"],["ac","Leistung am Hausanschluss (AC)"],["battery","Leistung an der Batterie (DC)"]],
+       hint:"Anker mit PV-Sensor misst an der Batterie (Laden und Entladen der Batterie, Solar kommt dazu). Prüfe unter System → Selbsttest → Energiebilanz, ob die Werte zur Hersteller-App passen."})+
+     `<div class="f"><label>Sensoren dieses Geräts</label><div id="devsens${i}" class="sub">${(u.num||u.dir||u.script)?"lädt …":"Erst Leistung bzw. Modus wählen."}</div></div>`+
+     field(p+"max_dis","Max. Entladeleistung (W)","num",{min:0,step:10})+
+     (D.charge?field(p+"max_chg","Max. Ladeleistung (W)","num",{min:0,step:10}):"")+
+     (D.charge?field(p+"can_charge","Aus dem Netz laden erlauben","bool",{adv:true}):"")+
+     (D.curtail?field(p+"curtail","Abregelung bei vollem Speicher erzwingen","bool",{adv:true,hint:"Stellt den vollen Speicher auf „Entladen“ mit 0 W bzw. Hausbedarf."}):"")+
+     field(p+"capacity_kwh","Nutzbare Kapazität (kWh)","num",{min:0.5,step:0.1,adv:true,hint:"Nur für den Replay."});
+  return h;
+}
+function renderUnits(){
+  advHidden=0;
+  let h=fs("⚡ Stromzähler",
+    field("grid.entity","Netzleistung (W)","text",{list:"sensor",hint:"Positiv = Bezug, negativ = Einspeisung. Am besten der rohe oder kurz geglättete Wert (z. B. Bitshake)."})+
+    field("grid.invert","Vorzeichen umkehren","bool",{hint:"Nur nötig, wenn dein Zähler Einspeisung positiv meldet."})+
+    field("grid.max_age","Ausfall erkennen nach (Sekunden)","num",{min:0,adv:true,hint:"Meldet der Zähler so lange nichts, gehen die Speicher auf 0 W. 0 = nur bei „nicht verfügbar“."}));
+  cfg.units.forEach((u,i)=>{
+    const conf=isConf(u);
+    h+=fs(`🔋 ${esc(u.name||("Speicher "+(i+1)))}${i?" (optional)":""}`,unitFields(i,u),{closed:!conf&&i>0,sub:conf?(DRV[u.driver||"anker"]||DRV.anker).label:"nicht eingerichtet"});
+  });
+  $("#p-units").innerHTML=h+advNote();
+  cfg.units.forEach((u,i)=>{
+    if(u.mode)fetch("api/entity_options?entity="+encodeURIComponent(u.mode)).then(r=>r.json()).then(j=>{
+      const dl=document.getElementById("dl-fb"+i);if(dl)dl.innerHTML=(j.options||[]).map(o=>`<option value="${esc(o)}"></option>`).join("");}).catch(()=>{});
+    const anchor=u.num||u.dir||u.script;
+    if(anchor)fetch("api/device_sensors?entity="+encodeURIComponent(anchor)).then(r=>r.json()).then(list=>{
+      const dl=document.getElementById("dl-sens"+i);
+      const fmt=x=>`${x.name||x.id} · ${x.state}${x.unit?" "+x.unit:""}`;
+      const ids=new Set(list.map(x=>x.id));
+      if(dl)dl.innerHTML=list.map(x=>`<option value="${esc(x.id)}" label="${esc(fmt(x))}"></option>`).join("")+
+        (allSensors||[]).filter(e=>!ids.has(e.id)).map(e=>`<option value="${esc(e.id)}" label="${esc(e.name)}"></option>`).join("");
+      const box=document.getElementById("devsens"+i);
+      if(box)box.innerHTML=list.length?`<details><summary>${list.length} Sensoren gefunden, mit aktuellem Wert</summary>
+        <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px">${list.map(x=>`<tr style="border-bottom:1px solid var(--line)"><td style="padding:3px 6px 3px 0">${esc(x.name||x.id)}<div class="sub" style="font-size:11px">${esc(x.id)}</div></td><td style="text-align:right;white-space:nowrap"><b>${esc(x.state)}</b> ${esc(x.unit)}</td></tr>`).join("")}</table>
+        <div class="hint" style="margin-top:6px">Vergleiche die Werte mit der Hersteller-App, um den richtigen Sensor für Solar, Laden und Entladen zu finden.</div></details>`:"Keine passenden Sensoren gefunden. Du kannst trotzdem jeden Sensor von Hand wählen.";
+    }).catch(()=>{});});
+}
+function renderControl(){
+  advHidden=0;
+  const f="features.",c="control.",s="soc.";
+  $("#p-control").innerHTML=
+   fs("✨ Funktionen",
+    field(f+"eco","Eco-Modus","bool",{hint:"Drosselt die Entladung bei niedrigem Ladestand, damit der Akku bis zum Morgen reicht."})+
+    field(f+"thresholds","Schwellen verwenden","bool",{hint:"Aus = es wird schon bei kleinsten Abweichungen geregelt."})+
+    field(f+"ac_charge","Laden aus Fremd-Überschuss erlauben","bool",{hint:"Z. B. von einer anderen PV-Anlage am Zähler."})+
+    field(f+"strict_zero","Strenge Nulleinspeisung bei vollem Speicher","bool",{hint:"Voller Speicher wird auf „Entladen“ gestellt, damit er die PV drosselt (nur bei Speichertypen, die das können)."})+
+    field(f+"pv_passthrough","PV direkt ins Haus geben, auch bei leerem Speicher","bool",{hint:"Liegt der Ladestand unter dem Minimum, darf der Speicher trotzdem so viel abgeben, wie seine Module gerade liefern. Die Batterie wird dabei nicht entladen. Braucht den PV-Sensor je Speicher."})+
+    field(f+"failsafe","Failsafe","bool",{hint:"Bei Zähler-Ausfall gehen die Speicher auf 0 W. Außerdem wird 0 W erneut gesendet, wenn die echte Leistung noch fließt."}))+
+   fs("🎚️ Regelung",
+    field(c+"split","Aufteilung auf beide Speicher","select",{options:[["equal","Gleichmäßig"],["soc","Nach Ladestand"],["sequential","Nacheinander"]]})+
+    field(c+"total_max_dis","Gesamtlimit Entladung (W)","num",{min:0,step:10,hint:"Vorsichtshalber 800 W (Balkonkraftwerk-Grenze). Für größere Anlagen erhöhen."})+
+    field(c+"total_max_chg","Gesamtlimit Laden (W)","num",{min:0,step:10})+
+    field(c+"min_gap","Mindestabstand zwischen Regelschritten (s)","num",{min:1,adv:true,hint:"Die Speicher melden oft nur alle ca. 5 s. Unter 4 s schwingt die Regelung meist."})+
+    field(c+"heartbeat","Zusätzlicher Takt (s)","num",{min:1,adv:true,hint:"Regelt auch dann, wenn der Zähler lange nichts meldet."})+
+    field(c+"threshold_on","Einschalt-Schwelle (W)","num",{min:0,step:10,adv:true})+
+    field(c+"threshold_off","Ausschalt-Schwelle (W)","num",{min:0,step:10,adv:true})+
+    field(c+"offset_discharge","Beim Entladen übrig lassen (W Netzbezug)","num",{min:0,step:5,adv:true})+
+    field(c+"offset_charge","Beim Laden übrig lassen (W Einspeisung)","num",{min:0,step:5,adv:true})+
+    field(c+"step","Rundung / kleinste Änderung (W)","num",{min:1,adv:true}))+
+   fs("🔋 Akku-Grenzen & Eco",
+    field(s+"min","Nicht entladen unter (%)","num",{min:0,max:100})+
+    field(s+"max","Nicht laden über (%)","num",{min:0,max:100})+
+    field(s+"hyst","Hysterese (%-Punkte)","num",{min:0,max:30,adv:true})+
+    field(s+"eco_threshold","Eco-Modus ab mittlerem Ladestand (%)","num",{min:0,max:100})+
+    field(s+"base_load","Eco-Entladeleistung gesamt (W)","num",{min:0,step:10,hint:"Etwa die nächtliche Grundlast deines Hauses. Gilt, solange das Lernen aus ist oder noch kein Wert vorliegt."})+
+    field(s+"learn_base_load","Eco-Leistung aus gelernter Grundlast","bool",{hint:"SOLASI misst die Grundlast nachts und passt die Eco-Leistung automatisch an. Braucht die echten Leistungssensoren oder einen Hausverbrauchs-Sensor."})+
+    field(s+"base_load_margin","Zuschlag auf die gelernte Grundlast (%)","num",{min:0,max:100,adv:true})+
+    field(s+"base_load_min","Eco-Leistung mindestens (W)","num",{min:0,step:10,adv:true})+
+    field(s+"base_load_max","Eco-Leistung höchstens (W)","num",{min:0,step:10,adv:true})+
+    `<div class="f"><label>Gelernte Grundlast</label><div id="learnbox" class="sub">lädt …</div></div>`)+advNote();
+  setTimeout(()=>{
+    fetch("api/learn").then(r=>r.json()).then(l=>{const e=document.getElementById("learnbox");if(!e)return;
+      e.textContent=l.value==null?"Noch keine Daten. Nach der ersten Nacht erscheint hier ein Wert.":`${l.value} W (Median der letzten ${l.nights.length} Nächte${l.nights.length?"":", vorläufig"}) · aktuell verwendet: ${l.used} W`}).catch(()=>{});
+  },0);
+}
+function renderSurplus(){
+  advHidden=0;
+  const sp="surplus.";
+  let h=fs("☀️ Woher kommt der Überschuss?",
+    field(sp+"source","Berechnen aus","select",{options:[["pv","PV-Leistung minus Hausverbrauch"],["grid","Einspeisung ins Netz"],["custom","Eigener Sensor"]],
+      hint:"Für Wallbox und Heizstab „PV minus Hausverbrauch“ wählen. Fehlen Sensoren, wird automatisch die Einspeisung genutzt."})+
+    field(sp+"pv_x","Weitere PV-Anlage (optional)","text",{list:"sensor"})+
+    field(sp+"house","Hausverbrauch-Sensor (optional)","text",{list:"sensor",hint:"Sonst berechnet SOLASI ihn aus Netz + Abgabe der Speicher."})+
+    field(sp+"custom","Eigener Überschuss-Sensor (W)","text",{list:"sensor"}));
+  cfg.surplus.slots.forEach((s,i)=>{
+    const p=`${sp}slots.${i}.`,used=!!(s.ent||s.num);
+    h+=fs(`🔌 ${esc(s.name||("Verbraucher "+(i+1)))}${i==0?" · höchste Priorität":i==2?" · niedrigste Priorität":""}`,
+      field(p+"name","Name","text")+
+      field(p+"ent","Schalter / Freigabe (Entität)","text",{list:"switchy",hint:"Leer lassen, wenn der Verbraucher nur über die stufenlose Vorgabe laufen soll."})+
+      field(p+"on_w","Einschalten ab Überschuss (W)","num",{min:0})+
+      field(p+"off_w","Ausschalten ab Defizit / Netzbezug (W)","num",{min:0,hint:"Niedrigere Prioritäten bekommen kleinere Werte, damit sie zuerst ausgehen."})+
+      field(p+"soc","Nur bei mittlerem Ladestand ab (%)","num",{min:0,max:100,hint:"Die Speicher haben Vorrang, bis dieser Wert erreicht ist. 0 = ignorieren."})+
+      field(p+"on_delay","Einschalten erst nach (Minuten)","num",{min:0,step:0.5,adv:true})+
+      field(p+"off_delay","Ausschalten erst nach (Minuten)","num",{min:0,step:0.5,adv:true})+
+      field(p+"min_on","Mindestlaufzeit (Minuten)","num",{min:0,adv:true})+
+      field(p+"min_off","Mindestpause (Minuten)","num",{min:0,adv:true})+
+      field(p+"cond","Zusatzbedingung (Entität muss „on“ sein)","text",{list:"all",adv:true})+
+      field(p+"num","Stufenlose Vorgabe (number, Wallbox/Heizstab)","text",{list:"number"})+
+      field(p+"unit_w","Watt pro Einheit der Vorgabe","num",{min:0.01,step:0.01,hint:"Wallbox einphasig 230 W/A, dreiphasig 690 W/A. Heizstab in Watt: 1. In Prozent bei 3000 W: 30."})+
+      field(p+"pmin","Mindestleistung (W)","num",{min:0})+
+      field(p+"pmax","Maximal- bzw. Nennleistung (W)","num",{min:0})+
+      field(p+"pwr","Tatsächliche Leistung (Sensor, optional)","text",{list:"sensor",adv:true})+
+      field(p+"reserve","Reserve (W)","num",{min:0,adv:true})+
+      field(p+"interval","Mindestabstand zwischen Anpassungen (s)","num",{min:5,adv:true})+
+      field(p+"block","Nicht aus dem Akku versorgen","bool",{hint:"Die Speicher speisen diesen Verbraucher dann nicht, er läuft aus PV oder Netz."}),
+      {closed:!used,sub:used?"eingerichtet":"nicht eingerichtet"});});
+  $("#p-surplus").innerHTML=h+advNote();
+}
+function renderExtras(){
+  advHidden=0;
+  $("#p-extras").innerHTML=
+   fs("🛟 Sicherheit & Kill-Switch",
+    `<div class="drvdesc">Mit dem roten <b>Not-Aus</b> oben stoppst du SOLASI jederzeit. Die Speicher gehen dann auf 0 W und in den Modus, den du je Speicher unter „Beim Stoppen“ gewählt hast (z. B. Eigenverbrauch).</div>`+
+    field("safety.kill_entity","Not-Aus-Schalter (optional)","text",{list:"all",hint:"Ein Schalter oder input_boolean in Home Assistant. Ist er „an“, stoppt SOLASI. Wird er „aus“, läuft es weiter."})+
+    field("safety.release_on_stop","Speicher beim Stoppen und Beenden freigeben","bool",{hint:"Sonst bleiben sie im externen Modus mit dem letzten Sollwert."})+
+    field("safety.auto_meter_min","Automatisch stoppen, wenn der Zähler so lange fehlt (Minuten)","num",{min:0,step:0.5,hint:"0 = nie. Bis dahin stehen die Speicher auf 0 W."})+
+    field("safety.release_on_disable","Freigeben, wenn die Live-Steuerung ausgeschaltet wird","bool",{adv:true})+
+    field("safety.auto_errors","Automatisch stoppen, wenn Befehle wiederholt fehlschlagen","bool",{adv:true})+
+    field("safety.resume_auto","Nach automatischem Stopp selbst fortsetzen","bool",{adv:true,hint:"Erst nach 5 Minuten, in denen wieder alles in Ordnung ist. Aus = du setzt von Hand fort."})+
+    field("safety.watchdog","Wächter für den Ausfall von SOLASI","bool",{hint:"SOLASI legt in Home Assistant eine Automation an, die die Speicher zurückstellt, wenn SOLASI selbst nicht mehr läuft."})+
+    field("safety.watchdog_min","Wächter löst aus nach (Minuten ohne Lebenszeichen)","num",{min:1,adv:true})+
+    `<div class="f"><label>Zustand des Wächters</label><div id="wdbox" class="sub">lädt …</div></div>`)+
+   fs("🔔 Benachrichtigungen",
+    field("notify.service","Ziel","text",{list:"notify",hint:"z. B. notify.mobile_app_dein_handy (Push aufs Handy) oder persistent_notification (Glocke in Home Assistant). Leer = aus."})+
+    field("notify.events.meter","Zähler ohne Meldung","bool")+
+    field("notify.events.offline","Speicher nicht erreichbar","bool")+
+    field("notify.events.empty","Speicher leer","bool")+
+    field("notify.events.curtail","Einspeisung trotz vollem Speicher","bool")+
+    field("notify.events.errors","Steuerbefehle schlagen fehl","bool")+
+    field("notify.events.stopped","SOLASI wurde gestoppt (Not-Aus oder automatisch)","bool")+
+    field("notify.delay_min","Erst melden nach (Minuten)","num",{min:0,step:0.5,adv:true})+
+    field("notify.cooldown_min","Gleiche Meldung frühestens nach (Minuten)","num",{min:1,adv:true})+
+    field("notify.recovery","Auch Entwarnung senden","bool",{adv:true})+
+    `<div class="f"><label>Testen</label><div><button class="primary" id="notifytest" type="button">Testnachricht senden</button></div></div>`)+
+   fs("💶 Preise für die Statistik",
+    field("prices.import_ct","Strompreis Bezug (ct/kWh)","num",{min:0,step:0.1})+
+    field("prices.feedin_ct","Einspeisevergütung (ct/kWh)","num",{min:0,step:0.1}))+
+   fs("💾 Sicherung der Einstellungen",
+    `<div class="f"><label>Exportieren</label><div><button class="primary" id="cfgexport" type="button">Einstellungen herunterladen</button></div>
+      <div class="hint">Hilft als Sicherung und beim Übertragen auf eine neue Installation.</div></div>
+     <div class="f"><label>Importieren</label><div><input type="file" id="cfgimport" accept="application/json,.json"></div>
+      <div class="hint">Ersetzt die aktuellen Einstellungen. Fehlende Werte werden mit Standardwerten ergänzt.</div></div>`,{closed:true})+
+   fs("🏷️ Namen der Optionen (Standard für Anker)",
+    field("names.mode_option","Option für externe Steuerung","text",{adv:true})+
+    field("names.dis","Richtung „Entladen“","text",{adv:true})+
+    field("names.chg","Richtung „Laden“","text",{adv:true}),{closed:true})+advNote();
+  setTimeout(()=>{
+    const b=document.getElementById("notifytest");
+    if(b)b.addEventListener("click",async()=>{
+      if(dirty)await save();
+      try{const r=await fetch("api/notify/test",{method:"POST"});const j=await r.json();toast(j.ok?"Testnachricht gesendet ✓":(j.error||"Senden fehlgeschlagen"))}catch(e){toast("Senden fehlgeschlagen")}});
+    const ex=document.getElementById("cfgexport");
+    if(ex)ex.addEventListener("click",()=>{
+      const blob=new Blob([JSON.stringify(cfg,null,2)],{type:"application/json"});
+      const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="solasi-einstellungen.json";document.body.appendChild(a);a.click();a.remove();toast("Einstellungen heruntergeladen");});
+    const im=document.getElementById("cfgimport");
+    if(im)im.addEventListener("change",async e=>{
+      const f=e.target.files[0];if(!f)return;
+      try{const data=JSON.parse(await f.text());
+        if(typeof data!=="object"||!data||!("units" in data))throw new Error("Das sieht nicht nach einer SOLASI-Sicherung aus");
+        if(!confirm("Aktuelle Einstellungen durch die Datei ersetzen?"))return;
+        const r=await fetch("api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+        const j=await r.json();if(!j.ok)throw new Error(j.error);
+        cfg=await (await fetch("api/config")).json();renderForms();toast("Einstellungen importiert ✓");
+      }catch(err){toast("Import fehlgeschlagen: "+err.message)}});
+    loadWatchdog();
+  },0);
+}
+async function loadWatchdog(){
+  const box=document.getElementById("wdbox");if(!box)return;
+  let w;try{w=await (await fetch("api/watchdog")).json();}catch(e){box.textContent="nicht abrufbar";return;}
+  const tag={aktiv:"ok",manuell:"warn","nicht nötig":"",aus:"",unbekannt:""}[w.state]??"";
+  box.innerHTML=`<span class="tag ${tag}">${esc(w.state)}</span> ${esc(w.detail||"")}
+    <div style="margin-top:8px"><button class="primary" id="wdsync" type="button" style="padding:4px 14px">Jetzt abgleichen</button></div>
+    ${w.state==="manuell"&&w.json?`<div class="hint" style="margin-top:8px">So fügst du ihn von Hand ein: Einstellungen → Automatisierungen → Neue Automatisierung → ⋮ → „In YAML bearbeiten“ → Text ersetzen und speichern.</div>
+      <textarea id="wdjson" readonly style="width:100%;height:160px;margin-top:6px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);padding:8px;font:12px ui-monospace,Consolas,monospace">${esc(w.json)}</textarea>
+      <button class="primary" id="wdcopy" type="button" style="margin-top:6px;padding:4px 14px">Text kopieren</button>`:""}`;
+  document.getElementById("wdsync").addEventListener("click",async()=>{
+    if(dirty)await save();
+    box.textContent="gleiche ab …";
+    try{await fetch("api/watchdog/sync",{method:"POST"});}catch(e){}
+    loadWatchdog();});
+  const c=document.getElementById("wdcopy");
+  if(c)c.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(w.json);toast("Kopiert ✓")}catch(e){document.getElementById("wdjson").select();toast("Bitte mit Strg+C kopieren")}});
+}
+function renderForms(){renderUnits();renderControl();renderSurplus();renderExtras();syncQuick()}
+function syncQuick(){
+  $("#q_enabled").checked=!!cfg.enabled;$("#q_dry").checked=!!cfg.dry_run;
+  $("#q_sp").checked=!!cfg.surplus.enabled;$("#q_spdry").checked=!!cfg.surplus.dry_run;
+}
+
+// ---------- Laden / Speichern ----------
+async function save(){
+  const b=$("#save");b.disabled=true;
+  try{
+    const r=await fetch("api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    const j=await r.json();
+    if(!j.ok)throw new Error(j.error);
+    dirty=false;$("#savemsg").textContent="Gespeichert um "+new Date().toLocaleTimeString("de-DE");toast("Gespeichert ✓");
+  }catch(e){$("#savemsg").textContent="Fehler: "+e.message;toast("Fehler beim Speichern")}
+  b.disabled=false;
+}
+async function loadAll(){
+  cfg=await (await fetch("api/config")).json();
+  const ents=await (await fetch("api/entities")).json();
+  const fill=(id,list)=>$("#"+id).innerHTML=list.map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("");
+  allSensors=ents.filter(e=>e.domain==="sensor");
+  fill("dl-sensor",allSensors);
+  fill("dl-number",ents.filter(e=>e.domain==="number"));
+  fill("dl-select",ents.filter(e=>e.domain==="select"));
+  fill("dl-switchy",ents.filter(e=>SW.includes(e.domain)));
+  fill("dl-all",ents);
+  fill("dl-script",ents.filter(e=>e.domain==="script"));
+  try{const sv=await (await fetch("api/notify/services")).json();
+    $("#dl-notify").innerHTML=sv.map(x=>`<option value="${esc(x)}"></option>`).join("");}catch(e){}
+  renderForms();
+}
+[["q_enabled","enabled"],["q_dry","dry_run"],["q_sp","surplus.enabled"],["q_spdry","surplus.dry_run"]].forEach(([id,path])=>{
+  $("#"+id).addEventListener("change",async e=>{
+    if(!cfg)return; set(path,e.target.checked);
+    if(path==="enabled"&&e.target.checked&&!cfg.dry_run&&!confirm("Regelung im LIVE-Betrieb starten? Die Speicher werden dann tatsächlich gesteuert."))
+      {e.target.checked=false;set(path,false);return;}
+    await save();renderForms();if(lastStatus)renderStatus(lastStatus);});});
+$("#save").addEventListener("click",save);
+async function killOrResume(){
+  const stopped=lastStatus&&lastStatus.safety&&lastStatus.safety.state==="stopped";
+  try{
+    if(!stopped){
+      if(!confirm("SOLASI jetzt stoppen?\nDie Speicher werden freigegeben und laufen wieder in ihrem eigenen Modus."))return;
+      await fetch("api/kill",{method:"POST"});toast("Gestoppt, Speicher werden freigegeben");
+    }else{await fetch("api/resume",{method:"POST"});toast("SOLASI läuft wieder");}
+  }catch(e){toast("Aktion fehlgeschlagen");}
+  poll();
+}
+$("#killbtn").addEventListener("click",killOrResume);
+const GROUPS={status:[["status","Übersicht"]],
+  settings:[["units","Anlage"],["control","Regelung"],["surplus","Überschuss"],["extras","Sicherheit & Meldungen"]],
+  eval:[["stats","Statistik"],["replay","Replay"]],
+  system:[["selftest","Selbsttest"],["log","Protokoll"],["card","Dashboard-Karte"]]};
+const SETTINGS_PAGES=["units","control","surplus","extras"];
+let curGroup="status";
+function groupOf(p){return Object.keys(GROUPS).find(g=>GROUPS[g].some(x=>x[0]===p))||"status"}
+function showPage(p){
+  const g=groupOf(p);curGroup=g;
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("act",x.dataset.g===g));
+  $("#subnav").innerHTML=GROUPS[g].length>1?GROUPS[g].map(([id,l])=>`<button data-p="${id}" class="${id===p?"act":""}">${l}</button>`).join(""):"";
+  document.querySelectorAll(".page").forEach(x=>x.classList.toggle("act",x.id==="p-"+p));
+  $("#savebar").style.display=SETTINGS_PAGES.includes(p)?"flex":"none";
+  if(p==="card")loadCard();
+  if(p==="selftest")loadSelfcheck();
+  if(p==="stats")loadStats();
+  if(p==="replay")renderReplayForm();
+}
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b)showPage(GROUPS[b.dataset.g][0][0])});
+$("#subnav").addEventListener("click",e=>{const b=e.target.closest("button");if(b)showPage(b.dataset.p)});
+$("#savebar").style.display="none";
+$("#q_expert").checked=expert;
+$("#q_expert").addEventListener("change",e=>{expert=e.target.checked;try{localStorage.setItem("solasi_expert",expert?"1":"0")}catch(x){}
+  if(cfg)renderForms();toast(expert?"Experten-Modus an":"Experten-Modus aus");});
+
+// ---------- Diagramme ----------
+function niceStep(range,ticks=4){const raw=Math.max(range,1e-9)/ticks,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return(f<=1?1:f<=2?2:f<=5?5:10)*p}
+function lineChart(series,{h=210,unit="W",title=""}={}){
+  const all=series.flatMap(x=>x.data);if(!all.length)return "";
+  let lo=Math.min(0,...all),hi=Math.max(...all,1);if(hi===lo)hi=lo+1;
+  const st=niceStep(hi-lo);lo=Math.floor(lo/st)*st;hi=Math.ceil(hi/st)*st;
+  const W0=640,pl=44,pr=10,pt=10,pb=22,iw=W0-pl-pr,ih=h-pt-pb;
+  const X=(i,n)=>pl+(n<=1?0:i/(n-1))*iw,Y=v=>pt+(1-(v-lo)/(hi-lo))*ih;
+  const ticks=Math.max(1,Math.round((hi-lo)/st));let g="";
+  for(let i=0;i<=ticks;i++){const v=lo+(hi-lo)*i/ticks;g+=`<line x1="${pl}" x2="${W0-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${pl-6}" y="${Y(v)+4}" text-anchor="end" class="axis">${Math.round(v)}</text>`;}
+  const zero=lo<0?`<line x1="${pl}" x2="${W0-pr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--muted)" stroke-dasharray="4 4"/>`:"";
+  const lines=series.map(x=>`<polyline fill="none" stroke="${x.color}" stroke-width="${x.w||2}" ${x.dash?`stroke-dasharray="${x.dash}"`:""} points="${x.data.map((v,i)=>X(i,x.data.length).toFixed(1)+","+Y(v).toFixed(1)).join(" ")}"/>`).join("");
+  const legend=series.map((x,i)=>`<span class="lg"><i style="background:${x.color}"></i>${esc(x.name)}</span>`).join("");
+  return `<div class="legend">${legend}<span class="sub">${esc(title)}</span></div><svg viewBox="0 0 ${W0} ${h}" class="chart" role="img">${g}${zero}${lines}<text x="${pl}" y="${h-4}" class="axis">Start</text><text x="${W0-pr}" y="${h-4}" text-anchor="end" class="axis">Ende</text></svg>`;
+}
+function barChart(days,keys,{h=200}={}){
+  if(!days.length)return "";
+  const W0=640,pl=40,pr=8,pt=8,pb=34,iw=W0-pl-pr,ih=h-pt-pb;
+  const top=Math.max(1,...days.flatMap(d=>keys.map(k=>d[k.key]||0))),bst=niceStep(top),hi=Math.ceil(top/bst)*bst,bt=Math.max(1,Math.round(hi/bst));
+  const gw=iw/days.length,bw=Math.min(18,(gw-4)/keys.length);
+  let g="";
+  for(let i=0;i<=bt;i++){const v=hi*i/bt,y=pt+(1-i/bt)*ih;g+=`<line x1="${pl}" x2="${W0-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-5}" y="${y+4}" text-anchor="end" class="axis">${bst<1?v.toFixed(1):Math.round(v)}</text>`;}
+  let bars="";
+  days.forEach((d,i)=>{const x0=pl+i*gw+(gw-bw*keys.length)/2;
+    keys.forEach((k,j)=>{const v=d[k.key]||0,bh=(v/hi)*ih;bars+=`<rect x="${x0+j*bw}" y="${pt+ih-bh}" width="${bw-1}" height="${bh}" rx="2" fill="${k.color}"><title>${d.date}: ${k.name} ${v} kWh</title></rect>`;});
+    if(days.length<=16||i%Math.ceil(days.length/12)===0)bars+=`<text x="${pl+i*gw+gw/2}" y="${h-pb+14}" text-anchor="middle" class="axis">${d.date.slice(8)}.${d.date.slice(5,7)}.</text>`;});
+  const legend=keys.map(k=>`<span class="lg"><i style="background:${k.color}"></i>${esc(k.name)}</span>`).join("");
+  return `<div class="legend">${legend}<span class="sub">kWh pro Tag</span></div><svg viewBox="0 0 ${W0} ${h}" class="chart" role="img">${g}${bars}</svg>`;
+}
+
+// ---------- Selbsttest ----------
+async function loadSelfcheck(){
+  $("#p-selftest").innerHTML=`<div class="card">Prüfe …</div>`;
+  let r;try{r=await (await fetch("api/selfcheck")).json();}catch(e){$("#p-selftest").innerHTML=`<div class="card">Prüfung fehlgeschlagen.</div>`;return;}
+  const icon={ok:"✅",warn:"⚠️",error:"❌",info:"ℹ️"};
+  const sm=r.summary;
+  const areas={};r.items.forEach(i=>(areas[i.area]=areas[i.area]||[]).push(i));
+  const cu=r.curtail||{};
+  const cuTxt={ok:["ok","Bestätigt"],fehlgeschlagen:["bad","Greift nicht"],unbekannt:["","Noch nicht beurteilt"]}[cu.state]||["",""];
+  let h=`<div class="hero"><div class="headline">${sm.error?`${sm.error} Problem${sm.error>1?"e":""} gefunden`:sm.warn?"Fast alles in Ordnung":"Alles in Ordnung"}</div>
+    <div class="sub">${sm.ok} in Ordnung · ${sm.warn} Hinweise · ${sm.error} Fehler</div>
+    <div style="margin-top:10px"><button class="primary" id="recheck">Erneut prüfen</button></div></div>
+    <div class="card" style="margin-bottom:14px"><h3>Abregelung bei vollem Speicher</h3>
+      <div class="row"><span>Ergebnis der Beobachtung</span><span class="tag ${cuTxt[0]}">${cuTxt[1]}</span></div>
+      <div class="sub" style="margin-top:6px">${esc(cu.note||"")}${cu.since?` (seit ${esc(cu.since)})`:""}${cu.export_w!=null?` · aktuell ${cu.export_w} W Einspeisung`:""}</div>
+      <div class="sub" style="margin-top:6px">SOLASI beobachtet bei vollen Speichern und Sonne, ob trotzdem eingespeist wird. Greift die Abregelung nicht, dürfen Verbraucher früher laufen und du bekommst eine Meldung.</div></div>`;
+  Object.entries(areas).forEach(([a,items])=>{
+    h+=`<div class="card" style="margin-bottom:12px"><h3>${esc(a)}</h3>`+items.map(i=>`<div class="row"><span>${icon[i.status]||""} ${esc(i.item)}</span><span style="text-align:right"><span class="sub">${esc(i.text)}</span>${i.hint?`<div class="sub" style="color:var(--warn)">→ ${esc(i.hint)}</div>`:""}</span></div>`).join("")+`</div>`;});
+  $("#p-selftest").innerHTML=h;
+  document.getElementById("recheck").addEventListener("click",loadSelfcheck);
+}
+
+// ---------- Statistik ----------
+let statsDays=30;
+async function loadStats(){
+  $("#p-stats").innerHTML=`<div class="card">Lade …</div>`;
+  let r;try{r=await (await fetch("api/stats?days="+statsDays)).json();}catch(e){$("#p-stats").innerHTML=`<div class="card">Statistik nicht verfügbar.</div>`;return;}
+  const t=r.total,pc=v=>v==null?"–":Math.round(v*100)+" %",eur=v=>v.toLocaleString("de-DE",{style:"currency",currency:"EUR"});
+  if(!r.days.length){$("#p-stats").innerHTML=`<div class="card welcome"><div style="font-size:40px">📊</div><h2>Noch keine Daten</h2><div class="sub">SOLASI sammelt ab jetzt. Die ersten Werte erscheinen nach einigen Minuten.<br>Für Hausverbrauch und Eigenversorgung werden die echten Lade-/Entladesensoren (oder ein Hausverbrauchs-Sensor) gebraucht.</div></div>`;return;}
+  const tile=(l,v,s)=>`<div class="card"><h3>${l}</h3><div class="big">${v}</div><div class="sub">${s||""}</div></div>`;
+  let h=`<div class="hero"><div class="headline">Die letzten ${r.days.length} Tage</div>
+    <div class="sub">Zeitraum:
+      ${[7,30,90].map(d=>`<button class="primary" style="padding:3px 12px;margin-left:6px;${statsDays===d?"":"background:var(--chip);color:var(--fg)"}" data-days="${d}">${d} Tage</button>`).join("")}</div></div>
+    <div class="grid">
+      ${tile("Autarkie",pc(t.autarky),"Anteil des Verbrauchs ohne Netzbezug")}
+      ${tile("Eigenverbrauch",pc(t.selfcons),"Anteil der PV, der nicht eingespeist wird")}
+      ${tile("Selbst gedeckt",eur(t.saved_eur),`${Math.max(t.house-t.imp,0).toFixed(1)} kWh zum Bezugspreis`)}
+      ${tile("Aus dem Speicher",eur(t.battery_eur),`${t.bat_dis.toFixed(1)} kWh entladen`)}
+      ${tile("Netzbezug",t.imp.toFixed(1)+" kWh","")}
+      ${tile("Einspeisung",t.exp.toFixed(1)+" kWh",`Vergütung ${eur(t.feedin_eur)}`)}
+    </div>
+    <div class="card" style="margin-top:14px">${barChart(r.days,[{key:"house",name:"Verbrauch",color:"#94a3b8"},{key:"pv",name:"PV",color:"#f59e0b"},{key:"imp",name:"Netzbezug",color:"#6366f1"},{key:"exp",name:"Einspeisung",color:"#14b8a6"}])}</div>
+    <div class="sub" style="margin-top:8px">Die Werte sind Näherungen aus den Messwerten im Regeltakt. Eigenversorgung und Beträge nutzen die Preise aus „Einstellungen → Sicherheit & Meldungen“.</div>`;
+  $("#p-stats").innerHTML=h;
+  document.querySelectorAll("#p-stats [data-days]").forEach(b=>b.addEventListener("click",()=>{statsDays=+b.dataset.days;loadStats();}));
+}
+
+// ---------- Replay ----------
+const RP=[["control.min_gap","Mindestabstand (s)","num"],["control.threshold_on","Einschalt-Schwelle (W)","num"],["control.threshold_off","Ausschalt-Schwelle (W)","num"],
+  ["control.offset_discharge","Offset Entladen (W)","num"],["control.offset_charge","Offset Laden (W)","num"],["control.step","Rundung (W)","num"],
+  ["soc.min","Min. SOC (%)","num"],["soc.max","Max. SOC (%)","num"],["soc.hyst","SOC-Hysterese (%)","num"],["soc.eco_threshold","Eco ab SOC (%)","num"],["soc.base_load","Eco-Leistung (W)","num"],
+  ["control.total_max_dis","Gesamtlimit Entladung (W)","num"],["control.split","Aufteilung","split"],
+  ["features.eco","Eco-Modus","bool"],["features.thresholds","Schwellen","bool"],["features.ac_charge","AC-Laden","bool"],["features.strict_zero","Strenge Nulleinspeisung","bool"]];
+function renderReplayForm(){
+  const el=$("#p-replay");if(el.dataset.ready)return;el.dataset.ready="1";
+  const cur=p=>get(p);
+  el.innerHTML=`<div class="hero"><div class="headline">Was wäre gewesen, wenn …?</div>
+    <div class="sub">Spielt echte Verlaufsdaten aus Home Assistant durch die Regelung. So testest du andere Einstellungen, ohne die Anlage anzufassen.<br>
+    Voraussetzung: Netzsensor sowie je Speicher Ladestand, echte Lade-/Entladeleistung und PV-Leistung, außerdem ein aktiver Recorder.</div></div>
+    ${fs("Zeitraum und Annahme",
+      `<div class="f"><label>Zeitraum</label><div><select id="rp_hours"><option value="6">letzte 6 Stunden</option><option value="12">letzte 12 Stunden</option><option value="24" selected>letzte 24 Stunden</option><option value="48">letzte 48 Stunden</option><option value="72">letzte 72 Stunden</option></select></div></div>
+       <div class="f"><label>Annahme: Firmware drosselt PV bei vollem Speicher</label><div><input type="checkbox" id="rp_curtail"></div><div class="hint">Aus = der Speicher reicht die PV bei vollem Akku ungedrosselt durch (vorsichtige Annahme).</div></div>`)}
+    ${fs("Andere Einstellungen ausprobieren (leer = wie bisher)",RP.map(([path,label,kind])=>{
+      const v=cur(path);
+      const input=kind==="num"?`<input type="number" step="any" data-rp="${path}" placeholder="aktuell ${v}">`
+        :kind==="bool"?`<select data-rp="${path}"><option value="">wie bisher (${v?"an":"aus"})</option><option value="1">an</option><option value="0">aus</option></select>`
+        :`<select data-rp="${path}"><option value="">wie bisher (${v})</option><option value="equal">gleichmäßig</option><option value="soc">nach Ladestand</option><option value="sequential">nacheinander</option></select>`;
+      return `<div class="f"><label>${label}</label><div>${input}</div></div>`;}).join(""))}
+    <div class="savebar" style="display:flex"><span class="msg" id="rpmsg">Die Simulation dauert einige Sekunden.</span><button class="primary" id="rprun">Simulation starten</button></div>
+    <div id="rpout"></div>`;
+  document.getElementById("rprun").addEventListener("click",runReplay);
+}
+async function runReplay(){
+  const overrides={};
+  document.querySelectorAll("#p-replay [data-rp]").forEach(e=>{
+    const v=e.value;if(v==="")return;const path=e.dataset.rp;
+    overrides[path]=e.tagName==="INPUT"?parseFloat(v):(v==="1"?true:v==="0"?false:v);});
+  const b=document.getElementById("rprun");b.disabled=true;$("#rpmsg").textContent="Lade Verlauf und simuliere …";
+  try{
+    const r=await fetch("api/replay",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({hours:+$("#rp_hours").value,curtail:$("#rp_curtail").checked,overrides})});
+    const j=await r.json();if(!j.ok)throw new Error(j.error);
+    renderReplay(j);$("#rpmsg").textContent="Fertig.";
+  }catch(e){$("#rpout").innerHTML=`<div class="banner bad">⚠️ ${esc(e.message)}</div>`;$("#rpmsg").textContent="Fehler";}
+  b.disabled=false;
+}
+function renderReplay(j){
+  const a=j.actual,c=j.current,x=j.alt;
+  const row=(l,av,cv,xv,fmt=v=>v)=>`<div class="row"><span>${l}</span><span style="display:flex;gap:18px"><b style="width:70px;text-align:right">${av==null?"–":fmt(av)}</b><b style="width:70px;text-align:right">${cv==null?"–":fmt(cv)}</b>${j.alt?`<b style="width:70px;text-align:right;color:var(--test)">${xv==null?"–":fmt(xv)}</b>`:""}</span></div>`;
+  const dev=a.imp>0.2?Math.round(Math.abs(c.imp-a.imp)/a.imp*100):null;
+  const diffTxt=j.alt?(()=>{const d=x.imp-c.imp;return `Mit den geänderten Einstellungen läge der Netzbezug um <b>${Math.abs(d).toFixed(2)} kWh ${d<0?"niedriger":"höher"}</b> und die Einspeisung um <b>${Math.abs(x.exp-c.exp).toFixed(2)} kWh ${x.exp<c.exp?"niedriger":"höher"}</b>.`})():"";
+  $("#rpout").innerHTML=`<div class="card" style="margin-top:14px"><h3>Ergebnis für ${j.hours} Stunden</h3>
+    <div class="row" style="font-size:12px;color:var(--muted)"><span></span><span style="display:flex;gap:18px"><span style="width:70px;text-align:right">Gemessen</span><span style="width:70px;text-align:right">Sim. jetzt</span>${j.alt?`<span style="width:70px;text-align:right;color:var(--test)">Sim. neu</span>`:""}</span></div>
+    ${row("Netzbezug (kWh)",a.imp,c.imp,x&&x.imp)}${row("Einspeisung (kWh)",a.exp,c.exp,x&&x.exp)}
+    ${row("Ladestand am Ende (%)",a.end_soc,c.end_soc,x&&x.end_soc)}${row("Niedrigster Ladestand (%)",a.min_soc,c.min_soc,x&&x.min_soc)}
+    ${row("Speicher entladen (kWh)",null,c.bat_dis,x&&x.bat_dis)}${row("Abgeregelte PV (kWh)",null,c.curtailed,x&&x.curtailed)}
+    ${row("Sollwert-Änderungen",null,c.writes,x&&x.writes)}${row("Eco-Modus (Stunden)",null,c.eco_h,x&&x.eco_h)}
+    ${diffTxt?`<div style="margin-top:10px">${diffTxt}</div>`:""}
+    <div class="sub" style="margin-top:8px">${dev==null?"":`Modell-Check: Der simulierte Netzbezug mit den aktuellen Einstellungen weicht um ${dev} % vom gemessenen ab. `}Das Modell ist eine Näherung: Lastgang und PV kommen aus der Historie, der Speicher wird vereinfacht nachgebildet.</div></div>
+    <div class="card" style="margin-top:14px"><h3>Netzleistung</h3>${lineChart([{name:"Gemessen",color:"#94a3b8",data:a.series.grid},{name:"Simulation jetzt",color:"#f59e0b",data:c.series.grid},...(x?[{name:"Simulation neu",color:"#8b5cf6",data:x.series.grid}]:[])],{title:"W, positiv = Bezug"})}</div>
+    <div class="card" style="margin-top:14px"><h3>Ladestand</h3>${lineChart([{name:"Gemessen",color:"#94a3b8",data:a.series.soc},{name:"Simulation jetzt",color:"#f59e0b",data:c.series.soc},...(x?[{name:"Simulation neu",color:"#8b5cf6",data:x.series.soc}]:[])],{title:"mittlerer SOC in %"})}</div>`;
+}
+
+// ---------- Dashboard-Karte ----------
+async function loadCard(){
+  let c;
+  try{c=await (await fetch("api/card")).json();}catch(e){$("#p-card").innerHTML=`<div class="card">Konnte Karten-Infos nicht laden.</div>`;return;}
+  const ok=c.installed;
+  const yaml="type: custom:solasi-card\nentity: sensor.solasi";
+  $("#p-card").innerHTML=`
+    <div class="hero"><div class="headline">SOLASI auf deinem Dashboard</div>
+      <div class="sub">Zeigt das Energiefluss-Diagramm als Karte, auch auf dem Handy und auf Wandtablets.</div></div>
+    <div class="grid">
+      <div class="card"><h3>Status</h3>
+        <div class="row"><span>Karte installiert</span><span class="tag ${ok?"ok":"warn"}">${ok?"ja":"nein, manuell nötig"}</span></div>
+        <div class="row"><span>Dashboard-Ressource</span><span class="tag ${c.resource==="manuell"?"warn":"ok"}">${esc(c.resource)}</span></div>
+        ${ok?`<div class="sub" style="margin-top:6px">Datei: ${esc(c.target)}</div>`:""}
+        ${c.restart_needed?`<div class="banner off" style="margin-top:10px">Der Ordner <b>www</b> wurde neu angelegt. Bitte Home Assistant einmal neu starten, damit er erreichbar ist.</div>`:""}
+      </div>
+      <div class="card"><h3>Karte hinzufügen</h3>
+        <div class="step" style="margin-bottom:8px"><b>1</b> Dashboard öffnen → <i>Bearbeiten</i> → <i>Karte hinzufügen</i> → <b>SOLASI</b> wählen.</div>
+        <div class="step" style="margin-bottom:8px"><b>2</b> Oder „Manuell“ wählen und diesen Text einfügen:</div>
+        <pre id="yamlbox" style="background:var(--chip);padding:10px 12px;border-radius:10px;margin:0 0 8px;overflow:auto">${esc(yaml)}</pre>
+        <button class="primary" id="copyyaml">YAML kopieren</button></div>
+    </div>
+    ${ok&&c.resource!=="manuell"?"":`<div class="card" style="margin-top:14px"><h3>Manuell einrichten</h3>
+      <div class="step" style="margin-bottom:8px"><b>1</b> <a href="card.js" download="solasi-card.js">solasi-card.js herunterladen</a> und nach <code>/config/www/solasi/</code> kopieren.</div>
+      <div class="step"><b>2</b> <i>Einstellungen → Dashboards → ⋮ → Ressourcen → Hinzufügen</i>: URL <code>${esc(c.url||"/local/solasi/solasi-card.js")}</code>, Typ „JavaScript-Modul“. (Erweiterten Modus im Benutzerprofil aktivieren, falls „Ressourcen“ fehlt.)</div></div>`}
+    <div class="card" style="margin-top:14px"><h3>Entitäten für eigene Karten und Automationen</h3>
+      <div class="row"><span><code>sensor.solasi</code></span><span class="sub">Status mit allen Werten als Attribute</span></div>
+      <div class="row"><span><code>sensor.solasi_pv_power</code></span><span class="sub">Solarleistung (W)</span></div>
+      <div class="row"><span><code>sensor.solasi_house_power</code></span><span class="sub">Hausverbrauch (W)</span></div>
+      <div class="row"><span><code>sensor.solasi_battery_power</code></span><span class="sub">Speicher, + entlädt, − lädt (W)</span></div>
+      <div class="row"><span><code>sensor.solasi_target_power</code></span><span class="sub">Gesamtsollwert (W)</span></div>
+      <div class="row"><span><code>sensor.solasi_surplus_power</code></span><span class="sub">Überschuss (W), wenn aktiv</span></div></div>`;
+  const b=document.getElementById("copyyaml");
+  if(b)b.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(yaml);toast("Kopiert ✓")}catch(e){toast("Bitte Text von Hand kopieren")}});
+}
+
+// ---------- Anzeige ----------
+const W=v=>v==null?"–":`${Math.round(v)} W`;
+function battery(soc){
+  const c=soc==null?"var(--muted)":soc>=50?"var(--ok)":soc>=20?"var(--warn)":"var(--bad)";
+  const w=soc==null?0:Math.max(0,Math.min(100,soc))*0.50;
+  return `<svg viewBox="0 0 62 34" aria-hidden="true"><rect x="1.5" y="3" width="52" height="28" rx="6" fill="none" stroke="var(--muted)" stroke-width="2"/>
+    <rect x="55" y="12" width="5" height="10" rx="2" fill="var(--muted)"/><rect x="4" y="6" width="${w}" height="22" rx="3.5" fill="${c}"/></svg>`;
+}
+function flowSVG(s){
+  const pv=s.pv_w,bat=s.bat_w,grid=s.grid_w,house=s.house_w;
+  const act=v=>v!=null&&Math.abs(v)>=5;
+  // Linie von (x1,y1) nach (x2,y2); fwd: Fluss in Richtung x1->x2
+  const line=(x1,y1,x2,y2,val,fwd,col)=>`<path d="M${x1} ${y1} L${x2} ${y2}" class="line ${act(val)?"active"+(fwd?"":" rev"):""}" ${act(val)?`style="stroke:${col}"`:""}/>`;
+  const node=(x,y,icon,label,val,sub,col,side)=>`<g><circle cx="${x}" cy="${y}" r="38" fill="color-mix(in srgb,${col} 14%,var(--card))" stroke="${col}" stroke-width="2.5"/>
+    <text x="${x}" y="${y+10}" text-anchor="middle" font-size="30">${icon}</text>
+    ${side
+      ?`<text x="${x+52}" y="${y-2}" class="node-label">${label}</text><text x="${x+52}" y="${y+20}" class="node-val">${val}</text>`
+      :`<text x="${x}" y="${y+62}" text-anchor="middle" class="node-label">${label}</text>
+    <text x="${x}" y="${y+82}" text-anchor="middle" class="node-val">${val}</text>
+    ${sub?`<text x="${x}" y="${y+98}" text-anchor="middle" class="node-sub">${sub}</text>`:""}`}</g>`;
+  const batSub=bat==null?"":bat>=5?"entlädt":bat<=-5?"lädt":"ruht";
+  const gridSub=grid>=5?"Bezug":grid<=-5?"Einspeisung":"ausgeglichen";
+  return `<svg viewBox="0 0 640 330" role="img" aria-label="Energiefluss">
+    ${line(320,92,320,160,pv,true,"var(--sun)")}
+    ${line(116,196,282,196,bat,bat!=null&&bat>0,"var(--bat)")}
+    ${line(358,196,524,196,grid,grid<0,"var(--grid)")}
+    ${node(320,54,"☀️","Solar",W(pv),"", "var(--sun)",true)}
+    ${node(112,196,"🔋","Speicher",bat==null?"–":W(Math.abs(bat)),batSub,"var(--bat)")}
+    ${node(320,196,"🏠","Haus",W(house),"", "var(--home)")}
+    ${node(528,196,"⚡","Netz",W(Math.abs(grid)),gridSub,"var(--grid)")}
+  </svg>`;
+}
+function headline(s){
+  const prefix=s.enabled&&s.dry_run?"Im Test: ":"";
+  if(s.safety&&s.safety.state==="stopped")return ["SOLASI ist gestoppt","Die Speicher laufen im eigenen Modus. Mit „Fortsetzen“ übernimmt SOLASI wieder."];
+  if(!s.connected)return ["Warte auf Home Assistant …",""];
+  if(!s.enabled)return ["SOLASI beobachtet nur","Die Regelung ist aus, es wird nichts gesendet."];
+  if(s.meter_ok===false)return ["Zähler ohne Meldung","Zur Sicherheit gehen die Speicher auf 0 W."];
+  const tt=Math.abs(s.t_target);
+  if(s.t_target>0)return [`${prefix}Die Speicher versorgen dein Haus mit ${tt} W`,`Netzbezug wird auf nahe null geregelt · mittlerer Ladestand ${s.avg_soc} %`];
+  if(s.t_target<0)return [`${prefix}Überschuss lädt die Speicher mit ${tt} W`,`Einspeisung wird vermieden · mittlerer Ladestand ${s.avg_soc} %`];
+  return [`${prefix}Alles ausgeglichen`,`Gerade ist keine Regelung nötig · mittlerer Ladestand ${s.avg_soc} %`];
+}
+function renderBadges(s){
+  const cp=$("#connpill");cp.className="pill "+(s.connected?"ok":"");$("#conntext").textContent=s.connected?"Verbunden":"Getrennt";
+  const mp=$("#modepill"),kb=$("#killbtn");
+  const stopped=s.safety&&s.safety.state==="stopped";
+  kb.textContent=stopped?"▶ Fortsetzen":"⛔ Not-Aus";kb.classList.toggle("resume",!!stopped);
+  if(stopped){mp.className="pill stop";$("#modetext").textContent="Gestoppt"}
+  else if(!s.enabled){mp.className="pill off";$("#modetext").textContent="Beobachten"}
+  else if(s.dry_run){mp.className="pill test";$("#modetext").textContent="Testmodus"}
+  else{mp.className="pill live";$("#modetext").textContent="Live"}
+}
+function renderStatus(s){
+  lastStatus=s;renderBadges(s);
+  const needSetup=cfg&&!cfg.grid.entity;
+  if(needSetup){
+    $("#p-status").innerHTML=`<div class="card welcome"><div style="font-size:46px">☀️</div><h2>Willkommen bei SOLASI</h2>
+      <div class="sub">In drei Schritten ist alles startklar.</div>
+      <div class="steps"><div class="step"><b>1</b><div><strong>Zähler wählen</strong><div class="sub">Dein Stromzähler (z. B. Bitshake) unter „Einstellungen → Anlage“.</div></div></div>
+      <div class="step"><b>2</b><div><strong>Speicher einrichten</strong><div class="sub">Leistung, Richtung, Modus und Ladestand je Speicher auswählen.</div></div></div>
+      <div class="step"><b>3</b><div><strong>Erst testen</strong><div class="sub">Mit Testmodus starten. Im Protokoll siehst du, was SOLASI tun würde.</div></div></div></div>
+      <button class="primary" onclick="showPage('units')">Jetzt einrichten</button></div>`;
+    return;}
+  let banners="";
+  if(s.safety&&s.safety.state==="stopped")banners+=`<div class="banner bad">⛔ <span><b>SOLASI ist gestoppt</b> (${esc(s.safety.reason)}${s.safety.since?`, seit ${esc(s.safety.since)}`:""}). Die Speicher wurden an ihren eigenen Modus zurückgegeben und werden nicht mehr gesteuert.
+    <button class="primary" style="margin-left:10px;padding:4px 14px" onclick="killOrResume()">Fortsetzen</button></span></div>`;
+  if(!s.connected)banners+=`<div class="banner bad">🔌 Keine Verbindung zu Home Assistant.</div>`;
+  if(!s.enabled)banners+=`<div class="banner off">⏸️ Die Regelung ist <b>aus</b>. SOLASI beobachtet nur und sendet nichts.</div>`;
+  else if(s.dry_run)banners+=`<div class="banner test">🧪 <span><b>Testmodus:</b> SOLASI rechnet nur, gesendet wird nichts. Das Protokoll zeigt, was passieren würde.</span></div>`;
+  if(s.enabled&&s.meter_ok===false)banners+=`<div class="banner bad">⚠️ <span><b>Zähler-Ausfall:</b> Failsafe aktiv, die Speicher werden auf 0 W gesetzt.</span></div>`;
+  if(!s.units){$("#p-status").innerHTML=banners+`<div class="card">Noch keine Daten. Bitte Zähler und Speicher einrichten und speichern.</div>`;return;}
+  const [hl,sub]=headline(s);
+  let h=banners+`<div class="hero"><div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>
+    <div class="flow">${flowSVG(s)}</div>
+    <div>${s.eco_active?'<span class="tag warn">🌙 Eco-Modus aktiv</span>':''}${s.blocked_w?`<span class="tag">Entladung gesperrt für ${s.blocked_w} W</span>`:''}<span class="tag ${s.meter_ok?"ok":"bad"}">Zähler ${s.meter_ok?"in Ordnung":"Ausfall"}</span>
+    <span class="tag">Gesamtsollwert ${s.t_target} W</span>
+    ${s.curtail&&s.curtail.state==="ok"?'<span class="tag ok">Abregelung bestätigt</span>':''}
+    ${s.curtail&&s.curtail.state==="fehlgeschlagen"?'<span class="tag bad">Abregelung greift nicht</span>':''}
+    ${s.eco_active&&s.learned_base_load?`<span class="tag">Grundlast gelernt: ${s.learned_base_load} W</span>`:''}</div></div>`;
+  h+=`<div class="grid">`;
+  s.units.forEach(u=>{
+    const soc=u.soc<0?null:u.soc;
+    h+=`<div class="card"><h3>${esc(u.name)}</h3>
+      <div class="bat">${battery(soc)}<div class="big">${soc==null?"–":soc+" %"}</div></div>
+      ${u.pv!=null?`<div class="row"><span>Solar dieses Speichers</span><b>${u.pv} W</b></div>`:""}
+      <div class="row"><span>Aktuell eingestellt</span><b>${u.set} W</b></div>
+      <div class="row"><span>Echte Leistung</span><b>${u.real} W</b></div>
+      <div class="row"><span>Neuer Sollwert</span><b>${u.plan} W</b></div>
+      <div style="margin-top:8px">
+        <span class="tag">${esc(u.dir||"–")}</span><span class="tag">${esc(u.mode||"–")}</span>
+        ${u.available?"":'<span class="tag warn">Leistung nicht verfügbar</span>'}
+        ${u.force?'<span class="tag test">Abregelung (voll)</span>':''}</div></div>`;});
+  if(s.surplus_enabled){
+    h+=`<div class="card"><h3>Überschuss${s.surplus_dry_run?" · Test":""}</h3>
+      <div class="big">${W(s.surplus_w)}</div><div class="sub" style="margin-bottom:6px">steht für Verbraucher zur Verfügung</div>`;
+    (s.slots||[]).forEach(sl=>{
+      h+=`<div class="row"><span>${esc(sl.name)}</span>
+        <span>${sl.state?`<span class="tag ${sl.state==="on"?"ok":""}">${esc(sl.state)}</span>`:""}${sl.num_v!=null?`<span class="tag">Vorgabe ${sl.num_v}</span>`:""}<b>${sl.own_w} W</b></span></div>`;});
+    h+=`</div>`;}
+  h+=`</div>`;
+  $("#p-status").innerHTML=h;
+}
+function renderLog(ev){
+  $("#log").innerHTML=(ev||[]).map(e=>`<div class="${e.level}"><span class="t">${e.ts}</span><span>${esc(e.msg)}</span></div>`).join("")||"<div>Noch keine Einträge.</div>";
+}
+async function poll(){
+  try{const s=await (await fetch("api/status")).json();renderStatus(s);renderLog(s.events);}
+  catch(e){$("#connpill").className="pill";$("#conntext").textContent="Getrennt";}
+}
+loadAll().then(()=>{poll();setInterval(poll,2000);});
+</script>
+</body>
+</html>

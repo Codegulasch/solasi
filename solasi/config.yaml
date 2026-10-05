@@ -1,0 +1,19 @@
+name: "SOLASI"
+version: "1.0.1"
+slug: solasi
+description: "SOLASI – dein Energie-Regler: Nulleinspeisung für 1-2 Anker SOLIX 4 E5000 Pro mit Eco-Modus, Überschusssteuerung und Live-Oberfläche"
+url: "https://github.com/Codegulasch/solasi"
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:solar-power
+panel_title: "SOLASI"
+homeassistant_api: true
+map:
+  - type: homeassistant_config
+    read_only: false

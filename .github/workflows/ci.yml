@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    name: Python-Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install --no-audit --no-fund
+        working-directory: solasi/tests/ui
+      - run: pip install aiohttp==3.10.5 pytest pytest-asyncio pyyaml
+      - run: python -m pytest -q
+        working-directory: solasi
+
+  ui:
+    name: Oberflächen-Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install aiohttp==3.10.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install --no-audit --no-fund
+        working-directory: solasi/tests/ui
+      - run: npm test
+        working-directory: solasi/tests/ui
+
+  addon:
+    name: Add-on prüfen und Docker-Image bauen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Konfigurationsdateien prüfen
+        run: |
+          pip install pyyaml
+          python - <<'PY'
+          import yaml, sys
+          c = yaml.safe_load(open("solasi/config.yaml"))
+          for k in ("name", "version", "slug", "description", "arch", "ingress", "homeassistant_api"):
+              assert k in c, f"config.yaml: {k} fehlt"
+          r = yaml.safe_load(open("repository.yaml"))
+          for k in ("name", "url", "maintainer"):
+              assert k in r, f"repository.yaml: {k} fehlt"
+          if "DEIN-NAME" in r["url"]:
+              print("::warning::repository.yaml: DEIN-NAME durch deinen GitHub-Namen ersetzen")
+          log = open("solasi/CHANGELOG.md").read()
+          assert f"## {c['version']}" in log, f"CHANGELOG.md hat keinen Abschnitt für {c['version']}"
+          print("Konfiguration ok, Version", c["version"])
+          PY
+      - name: Docker-Image bauen
+        run: docker build --build-arg BUILD_VERSION=ci -t solasi-ci solasi
+      - name: Rauchtest im Container
+        run: docker run --rm solasi-ci python -c "import main, controller, drivers, watchdog, replay; print('Import ok, Version', main.VERSION)"
+
+  version:
+    name: Version erhöht?
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prüfen
+        run: |
+          base="origin/${{ github.base_ref }}"
+          changed=$(git diff --name-only "$base"...HEAD -- solasi/app solasi/Dockerfile solasi/config.yaml)
+          if [ -z "$changed" ]; then echo "Keine Änderungen am Add-on."; exit 0; fi
+          old=$(git show "$base:solasi/config.yaml" | grep '^version:' || true)
+          new=$(grep '^version:' solasi/config.yaml)
+          echo "alt: $old"; echo "neu: $new"
+          if [ "$old" = "$new" ]; then
+            echo "::error::Das Add-on wurde geändert, aber die Version in solasi/config.yaml nicht erhöht. Ohne höhere Version bekommen Nutzer kein Update."
+            exit 1
+          fi

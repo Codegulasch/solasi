@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: repository.yaml ausgefüllt?
+        run: |
+          if grep -q "DEIN-NAME" repository.yaml; then
+            echo "::error::repository.yaml enthält noch DEIN-NAME. Bitte url und maintainer eintragen."; exit 1
+          fi
+      - name: Tag und Version vergleichen
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver=$(grep '^version:' solasi/config.yaml | sed -E 's/version:[[:space:]]*"?([^"]*)"?/\1/')
+          echo "Tag: $tag, config.yaml: $ver"
+          [ "$tag" = "$ver" ] || { echo "::error::Tag v$tag passt nicht zur Version $ver in config.yaml"; exit 1; }
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
+      - name: Release-Text aus dem CHANGELOG ziehen
+        run: |
+          awk -v v="## ${VERSION}" '$0==v{f=1;next} /^## /{f=0} f' solasi/CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Siehe CHANGELOG.md" > notes.md
+          cat notes.md
+      - name: Paket schnüren
+        run: zip -qr "solasi-${VERSION}.zip" solasi -x "*/__pycache__/*" "*/node_modules/*" "*.pyc"
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "solasi-${VERSION}.zip" --title "SOLASI ${VERSION}" --notes-file notes.md

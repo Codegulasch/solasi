@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+package-lock.json
+*.zip
+.DS_Store
+.vscode/
+.idea/
