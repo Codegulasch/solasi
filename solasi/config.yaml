@@ -1,7 +1,7 @@
 name: "SOLASI"
-version: "1.0.5"
+version: "1.0.6"
 slug: solasi
-description: "SOLASI – dein Energie-Regler: Nulleinspeisung für 1-2 Anker SOLIX 4 E5000 Pro mit Eco-Modus, Überschusssteuerung und Live-Oberfläche"
+description: "SOLASI – Nulleinspeisung und Energieregelung für Heimspeicher (Anker SOLIX, Marstek u. a.) mit Eco-Modus, Überschusssteuerung, Not-Aus und Live-Übersicht"
 url: "https://github.com/Codegulasch/solasi"
 arch:
   - amd64

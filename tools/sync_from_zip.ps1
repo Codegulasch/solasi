@@ -3,7 +3,7 @@
   Spielt ein neues Paket (solasi_repo.zip oder ein entpackter Ordner) in die Git-Arbeitskopie ein (Windows).
 
 .DESCRIPTION
-  Ersetzt nur den Add-on-Ordner, .github und tools. Nicht angefasst werden repository.yaml, LICENSE und README.md.
+  Ersetzt den Add-on-Ordner, .github, tools, README.md und DEVELOPMENT.md. Nicht angefasst werden repository.yaml und LICENSE.
   Die Projekt-URL in config.yaml bleibt erhalten.
 
 .EXAMPLE
@@ -89,10 +89,31 @@ if ($oldUrl) {
 }
 
 # --- fehlende Dateien auf oberster Ebene anlegen (vorhandene bleiben unveraendert) ---
-foreach ($f in @("repository.yaml", "LICENSE", "README.md", ".gitignore", ".gitattributes")) {
+foreach ($f in @("repository.yaml", "LICENSE", ".gitignore", ".gitattributes")) {
   $from = Join-Path $root $f
   $to = Join-Path $Repo $f
   if ((Test-Path $from) -and -not (Test-Path $to)) { Copy-Item $from $to; Write-Host "Neu angelegt: $f" }
+}
+
+# README.md und DEVELOPMENT.md gehoeren zum Paket und werden aktualisiert.
+# Konto und Repository-Name kommen aus repository.yaml.
+$owner = $null; $rname = $null
+$repoYaml = Join-Path $Repo "repository.yaml"
+if (Test-Path $repoYaml) {
+  $mm = [regex]::Match([System.IO.File]::ReadAllText($repoYaml, $utf8), 'github\.com/([^/\s"]+)/([^/\s"]+)')
+  if ($mm.Success) { $owner = $mm.Groups[1].Value; $rname = $mm.Groups[2].Value }
+}
+foreach ($f in @("README.md", "DEVELOPMENT.md")) {
+  $from = Join-Path $root $f
+  if (-not (Test-Path $from)) { continue }
+  $text = [System.IO.File]::ReadAllText($from, $utf8)
+  if ($owner) {
+    $target = "github.com/$owner/$rname"
+    $text = [regex]::Replace($text, 'github\.com/DEIN-NAME/[A-Za-z0-9._-]*', $target.Replace('$', '$$'))
+    $text = [regex]::Replace($text, 'github\.com%2FDEIN-NAME%2F[A-Za-z0-9._-]*', ("github.com%2F" + $owner + "%2F" + $rname).Replace('$', '$$'))
+    $text = $text.Replace("DEIN-NAME", $owner)
+  }
+  [System.IO.File]::WriteAllText((Join-Path $Repo $f), $text, $utf8)
 }
 
 if ($tmp) { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }

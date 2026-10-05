@@ -67,12 +67,12 @@ echo "Add-on:      ${addon} (Version ${version})"
 old_ref="$(grep -m1 '^url:' repository.yaml 2>/dev/null | sed -E 's#.*github\.com/([^/ "]+)/([^/ "]+).*#\1/\2#' || true)"
 old_owner="${old_ref%%/*}"; old_repo="${old_ref#*/}"
 [ -n "$old_ref" ] && [ "$old_owner" != "$old_ref" ] || { old_owner="DEIN-NAME"; old_repo="solasi"; }
-for f in repository.yaml README.md "$addon/config.yaml"; do
+for f in repository.yaml README.md DEVELOPMENT.md "$addon/config.yaml"; do
   [ -f "$f" ] || continue
   sedi "s#github.com/${old_owner}/${old_repo}#github.com/${user}/${repo}#g; s#github.com%2F${old_owner}%2F${old_repo}#github.com%2F${user}%2F${repo}#g; s#DEIN-NAME#${user}#g" "$f"
 done
 sedi "s#^maintainer:.*#maintainer: ${user}#" repository.yaml
-if grep -rq "DEIN-NAME" repository.yaml README.md "$addon/config.yaml"; then
+if grep -rq "DEIN-NAME" repository.yaml README.md DEVELOPMENT.md "$addon/config.yaml" 2>/dev/null; then
   echo "Es stehen noch Platzhalter (DEIN-NAME) in den Dateien."; exit 1
 fi
 echo "Konto und Repository-Name eingetragen: ${user}/${repo}"

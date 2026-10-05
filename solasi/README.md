@@ -1,16 +1,27 @@
-# SOLASI – Home-Assistant-Add-on („App“)
+# SOLASI
 
-Lokale Installation (ohne GitHub):
+**Nulleinspeisung und Energieregelung für Heimspeicher, direkt in Home Assistant.**
 
-1. Ordner `solasi` nach `/addons/solasi` auf dem Home-Assistant-Rechner kopieren
-   (Samba-Freigabe „addons“ oder Add-on „File editor“/„Terminal“).
-2. *Einstellungen → Add-ons (bzw. Apps) → Store → ⋮ → Nach Updates suchen*.
-3. Unter **Lokale Add-ons** „SOLASI“ öffnen → **Installieren** → **Starten**
-   → **In der Seitenleiste anzeigen** aktivieren.
+SOLASI steuert deinen Batteriespeicher so, dass dein Haus möglichst viel Solarstrom selbst verbraucht: kaum Einspeisung ins Netz, kaum Bezug aus dem Netz.
+Es läuft lokal auf deinem Home Assistant, ohne Cloud und ohne Konto.
 
-Alles Weitere steht im Reiter „Dokumentation“ des Add-ons (DOCS.md).
+**Das kann SOLASI**
 
-Tests: `pip install aiohttp pytest pytest-asyncio && python -m pytest tests`
+- Regelt einen oder zwei Speicher gemeinsam auf Nulleinspeisung, Solarstrom geht zuerst ins Haus
+- Eco-Modus, der den Akku schont und die nächtliche Grundlast lernt
+- Überschuss für Heizstab, Wallbox (stufenlos) und Schalter
+- Anker SOLIX, Marstek und weitere Speichertypen, dazu ein eigenes Skript für alles Weitere
+- Live-Übersicht mit Energiefluss, Dashboard-Karte, Statistik und „Was wäre wenn“-Replay
+- Sicherheit: Testmodus, Not-Aus, Rückfall auf den Modus des Herstellers, Wächter und Benachrichtigungen
 
-Dashboard-Karte: SOLASI installiert `solasi-card.js` automatisch nach `<config>/www/solasi/`.
-Details im Reiter „Dashboard-Karte“ der Oberfläche bzw. in DOCS.md.
+**Erste Schritte**
+
+1. Add-on **starten** und **In der Seitenleiste anzeigen** einschalten.
+2. **SOLASI** in der Seitenleiste öffnen. Die Willkommensseite führt durch die Einrichtung.
+3. Mit eingeschaltetem **Testmodus** beginnen: SOLASI rechnet dann alles durch, sendet aber nichts. Im Protokoll siehst du, was passieren würde.
+4. Erst wenn alles plausibel aussieht, den Testmodus ausschalten.
+
+Die ausführliche Anleitung findest du im Reiter **Dokumentation**.
+
+**Wichtig:** SOLASI steuert echte Hardware. Nutzung auf eigene Verantwortung, ohne Gewähr. Beachte die Einspeisegrenzen deiner Anlage und die Vorgaben deines Netzbetreibers.
+SOLASI ist ein unabhängiges Projekt und nicht mit SolarAssistant, Anker oder anderen Herstellern verbunden.

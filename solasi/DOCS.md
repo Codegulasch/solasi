@@ -1,122 +1,97 @@
-# SOLASI
+# SOLASI – Anleitung
 
-Nulleinspeisung für **ein oder zwei Anker SOLIX 4 E5000 Pro** (offizielle lokale Integration „Anker Solix Official“)
-mit Live-Übersicht, Eco-Modus, Abregelung bei vollem Speicher und Überschusssteuerung für Verbraucher
-(Ein/Aus und stufenlos für Wallbox und Heizstab). Alle Einstellungen nimmst du in der Oberfläche von SOLASI vor,
-es ist keine YAML-Datei und kein Blueprint nötig.
+SOLASI regelt deinen Batteriespeicher so, dass dein Haus möglichst viel Solarstrom selbst verbraucht: kaum Einspeisung ins Netz, kaum Bezug aus dem Netz.
+Alle Einstellungen nimmst du in der Oberfläche von SOLASI vor (Seitenleiste in Home Assistant), du brauchst keine Konfigurationsdatei.
 
-*SOLASI = SOLar-Anlagen-Speicher-Interface. Unabhängiges Projekt, nicht verbunden mit SolarAssistant (solar-assistant.io) oder Anker.*
+> **Wichtig:** SOLASI steuert echte Hardware. Fang immer im **Testmodus** an (Schritt 5 der Einrichtung) und lerne den **Not-Aus** kennen (Kapitel „Sicherheit“).
 
-## Inbetriebnahme
+## Inhalt
 
-1. **Alte Blueprint-Automation ausschalten.** Zwei Regler gleichzeitig würden gegeneinander arbeiten.
-2. Add-on starten und in der Seitenleiste **SOLASI** öffnen.
-3. Unter **Einstellungen → Anlage** Netzsensor (Bitshake), je Speicher den **Speichertyp** und die dazu passenden Entitäten (bei Anker: Leistung (number), Leistungsfluss (select),
-   Betriebsmodus (select) und SOC wählen. Die echten Lade-/Entladesensoren sind optional, aber für Failsafe
-   und Hausverbrauchsberechnung empfehlenswert. **Speichern** nicht vergessen.
-4. Oben **Regelung aktiv** einschalten und den **Testmodus** angeschaltet lassen. SOLASI berechnet dann alles,
-   sendet aber nichts. Unter **System → Protokoll** steht, was gesendet würde („Test: Speicher A: 0 W → 280 W …“).
-5. Stimmen Richtung und Werte, den **Testmodus ausschalten**. Ab jetzt steuert SOLASI die Geräte.
+1. [Voraussetzungen](#voraussetzungen)
+2. [Einrichtung Schritt für Schritt](#einrichtung-schritt-für-schritt)
+3. [Die Oberfläche](#die-oberfläche)
+4. [Speichertypen](#speichertypen)
+5. [Regelung und Einstellungen](#regelung-und-einstellungen)
+6. [Überschuss für Verbraucher, Wallbox und Heizstab](#überschuss-für-verbraucher-wallbox-und-heizstab)
+7. [Sicherheit und Not-Aus](#sicherheit-und-not-aus)
+8. [Benachrichtigungen](#benachrichtigungen)
+9. [Auswertung: Statistik und Replay](#auswertung-statistik-und-replay)
+10. [Selbsttest und Energiebilanz](#selbsttest-und-energiebilanz)
+11. [Dashboard-Karte](#dashboard-karte)
+12. [Sicherung der Einstellungen](#sicherung-der-einstellungen)
+13. [Häufige Fragen und Fehlersuche](#häufige-fragen-und-fehlersuche)
+14. [Datenschutz und Haftung](#datenschutz-und-haftung)
 
-Die Schalter oben in der Kopfzeile wirken sofort und werden automatisch gespeichert.
+## Voraussetzungen
 
-## Dashboard-Karte
+- Home Assistant mit Add-on-Store (Home Assistant OS oder Supervised).
+- Dein Speicher ist in Home Assistant eingebunden. Bei der **Anker SOLIX Solarbank 4 E5000 Pro** über die offizielle Integration *Anker Solix Official*.
+- Ein **Sensor für die Netzleistung in Watt** (positiv = Bezug, negativ = Einspeisung), zum Beispiel ein Lesekopf am Stromzähler oder ein Shelly EM.
+  Am besten der rohe oder kurz geglättete Wert, nicht ein Durchschnitt über Minuten, sonst reagiert die Regelung träge.
+- Empfohlen: Sensoren für die **Solarleistung** und für **Laden und Entladen** deines Speichers.
 
-SOLASI installiert beim Start automatisch die Karte `solasi-card` und versucht, sie als Dashboard-Ressource einzutragen.
-Unter **System → Dashboard-Karte** siehst du, was geklappt hat, und findest bei Bedarf die manuelle Anleitung.
+Nutzt du bisher eine Automation oder einen Blueprint zur Nulleinspeisung, **schalte ihn aus**, bevor SOLASI live steuert. Zwei Regler gleichzeitig arbeiten gegeneinander.
 
-Karte hinzufügen: Dashboard bearbeiten → *Karte hinzufügen* → **SOLASI** wählen, oder „Manuell“:
+## Einrichtung Schritt für Schritt
 
-```yaml
-type: custom:solasi-card
-entity: sensor.solasi        # optional
-title: SOLASI                # optional, "" blendet den Titel aus
-show_headline: true           # Klartext-Überschrift
-show_batteries: true          # Ladestand je Speicher
-show_surplus: true            # Überschuss und Verbraucher
-show_tags: true               # Eco, Zähler, Sollwert
-```
+1. **SOLASI öffnen.** Die Willkommensseite führt dich zu *Einstellungen → Anlage*.
+2. **Zähler wählen.** Trage den Sensor der Netzleistung ein. Zeigt dein Zähler Einspeisung als positiven Wert, schalte „Vorzeichen umkehren“ ein.
+3. **Speicher einrichten.** Wähle den **Speichertyp** und die passenden Entitäten. Die Felder schlagen sie vor, die Sensoren desselben Geräts stehen mit aktuellem Wert vorn.
+   Bei der Anker SOLIX sind das:
+   - **Leistung (number):** die Entität „Leistungssteuerung“
+   - **Leistungsfluss / Richtung (select):** Laden oder Entladen
+   - **Betriebsmodus (select):** der Modus des Speichers. SOLASI schaltet ihn auf externe Steuerung (`third_party_control`)
+   - **Ladestand (SOC)** sowie, empfohlen, **PV-Leistung**, **Entlade-** und **Ladeleistung**
+   - **Beim Stoppen: Modus setzen auf:** der Modus, den der Speicher bekommt, wenn SOLASI stoppt, bei Anker meist „self_consumption“ (in der Anker-App „Eigenverbrauch“)
+4. **Messart prüfen.** Messen deine Lade- und Entladesensoren die Batterie oder die Abgabe ans Haus? Bei Anker mit PV-Sensor stimmt „Automatisch“. Details im Kapitel [Selbsttest und Energiebilanz](#selbsttest-und-energiebilanz).
+5. **Im Testmodus starten.** Schalte oben **Regelung** ein und lass **Testmodus** an. SOLASI rechnet dann alles durch, sendet aber nichts. Unter *System → Protokoll* steht, was passieren würde
+   (zum Beispiel „Test: Speicher A: 0 W → 280 W“).
+6. **Selbsttest ausführen** (*System → Selbsttest*). Er meldet fehlende oder falsche Entitäten mit einem Lösungsvorschlag.
+7. **Live schalten.** Wenn Richtung und Werte plausibel sind, den **Testmodus ausschalten**. Ab jetzt steuert SOLASI den Speicher und stellt ihn bei Bedarf auf externe Steuerung.
 
-SOLASI legt dafür diese Entitäten in Home Assistant an (auch für eigene Karten, Verläufe und Automationen nutzbar):
-`sensor.solasi` (Status, alle Werte als Attribute), `sensor.solasi_pv_power`, `sensor.solasi_house_power`,
-`sensor.solasi_battery_power` (+ entlädt, − lädt), `sensor.solasi_target_power`, `sensor.solasi_surplus_power`.
-Es sind virtuelle Entitäten ohne Eintrag in der Entitäten-Verwaltung. Sie verschwinden bei einem Neustart von
-Home Assistant und werden von SOLASI sofort wieder angelegt.
+Die Schalter oben wirken sofort und werden automatisch gespeichert. Änderungen in den Formularen gelten erst nach **Speichern**.
 
-Falls die automatische Installation nicht klappt: `solasi-card.js` nach `/config/www/solasi/` kopieren und unter
-*Einstellungen → Dashboards → ⋮ → Ressourcen* als JavaScript-Modul mit der URL `/local/solasi/solasi-card.js` eintragen.
-Wurde der Ordner `www` neu angelegt, muss Home Assistant einmal neu gestartet werden.
+## Die Oberfläche
 
-## Kill-Switch und Sicherheit
+| Bereich | Inhalt |
+|---|---|
+| **Übersicht** | Energiefluss (Solar, Speicher, Haus, Netz), Ladestand je Speicher, aktueller Sollwert, Überschuss und Verbraucher |
+| **Einstellungen** | *Anlage* (Zähler und Speicher), *Regelung*, *Überschuss*, *Sicherheit & Meldungen* |
+| **Auswertung** | *Statistik* und *Replay* |
+| **System** | *Selbsttest*, *Protokoll*, *Dashboard-Karte* |
 
-Ein Speicher im externen Modus (z. B. „third_party_control“) arbeitet mit dem **letzten Sollwert** weiter, auch wenn niemand mehr
-regelt. SOLASI sichert das in mehreren Schichten ab:
+Oben in der Kopfleiste siehst du die Verbindung, den Modus (**Live**, **Testmodus**, **Beobachten** oder **Gestoppt**), den **Not-Aus** und die Schalter **Experte**, **Regelung**, **Testmodus**,
+**Überschuss** und **Überschuss-Test**. Mit **Experte** erscheinen zusätzliche Feineinstellungen. Gruppen in den Einstellungen lassen sich ein- und ausklappen.
 
-1. **Not-Aus-Knopf** oben (⛔): Stoppt SOLASI sofort. Alle Speicher gehen auf 0 W und in den **Rückfall-Modus**, den du je Speicher
-   unter *Einstellungen → Anlage → „Beim Stoppen: Modus setzen auf“* wählst (bei Anker z. B. „self_consumption“, in der Anker-App
-   „Eigenverbrauch“; die Vorschläge stammen aus dem Betriebsmodus des Speichers). Danach prüft SOLASI, ob der Modus wirklich
-   gesetzt wurde, und meldet es, wenn nicht. Der Knopf wird zu **▶ Fortsetzen**. Der Stopp bleibt auch nach einem Neustart bestehen.
-2. **Not-Aus-Schalter in Home Assistant** (optional): Unter *Sicherheit & Meldungen* kannst du einen Schalter oder input_boolean
-   wählen. Ist er „an“, stoppt SOLASI, wird er „aus“, läuft es weiter. Damit lässt sich SOLASI aus Automationen,
-   Dashboards oder per Taster stoppen.
-3. **Automatisch stoppen**: bei Zählerausfall länger als eingestellt (Standard 5 Minuten, bis dahin stehen die Speicher auf 0 W)
-   und wenn Steuerbefehle wiederholt fehlschlagen. Auf Wunsch setzt SOLASI danach nach 5 Minuten ohne Störung selbst fort,
-   sonst bleibt es gestoppt, bis du „Fortsetzen“ drückst.
-4. **Beim Beenden** (Add-on stoppen, neu starten, aktualisieren) gibt SOLASI die Speicher frei. Ebenso, wenn du die
-   Live-Steuerung ausschaltest oder in den Testmodus wechselst.
-5. **Wächter für den Absturz** (automatisch): Fällt SOLASI hart aus, kann es selbst nichts mehr zurückstellen. Deshalb sendet
-   SOLASI alle 30 Sekunden ein Lebenszeichen (`sensor.solasi_heartbeat`) und legt in Home Assistant eine eigene Automation
-   **„SOLASI Wächter“** an. Sie läuft unabhängig von SOLASI: Bleibt das Lebenszeichen länger aus (Standard 3 Minuten) oder meldet
-   sich SOLASI nach einem Neustart von Home Assistant nicht, stellt sie die Speicher auf den Rückfall-Modus zurück, schaltet
-   Fernsteuerungs-Schalter aus und schickt eine Meldung. SOLASI hält die Automation bei jeder Änderung der Einstellungen
-   aktuell und entfernt sie, wenn du den Wächter ausschaltest. Beendest du SOLASI selbst (Add-on stoppen oder aktualisieren),
-   meldet es „stopped“ und der Wächter greift nicht ein, weil die Speicher dann schon freigegeben sind.
-   Änderungen, die du von Hand an dieser Automation machst, werden beim nächsten Abgleich überschrieben. Darf SOLASI keine
-   Automationen anlegen, zeigt *Sicherheit & Meldungen* den Zustand „manuell“ und den fertigen Text zum Einfügen.
-
-Bei den anderen Speichertypen bedeutet „Freigabe“: Modus-Typ auf Stop und Leistungen auf 0, Fernsteuerung aus, Rückfall-Modus
-setzen. Beim Ausgangslimit wird ein Rückfall-Limit gesetzt, wenn eines eingetragen ist. Beim Skript-Typ wird das Skript mit
-`mode: release` und `power_w: 0` aufgerufen.
-
-Grenzen: Ist Home Assistant selbst nicht erreichbar (Absturz, Neustart), kann SOLASI keine Befehle senden. Auch ein
-hart abgebrochener Docker-Container kann nichts mehr zurückstellen, dafür gibt es den Wächter.
-
-## Sicherung der Einstellungen
-
-Unter *Sicherheit & Meldungen → Sicherung der Einstellungen* kannst du alle Einstellungen als Datei herunterladen und wieder einspielen,
-zum Beispiel als Sicherung oder für eine neue Installation.
-
-## Bedienung
-
-Die Oberfläche hat vier Bereiche: **Übersicht**, **Einstellungen** (Anlage, Regelung, Überschuss, Sicherheit & Meldungen),
-**Auswertung** (Statistik, Replay) und **System** (Selbsttest, Protokoll, Dashboard-Karte). Gruppen lassen sich ein- und
-ausklappen. Standardmäßig siehst du nur das Wesentliche. Mit dem Schalter **Experte** oben erscheinen zusätzliche
-Feineinstellungen (Mindestabstand, Schwellen, Offsets, Hysterese, Verzögerungen, Namen der Optionen und mehr).
+**Den Energiefluss lesen:** Die Ladeleistung der Batterie kommt zuerst aus der Solarleistung (Linie *Solar → Speicher*), der Rest geht ins Haus. Reicht die Solarleistung nicht, kommt der Rest der Ladung aus dem Netz
+und läuft über das Haus in den Speicher. Beim Entladen gibt der Speicher über die Linie *Speicher → Haus* ab. Die Verteilung ist aus den Messwerten abgeleitet, die Anlage meldet sie nicht selbst.
+Unbekannte Werte zeigt SOLASI als „–“, nie als 0 W.
 
 ## Speichertypen
 
-SOLASI ist nicht auf Anker festgelegt. Je Speicher wählst du unter *Einstellungen → Anlage* den **Speichertyp**:
+SOLASI ist nicht auf einen Hersteller festgelegt. Je Speicher wählst du unter *Einstellungen → Anlage* den **Speichertyp**. Typen lassen sich mischen.
 
 | Typ | So wird gesteuert | Passt z. B. zu |
 |---|---|---|
-| Anker SOLIX (Betrag + Richtung) | Zahl für die Leistung + Auswahl für die Richtung, Modus-Wächter | Anker Solarbank 4 E5000 Pro, Max AC |
+| Anker SOLIX (Betrag + Richtung) | Zahl für die Leistung, Auswahl für die Richtung | Anker Solarbank 4 E5000 Pro |
 | Eine Zahl mit Vorzeichen | Eine Zahl: positiv = Entladen, negativ = Laden (umstellbar), optional Arbeitsmodus | Marstek im Passiv-Modus |
-| Modus + Leistungen | Auswahl Stop/Laden/Entladen + Zahl für Entlade- und Ladeleistung, optional Fernsteuerung und Arbeitsmodus | Marstek über Modbus |
-| Ausgangslimit (nur Entladen) | Eine Zahl begrenzt die Abgabe, kein Netzladen | Wechselrichter-Limit (z. B. OpenDTU) |
-| Eigenes Skript | Ruft ein Skript mit `power_w`, `mode` und `unit` auf | alles andere (Victron, Huawei, Sungrow …) |
+| Modus + Leistungen | Auswahl Stop / Laden / Entladen plus Zahlen für Entlade- und Ladeleistung, optional Fernsteuerung und Arbeitsmodus | Marstek über Modbus |
+| Ausgangslimit (nur Entladen) | Eine Zahl begrenzt die Abgabe, kein Laden aus dem Netz | Wechselrichter-Limit (z. B. über OpenDTU) |
+| Eigenes Skript | Ruft ein Home-Assistant-Skript auf | alles andere (Victron, Huawei, Sungrow …) |
 
-Die Typen lassen sich mischen, z. B. ein Anker und ein Marstek. Die Regelung verteilt den Sollwert wie bisher.
 Speichertypen ohne Netzladen (Ausgangslimit, Modus ohne Ladezahl) werden bei Überschuss nie zum Laden eingeplant.
-Die Auswahl der Entitäten, Optionsnamen und Leistungssensoren (mit Vorzeichen) hängt vom Typ ab. Der Selbsttest prüft sie typgerecht.
 
-**Skript-Typ:** Das Skript bekommt beim Aufruf diese Felder:
+> **Stand:** Die Anker SOLIX ist im Praxiseinsatz entwickelt und getestet. Die anderen Typen sind nach den Beschreibungen der jeweiligen Integrationen umgesetzt und bisher nur in Simulationen geprüft.
+> Beobachte sie bitte zuerst im Testmodus und gib gern Rückmeldung.
+
+**Eigenes Skript:** SOLASI ruft das Skript mit diesen Feldern auf. Beim Zurückgeben des Speichers (Not-Aus) ist `mode` gleich `release` und `power_w` gleich 0.
 
 ```yaml
 script:
   mein_speicher_setzen:
     fields:
       power_w: { description: "Sollwert in W: positiv = Entladen, negativ = Laden" }
-      mode:    { description: "discharge, charge oder idle" }
+      mode:    { description: "discharge, charge, idle oder release" }
       unit:    { description: "Name des Speichers" }
     sequence:
       - action: number.set_value
@@ -124,100 +99,174 @@ script:
         data: { value: "{{ power_w }}" }
 ```
 
-SOLASI merkt sich beim Skript-Typ den zuletzt gesendeten Sollwert, weil der aktuelle Wert nicht ausgelesen werden kann.
-Die beschriebenen Typen sind anhand der Dokumentation der jeweiligen Integrationen umgesetzt und im Simulator getestet,
-nicht an echter Hardware. Beim ersten Einsatz bitte zuerst im Testmodus beobachten.
+SOLASI merkt sich beim Skript den zuletzt gesendeten Sollwert, weil er sich nicht auslesen lässt.
 
-## Sensoren, Messart und PV-Durchleitung
+## Regelung und Einstellungen
 
-**Sensoren wählen:** Unter *Einstellungen → Anlage* zeigt jeder Speicher die Sensoren desselben Geräts mit aktuellem Wert. Vergleiche sie mit der
-Hersteller-App, um Solar, Laden und Entladen zu finden. Die Felder schlagen diese Sensoren zuerst vor.
+### Wie SOLASI regelt
+SOLASI liest den Zähler und rechnet daraus den Sollwert für den Speicher. Es lässt bewusst ein paar Watt Netzbezug übrig (voreingestellt 10 W), damit kein Akkustrom ins Netz fließt.
+Bei zwei Speichern wird der Sollwert aufgeteilt: gleichmäßig, nach Ladestand oder nacheinander.
+
+### Funktionen (*Einstellungen → Regelung*)
+Jede Funktion lässt sich einzeln ein- und ausschalten.
+
+| Funktion | Was sie tut |
+|---|---|
+| **Eco-Modus** | Begrenzt die Abgabe aus der Batterie bei niedrigem Ladestand auf die Grundlast, damit der Akku bis zum Morgen reicht. Solarleistung kommt zusätzlich direkt ins Haus |
+| **Schwellen verwenden** | Reagiert erst ab einer Mindestabweichung (voreingestellt 120 W ein, 80 W aus). Verhindert unruhiges Schalten |
+| **Laden aus Fremd-Überschuss erlauben** | Der Akku darf auch mit Überschuss anderer Erzeuger am Zähler geladen werden |
+| **Strenge Nulleinspeisung bei vollem Speicher** | Ein voller Speicher wird auf „Entladen“ gestellt, damit die Solarleistung gedrosselt wird statt ins Netz zu gehen. Ob der Speicher das umsetzt, hängt von seiner Firmware ab. Der Selbsttest beobachtet es |
+| **Externe Steuerung automatisch einschalten** | Sobald SOLASI live steuert, stellt es den Betriebsmodus des Speichers auf externe Steuerung (bei Anker `third_party_control`): beim Start, nach „Fortsetzen“ und wenn der Modus von außen verstellt wird. Zum Zurückgeben dient der Not-Aus |
+| **PV direkt ins Haus geben, auch bei leerem Speicher** | Liegt der Ladestand unter dem Minimum, darf der Speicher trotzdem so viel abgeben, wie seine Module gerade liefern. Die Batterie wird dabei nicht entladen. Braucht den PV-Sensor |
+| **Failsafe** | Fällt der Zähler aus, gehen die Speicher auf 0 W. Fließt noch Leistung, obwohl 0 W gewollt sind, wird 0 W erneut gesendet |
+
+### Grenzen und Akku
+- **Gesamtlimit Entladung / Laden:** Voreingestellt sind vorsichtige 800 W für die Abgabe. Passe es an deine Anlage und die Vorgaben deines Netzbetreibers an.
+- **Nicht entladen unter / Nicht laden über:** Ladestandsgrenzen (voreingestellt 15 % und 99 %). Eine Hysterese verhindert Hin- und Herschalten an der Grenze.
+- **Eco-Modus ab mittlerem Ladestand** (voreingestellt 35 %) und **Eco-Entladeleistung** (150 W) legen fest, wann und wie stark Eco bremst.
+- **Grundlast lernen:** Mit „Eco-Leistung aus gelernter Grundlast“ misst SOLASI nachts den Verbrauch deines Hauses und passt die Eco-Leistung selbst an (Median der letzten sieben Nächte plus Zuschlag).
+  Dafür braucht es Sensoren für Laden und Entladen oder einen Hausverbrauchs-Sensor. Der gelernte Wert steht in den Einstellungen und als `sensor.solasi_base_load`.
+
+### Sensoren und Messart
+Unter *Einstellungen → Anlage* zeigt jeder Speicher die **Sensoren desselben Geräts mit aktuellem Wert**. Vergleiche sie mit der Hersteller-App, um Solar, Laden und Entladen zu finden.
 
 **Messart der Leistungssensoren:**
 
 | Messart | Bedeutung | Abgabe ins Haus |
 |---|---|---|
-| Batterie (DC) | Lade-/Entladeleistung der Batterie (typisch bei Anker) | Solar + Batterie |
-| Haus-Anschluss (AC) | Leistung, die der Speicher an das Haus abgibt bzw. aus dem Netz zieht | direkt gemessen |
+| Batterie (DC) | Lade- und Entladeleistung der Batterie (typisch bei Anker) | Solar + Batterie |
+| Haus-Anschluss (AC) | Leistung, die der Speicher ans Haus abgibt bzw. aus dem Netz zieht | direkt gemessen |
 
 „Automatisch“ nimmt bei Anker mit PV-Sensor die Batterieseite, sonst AC. Beispiel Anker: 540 W Solar, Batterie lädt 140 W → 400 W gehen ins Haus.
-**Selbsttest → Energiebilanz** zeigt die berechneten Werte zum Vergleich mit der Hersteller-App. Weichen sie ab, ist meist die Messart oder ein Sensor falsch.
 
-**Unbekannt ist nicht 0:** Ist ein Sensor nicht verfügbar, zeigt SOLASI „–“ und rechnet davon abhängige Werte nicht mit 0 W.
+## Überschuss für Verbraucher, Wallbox und Heizstab
 
-**PV-Durchleitung:** Liegt der Ladestand unter dem Minimum, darf ein Speicher trotzdem so viel abgeben, wie seine Module gerade liefern (minus 10 W).
-Die Batterie wird dabei nicht entladen. Der Eco-Modus begrenzt nur den Anteil aus der Batterie, die PV kommt zusätzlich direkt ins Haus.
-Das setzt voraus, dass der Speicher im externen Modus die PV zuerst nutzt. Bitte im Testmodus beobachten, dann live mit dem Not-Aus in Reichweite prüfen.
+Unter *Einstellungen → Überschuss* richtest du bis zu **drei Verbraucher** ein, die laufen, wenn mehr Solarstrom da ist, als das Haus braucht. Oben in der Kopfleiste schaltest du die Funktion mit **Überschuss** ein.
+Der **Überschuss-Test** protokolliert nur, was geschaltet würde.
 
-## Energiefluss lesen
+- **Quelle des Überschusses:** *PV minus Hausverbrauch* (empfohlen, braucht PV-Sensoren), *Einspeisung ins Netz* oder ein *eigener Sensor*.
+- **Ein- und Ausschalten:** Jeder Verbraucher hat eine Einschaltschwelle (Überschuss in Watt), eine Ausschaltschwelle (Defizit), Verzögerungen, Mindestlaufzeit und Mindestpause. Die Verbraucher haben eine Reihenfolge,
+  der erste hat Priorität. Niedrigere Prioritäten bekommen sinnvollerweise kleinere Ausschaltschwellen, damit sie zuerst ausgehen.
+- **Ladestand-Bedingung:** Verbraucher laufen erst, wenn der mittlere Ladestand einen Wert erreicht hat. So haben die Speicher Vorrang.
+- **Stufenlos (Wallbox, Heizstab):** Trage eine Entität (number) für den Ladestrom bzw. die Leistung ein, dazu die **Watt pro Einheit** (Wallbox einphasig 230 W je Ampere, dreiphasig 690 W je Ampere, Heizstab in Watt: 1),
+  Mindest- und Maximalleistung. SOLASI führt den Wert dem Überschuss nach und rundet auf die Schrittweite der Entität ab, damit sie den Überschuss nie übersteigt.
+- **Nicht aus dem Akku versorgen:** Der Speicher speist diesen Verbraucher dann nicht, er läuft aus Solarstrom oder Netz.
 
-Die Grafik verteilt die gemessenen Werte auf ihre Linien. Die Ladeleistung der Batterie kommt zuerst aus der Solarleistung (Linie **Solar → Speicher**),
-der Rest der Solarleistung geht ins Haus. Reicht die Solarleistung nicht für die Ladung, kommt der Rest aus dem Netz und läuft über das Haus in den Speicher.
-Der Speicher gibt beim Entladen über die Linie **Speicher → Haus** ab. Die Verteilung ist aus den Messwerten abgeleitet, die Anlage meldet sie nicht selbst.
+## Sicherheit und Not-Aus
 
-## Selbsttest und Systemprüfung
+Ein Speicher im externen Modus arbeitet mit dem **letzten Sollwert** weiter, auch wenn niemand mehr regelt. SOLASI sichert das in mehreren Schichten ab:
 
-**System → Selbsttest** enthält zwei Dinge:
+1. **Not-Aus-Knopf (⛔) oben.** Er stoppt SOLASI sofort. Alle Speicher gehen auf 0 W und in den **Rückfall-Modus** (zum Beispiel Eigenverbrauch). SOLASI prüft danach, ob der Modus gesetzt wurde, und meldet es, wenn nicht.
+   Der Knopf wird zu **▶ Fortsetzen**. Der Stopp bleibt auch nach einem Neustart bestehen.
+2. **Not-Aus-Schalter in Home Assistant** (optional, *Sicherheit & Meldungen*): Ist ein gewählter Schalter „an“, stoppt SOLASI, wird er „aus“, läuft es weiter. So lässt sich SOLASI auch aus Automationen oder per Taster stoppen.
+3. **Automatisch stoppen** bei Zählerausfall (voreingestellt nach 5 Minuten, bis dahin stehen die Speicher auf 0 W) und wenn Steuerbefehle wiederholt fehlschlagen. Auf Wunsch macht SOLASI danach nach 5 ruhigen Minuten selbst weiter,
+   sonst bleibt es gestoppt, bis du „Fortsetzen“ drückst.
+4. **Freigabe beim Beenden:** Stoppst, startest oder aktualisierst du das Add-on, gibt SOLASI die Speicher frei. Ebenso, wenn du die Live-Steuerung ausschaltest oder in den Testmodus wechselst.
+5. **Wächter für den Absturz.** Fällt SOLASI plötzlich komplett aus, kann es selbst nichts mehr zurückstellen. Deshalb sendet es alle 30 Sekunden ein Lebenszeichen und legt in Home Assistant die Automation **„SOLASI Wächter“** an.
+   Sie läuft unabhängig: Bleibt das Lebenszeichen länger aus (voreingestellt 3 Minuten) oder meldet sich SOLASI nach einem Neustart von Home Assistant nicht, stellt sie die Speicher auf den Rückfall-Modus und schickt eine Meldung.
+   Beendest du SOLASI selbst, greift der Wächter nicht ein, weil die Speicher dann schon frei sind. SOLASI hält die Automation aktuell. Änderungen, die du von Hand an ihr vornimmst, werden überschrieben.
+   Darf SOLASI keine Automation anlegen, zeigt *Sicherheit & Meldungen* den fertigen Text zum Einfügen.
 
-- **Systemprüfung:** Prüft per Knopfdruck alle gewählten Entitäten (existieren sie, liefern sie Zahlen, stimmt die Einheit,
-  gibt es die Optionen `third_party_control`, `charge` und `discharge`) und gibt konkrete Hinweise zur Behebung.
-- **Abregelungs-Wächter:** Läuft dauerhaft mit. Sind alle Speicher voll und scheint die Sonne, prüft SOLASI, ob trotzdem
-  eingespeist wird. Nach drei Minuten Einspeisung gilt die Abregelung als *nicht wirksam*. Dann dürfen Verbraucher der
-  Überschusssteuerung unabhängig vom Ladestand laufen, und du bekommst eine Meldung. Bleibt der Zähler dagegen ausgeglichen,
-  gilt die Abregelung als *bestätigt*.
+**Rückfall-Modus festlegen:** Trage ihn bei jedem Speicher unter *Einstellungen → Anlage* im Feld „Beim Stoppen: Modus setzen auf“ ein. Ohne ihn bleibt der Speicher im externen Modus mit 0 W.
+
+**Möchtest du kurz in der Hersteller-App umstellen?** Nimm vorher den Not-Aus, sonst stellt SOLASI den Modus nach spätestens 30 Sekunden zurück.
+
+**Grenzen:** Ist Home Assistant selbst nicht erreichbar, kann SOLASI keine Befehle senden. Beachte die gesetzlichen Einspeisegrenzen deiner Anlage.
 
 ## Benachrichtigungen
 
-Unter *Einstellungen → Sicherheit & Meldungen* wählst du ein Ziel (z. B. `notify.mobile_app_dein_handy` oder `persistent_notification`)
-und die Ereignisse: Zähler ohne Meldung, Speicher nicht erreichbar, Speicher leer, Einspeisung trotz vollem Speicher,
-fehlschlagende Steuerbefehle. Gemeldet wird erst nach einer einstellbaren Dauer, dieselbe Meldung kommt frühestens nach der
-Sperrzeit wieder, und bei Entwarnung folgt eine Nachricht. Mit „Testnachricht senden“ prüfst du das Ziel.
+Unter *Einstellungen → Sicherheit & Meldungen* wählst du ein Ziel, zum Beispiel `notify.mobile_app_dein_handy` für eine Mitteilung aufs Handy oder `persistent_notification` für die Glocke in Home Assistant.
+Gemeldet wird bei: Zähler ohne Meldung, Speicher nicht erreichbar, Speicher leer, Einspeisung trotz vollem Speicher, fehlschlagende Steuerbefehle und wenn SOLASI gestoppt wurde.
+Eine Meldung kommt erst, wenn die Störung eine einstellbare Zeit dauert, dieselbe Meldung wiederholt sich frühestens nach einer Sperrzeit, und bei Entwarnung folgt eine Nachricht. Mit **Testnachricht senden** prüfst du das Ziel.
 
-## Grundlast lernen
+## Auswertung: Statistik und Replay
 
-SOLASI misst nachts (PV unter 20 W, sonst Sonnenstand, sonst 1 bis 5 Uhr) den Hausverbrauch und bildet je Nacht den
-Median. Der Median der letzten sieben Nächte ist die gelernte Grundlast. Mit „Eco-Leistung aus gelernter Grundlast“
-nutzt der Eco-Modus diesen Wert plus Zuschlag, begrenzt auf ein Minimum und Maximum. Dafür werden die echten Lade-/
-Entladesensoren oder ein Hausverbrauchs-Sensor gebraucht. Der gelernte Wert liegt auch als `sensor.solasi_base_load` vor.
+**Statistik:** Pro Tag siehst du Verbrauch, Solarertrag, Netzbezug, Einspeisung und Speicherdurchsatz, dazu **Autarkie**, **Eigenverbrauch** und Beträge nach deinen Preisen (*Sicherheit & Meldungen → Preise*).
+Die Werte sind Näherungen. Für den Hausverbrauch braucht SOLASI Sensoren für Laden und Entladen (oder einen Hausverbrauchs-Sensor).
 
-## Statistik
+**Replay:** *Auswertung → Replay* spielt echte Verlaufsdaten der letzten Stunden (bis 72) durch die Regelung. Du kannst einzelne Einstellungen ändern und siehst Netzbezug, Einspeisung, Ladestand, Eco-Zeit und
+Schaltvorgänge im Vergleich zu den gemessenen Werten und zu deinen aktuellen Einstellungen. Voraussetzung sind Netzsensor sowie je Speicher Ladestand, Lade- und Entladeleistung und PV-Leistung, außerdem ein aktiver Recorder.
+Das Replay ist eine **Näherung**. Der „Modell-Check“ zeigt, wie weit die Simulation mit deinen Einstellungen vom Gemessenen abweicht. Mit der Annahme „Firmware drosselt PV bei vollem Speicher“ spielst du beide Möglichkeiten durch.
 
-SOLASI integriert Leistung zu Energie und zeigt je Tag Verbrauch, PV, Netzbezug, Einspeisung und Speicherdurchsatz,
-dazu Autarkie, Eigenverbrauch und Beträge nach deinen Preisen. Die Werte sind Näherungen aus dem Regeltakt.
+## Selbsttest und Energiebilanz
 
-## Replay
+**System → Selbsttest** zeigt:
 
-**Auswertung → Replay** spielt echte Verlaufsdaten (bis 72 Stunden) aus dem Recorder durch die Regelung. Du kannst einzelne
-Einstellungen ändern und siehst Netzbezug, Einspeisung, Ladestand, Eco-Zeit und Schaltvorgänge im Vergleich zu den gemessenen
-Werten und zu den aktuellen Einstellungen. Voraussetzung sind Netzsensor sowie je Speicher Ladestand, echte Lade- und
-Entladeleistung und PV-Leistung. **Das Modell ist eine Näherung:** Lastgang und PV kommen aus der Historie, der Speicher wird
-vereinfacht nachgebildet. Der „Modell-Check“ zeigt, wie weit die Simulation mit den aktuellen Einstellungen vom Gemessenen abweicht.
-Mit der Annahme „Firmware drosselt PV bei vollem Speicher“ kannst du beide Möglichkeiten durchspielen.
+- **Systemprüfung:** Sie prüft alle gewählten Entitäten (gibt es sie, liefern sie Zahlen, stimmt die Einheit, gibt es die nötigen Optionen) und nennt zu jedem Problem eine Lösung. Außerdem prüft sie Rückfall-Modus, Not-Aus-Schalter und Benachrichtigungen.
+- **Energiebilanz:** Solar, Batterie, Abgabe ins Haus, Netz und Haus, berechnet aus deinen Sensoren. **Vergleiche diese Werte mit der Hersteller-App.** Weichen sie ab, ist meist die Sensorauswahl oder die Messart falsch.
+  Eine Warnung erscheint auch, wenn Ladesensoren eher nach Batterie- als nach Netzleistung aussehen.
+- **Abregelung bei vollem Speicher:** SOLASI beobachtet bei vollen Speichern und Sonne, ob trotzdem eingespeist wird. Nach drei Minuten Einspeisung gilt die Abregelung als *nicht wirksam*, dann dürfen Verbraucher früher laufen
+  und du bekommst eine Meldung. Bleibt der Zähler ausgeglichen, gilt sie als *bestätigt*.
 
-## Funktionen
+## Dashboard-Karte
 
-| Funktion | Beschreibung |
-|---|---|
-| Gemeinsamer Regler | Berechnet den Gesamtsollwert und verteilt ihn gleichmäßig, nach Ladestand oder nacheinander auf beide Geräte |
-| Eco-Modus | Begrenzt die Gesamtentladung ab einem mittleren SOC auf die Grundlast |
-| Schwellen & Hysterese | Ein-/Ausschaltschwellen, SOC-Hysterese, getrennte Offsets für Laden und Entladen |
-| AC-Laden | Fremd-Überschuss (z. B. andere PV-Anlage) darf den Akku laden |
-| Externe Steuerung automatisch | Beim Start, nach „Fortsetzen“ und wenn der Modus von außen verstellt wird, setzt SOLASI den Betriebsmodus des Speichers auf die Option für externe Steuerung (bei Anker `third_party_control`), auch wenn gerade nichts zu regeln ist. Zum Zurückgeben dient der Not-Aus oder das Ausschalten der Live-Steuerung |
-| Strenge Nulleinspeisung | Voller Speicher wird auf Entladen 0 W bzw. Hausbedarf gestellt, damit die PV gedrosselt wird |
-| Failsafe | Fällt der Zähler aus, werden die Geräte auf 0 W gesetzt; Real-Power-Check |
-| Überschuss | Bis zu 3 Verbraucher mit eigenen Schwellen, Verzögerungen, Mindestlaufzeiten, SOC-Bedingung, Zusatzbedingung |
-| Stufenlose Regelung | Wallbox (Ladestrom) oder Heizstab (Leistung/Prozent) folgen dem Überschuss |
-| Entladesperre | Pro Verbraucher: Der Speicher speist ihn nicht aus dem Akku |
+SOLASI installiert beim Start die Karte `solasi-card` und trägt sie als Dashboard-Ressource ein. Unter **System → Dashboard-Karte** siehst du den Stand und findest bei Bedarf die manuelle Anleitung.
 
-Jede Zusatzfunktion lässt sich einzeln ausschalten.
+Karte hinzufügen: Dashboard bearbeiten → *Karte hinzufügen* → **SOLASI** wählen, oder „Manuell“:
 
-## Hinweise
+```yaml
+type: custom:solasi-card
+entity: sensor.solasi        # optional
+title: SOLASI                # optional, "" blendet den Titel aus
+show_headline: true          # Klartext-Überschrift
+show_batteries: true         # Ladestand je Speicher
+show_surplus: true           # Überschuss und Verbraucher
+show_tags: true              # Eco, Zähler, Sollwert
+```
 
-- **Zähler:** Am besten der rohe Bitshake-Wert oder ein Mittelwert über wenige Sekunden. Ein Median über Minuten macht die Regelung träge.
-- **Mindestabstand:** Viele Speicher melden Werte nur etwa alle 5 Sekunden. Unter 4 Sekunden schwingt die Regelung meist.
-- **Gesamtlimit:** Voreingestellt sind konservative 800 W. Für größere angemeldete Anlagen erhöhen.
-- **Abregelung bei vollem Speicher:** Ob die Firmware die PV dann wirklich drosselt, lässt sich nur live prüfen
-  (sonniger Tag, voller Speicher, wenig Verbrauch, Zähler beobachten).
-- **Überschuss für Wallbox/Heizstab:** Als Quelle „PV minus Hausverbrauch“ wählen und die PV-Sensoren je Gerät eintragen.
-- **Zugriff:** Die Oberfläche ist nur über Home Assistant (Ingress) erreichbar.
-- Einstellungen liegen in `/data/settings.json` und sind Teil der Home-Assistant-Backups.
+**Entitäten für eigene Karten, Verläufe und Automationen:** `sensor.solasi` (Status, alle Werte als Attribute), `sensor.solasi_pv_power`, `sensor.solasi_house_power`, `sensor.solasi_battery_power`
+(+ entlädt, − lädt), `sensor.solasi_target_power`, `sensor.solasi_surplus_power`, `sensor.solasi_base_load`. Sie erscheinen nicht in der Entitäten-Verwaltung und werden nach einem Neustart von Home Assistant sofort neu angelegt.
+
+**Klappt die automatische Installation nicht?** Kopiere `solasi-card.js` nach `/config/www/solasi/` und trage unter *Einstellungen → Dashboards → ⋮ → Ressourcen* die URL `/local/solasi/solasi-card.js` als JavaScript-Modul ein
+(dafür den erweiterten Modus im Benutzerprofil einschalten). Wurde der Ordner `www` neu angelegt, starte Home Assistant einmal neu.
+
+## Sicherung der Einstellungen
+
+Unter *Einstellungen → Sicherheit & Meldungen → Sicherung der Einstellungen* lädst du alle Einstellungen als Datei herunter und spielst sie bei Bedarf wieder ein, zum Beispiel für eine neue Installation.
+Die Einstellungen sind außerdem Teil der Home-Assistant-Backups.
+
+## Häufige Fragen und Fehlersuche
+
+**Kann ich SOLASI ausprobieren, ohne dass etwas passiert?**
+Ja, mit dem **Testmodus**. SOLASI rechnet dann alles durch und schreibt ins Protokoll, was es senden würde, sendet aber nichts.
+
+**Wie stoppe ich SOLASI schnell?**
+Mit dem **⛔ Not-Aus** oben. Der Speicher geht auf 0 W und in den Rückfall-Modus. Mit **▶ Fortsetzen** läuft SOLASI weiter.
+
+**Der Speicher zeigt „Leistung nicht verfügbar“.**
+Das ist normal, solange er nicht im Modus für externe Steuerung ist. Sobald SOLASI live steuert, schaltet es ihn um. Im Testmodus bleibt der Zustand, wie er ist.
+
+**SOLASI regelt nicht, der Sollwert bleibt 0 W.**
+Prüfe der Reihe nach: Ist **Regelung** eingeschaltet? Ist der **Testmodus** noch an? Steht oben **Gestoppt**? Liegt der Netzbezug unter der Einschaltschwelle (voreingestellt 120 W)?
+Ist der Ladestand unter dem Minimum oder greift der Eco-Modus? Der **Selbsttest** zeigt Fehler in der Einrichtung.
+
+**„Solar“ zeigt „–“.**
+Der gewählte PV-Sensor liefert gerade keinen Wert oder ist falsch gewählt. Vergleiche in der Sensorliste des Geräts mit der Hersteller-App.
+
+**Hausverbrauch oder Speicherleistung weichen von der Hersteller-App ab.**
+Öffne *System → Selbsttest → Energiebilanz* und prüfe Sensorauswahl und **Messart**. Kleine Abweichungen entstehen, weil Zähler und Speicher in unterschiedlichen Takten messen.
+
+**Der Modus springt in der Hersteller-App immer wieder zurück.**
+Das ist gewollt: SOLASI hält den Speicher im Modus für externe Steuerung. Nimm zum Umstellen vorher den **Not-Aus**, oder schalte unter *Regelung → Funktionen* „Externe Steuerung automatisch einschalten“ aus.
+
+**Was passiert bei einem Neustart von Home Assistant oder SOLASI?**
+SOLASI macht danach weiter. Ein gesetzter Not-Aus bleibt bestehen. Beim Beenden gibt SOLASI die Speicher frei, bei einem plötzlichen Absturz greift der Wächter.
+
+**Kann ich Speicher verschiedener Hersteller mischen?**
+Ja, jeder Speicher hat seinen eigenen Typ. SOLASI verteilt den Sollwert auf beide.
+
+**Nach einem Update sieht die Oberfläche alt aus.**
+Lade die Seite neu (`Strg + Umschalt + R`, auf dem Mac `Cmd + Umschalt + R`).
+
+**Wo liegen meine Daten?**
+Einstellungen, Statistik und gelernte Werte liegen im Datenordner des Add-ons und sind Teil der Home-Assistant-Backups.
+
+**Ich habe einen Fehler gefunden oder eine Idee.**
+Melde dich unter [github.com/DEIN-NAME/solasi/issues](https://github.com/DEIN-NAME/solasi/issues/new/choose). Bitte hänge Selbsttest und Protokoll an, aber keine Zugangsdaten.
+
+## Datenschutz und Haftung
+
+SOLASI läuft lokal und spricht nur mit deinem Home Assistant. Es gibt keine Cloud, kein Konto und keine Datenübertragung an Dritte.
+
+Die Software steuert Hardware und wird **ohne Gewähr** bereitgestellt. Du nutzt sie auf eigene Verantwortung. Beachte die Einspeisegrenzen deiner Anlage, die Anmeldepflichten und die Vorgaben deines Netzbetreibers sowie die Hinweise deines Speicherherstellers.
+SOLASI ist ein unabhängiges Projekt und steht in keiner Verbindung zu SolarAssistant (solar-assistant.io), zu Anker oder zu anderen Herstellern.

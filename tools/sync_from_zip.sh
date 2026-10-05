@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Spielt ein neues Paket (solasi_repo.zip) in dieses Repository ein.
-# Ersetzt nur: solasi/, .github/, tools/. Nicht angefasst werden repository.yaml, LICENSE und README.md.
+# Ersetzt: solasi/, .github/, tools/, README.md und DEVELOPMENT.md. Nicht angefasst werden repository.yaml und LICENSE.
 # Aufruf:  tools/sync_from_zip.sh ~/Downloads/solasi_repo.zip
 set -euo pipefail
 # sed -i unterscheidet sich zwischen Linux (GNU) und macOS (BSD): bei macOS braucht es ein leeres Suffix.
@@ -25,8 +25,18 @@ copy_dir solasi
 [ -n "$old_url" ] && sedi "s#^url:.*#${old_url}#" solasi/config.yaml
 copy_dir .github
 copy_dir tools
-for f in repository.yaml LICENSE README.md .gitignore .gitattributes; do
+for f in repository.yaml LICENSE .gitignore .gitattributes; do
   [ -f "$f" ] || { [ -f "$src/$f" ] && cp "$src/$f" "$f" && echo "Neu angelegt: $f"; }
+done
+# README.md und DEVELOPMENT.md gehören zum Paket und werden aktualisiert. Konto und Repository-Name kommen aus repository.yaml.
+ref="$(grep -m1 '^url:' repository.yaml 2>/dev/null | sed -E 's#.*github\.com/([^/ "]+)/([^/ "]+).*#\1/\2#' || true)"
+owner="${ref%%/*}"; rname="${ref#*/}"
+for f in README.md DEVELOPMENT.md; do
+  [ -f "$src/$f" ] || continue
+  cp "$src/$f" "$f"
+  if [ -n "$ref" ] && [ "$owner" != "$ref" ]; then
+    sedi "s#github.com/DEIN-NAME/[A-Za-z0-9._-]*#github.com/${owner}/${rname}#g; s#github.com%2FDEIN-NAME%2F[A-Za-z0-9._-]*#github.com%2F${owner}%2F${rname}#g; s#DEIN-NAME#${owner}#g" "$f"
+  fi
 done
 chmod +x tools/*.sh
 echo; echo "Eingespielt."
