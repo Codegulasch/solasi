@@ -244,21 +244,22 @@ def release_commands(u, s, names, ha):
     """Befehle, die den Speicher an sein eigenes Regelverhalten zurückgeben (z. B. Eigenverbrauch).
 
     Reihenfolge: zuerst Leistung auf 0 bzw. Stop (solange der Speicher noch im externen Modus ist),
-    dann Fernsteuerung aus, zuletzt den Rückfall-Modus setzen."""
+    dann Fernsteuerung aus, zuletzt den Rückfall-Modus setzen.
+
+    Es wird immer gesendet, solange die Entität erreichbar ist, auch wenn der bekannte Zustand schon passt:
+    Direkt nach einem Schreibvorgang ist der bekannte Zustand oft noch alt, und ein überflüssiger Befehl schadet nicht."""
     d, o, k = driver(u), opts(u, names), u.get("name", "Speicher")
+    unusable = (None, "unavailable", "unknown")
     cmds = []
-    if d == "anker":
-        if s["has"] and s["set"] != 0:
-            cmds.append(("number", "set_value", {"entity_id": u["num"], "value": 0}, f"{k}: Leistung auf 0"))
-    elif d == "signed":
-        if s["has"] and s["set"] != 0:
+    if d in ("anker", "signed"):
+        if s["has"]:
             cmds.append(("number", "set_value", {"entity_id": u["num"], "value": 0}, f"{k}: Leistung auf 0"))
     elif d == "modal":
-        if u.get("num_chg") and is_num(ha.state(u["num_chg"])) and num(ha.state(u["num_chg"])) != 0:
+        if u.get("num_chg") and is_num(ha.state(u["num_chg"])):
             cmds.append(("number", "set_value", {"entity_id": u["num_chg"], "value": 0}, f"{k}: Ladeleistung auf 0"))
-        if is_num(ha.state(u["num"])) and num(ha.state(u["num"])) != 0:
+        if is_num(ha.state(u["num"])):
             cmds.append(("number", "set_value", {"entity_id": u["num"], "value": 0}, f"{k}: Entladeleistung auf 0"))
-        if s["dir"] != o["stop"]:
+        if ha.state(u["dir"]) not in unusable:
             cmds.append(("select", "select_option", {"entity_id": u["dir"], "option": o["stop"]}, f"{k}: Modus → {o['stop']}"))
     elif d == "limit":
         fv = u.get("fallback_value")
@@ -268,9 +269,9 @@ def release_commands(u, s, names, ha):
     elif d == "script":
         cmds.append(("script", "turn_on", {"entity_id": u["script"], "variables": {"power_w": 0, "mode": "release", "unit": k}},
                      f"{k}: Skript mit mode=release"))
-    if u.get("enable") and ha.state(u["enable"]) == "on":
+    if u.get("enable") and ha.state(u["enable"]) not in unusable:
         cmds.append(("homeassistant", "turn_off", {"entity_id": u["enable"]}, f"{k}: Fernsteuerung ausschalten"))
     fb = u.get("fallback_mode")
-    if u.get("mode") and fb and ha.state(u["mode"]) != fb:
+    if u.get("mode") and fb and ha.state(u["mode"]) not in unusable:
         cmds.append(("select", "select_option", {"entity_id": u["mode"], "option": fb}, f"{k}: Modus → {fb}"))
     return cmds

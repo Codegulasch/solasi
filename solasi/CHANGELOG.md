@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.0.7
+- **Not-Aus und Freigabe sind zuverlässiger:** Beim Stoppen sendet SOLASI jetzt immer 0 W und den Rückfall-Modus an den Speicher, auch wenn der zuletzt bekannte Zustand schon zu passen scheint.
+  Direkt nach einem Befehl meldet das Gerät seinen neuen Zustand oft verzögert. Dann hätte SOLASI die Leistung stehen lassen können, obwohl der Speicher noch lief. Gilt für alle Speichertypen.
+
 ## 1.0.6
 - Neue, ausführliche **Anleitung** in Home Assistant (Reiter „Dokumentation“) mit Einrichtung Schritt für Schritt, Sicherheit und Fehlersuche.
 - Überarbeitete Kurzbeschreibung im Add-on-Store.

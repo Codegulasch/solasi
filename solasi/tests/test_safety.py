@@ -22,9 +22,18 @@ def test_freigabe_anker_nicht_verfuegbar_nur_modus():
     u = unit(num="number.p", dir="select.d", mode="select.m", fallback_mode="self_consumption")
     ha = FakeHA({"number.p": "unavailable", "select.d": "discharge", "select.m": "third_party_control"})
     c = drivers.release_commands(u, drivers.read(ha, u, NAMES), NAMES, ha)
-    assert [x[2]["entity_id"] for x in c] == ["select.m"]
+    assert [x[2]["entity_id"] for x in c] == ["select.m"]                       # Leistung nicht erreichbar: nur der Modus
     ha.s["select.m"] = "self_consumption"
-    assert drivers.release_commands(u, drivers.read(ha, u, NAMES), NAMES, ha) == []          # schon im Zielmodus
+    c = drivers.release_commands(u, drivers.read(ha, u, NAMES), NAMES, ha)
+    assert [x[2]["entity_id"] for x in c] == ["select.m"]                       # Modus wird zur Sicherheit trotzdem gesetzt
+    ha.s["select.m"] = "unavailable"
+    assert drivers.release_commands(u, drivers.read(ha, u, NAMES), NAMES, ha) == []   # Gerät offline: nichts zu senden
+
+def test_freigabe_sendet_auch_wenn_der_bekannte_zustand_schon_passt():
+    u = unit(num="number.p", dir="select.d", mode="select.m", fallback_mode="self_consumption")
+    ha = FakeHA({"number.p": "0", "select.d": "discharge", "select.m": "self_consumption"})
+    c = drivers.release_commands(u, drivers.read(ha, u, NAMES), NAMES, ha)
+    assert [(x[2]["entity_id"], x[2].get("value", x[2].get("option"))) for x in c] == [("number.p", 0), ("select.m", "self_consumption")]
 
 def test_freigabe_ohne_rueckfallmodus_setzt_nur_null():
     u = unit(num="number.p", dir="select.d", mode="select.m")
@@ -37,7 +46,7 @@ def test_freigabe_modal_stop_dann_fernsteuerung_aus_dann_modus():
     ha = FakeHA({"select.f": "discharge", "number.d": "300", "number.c": "0", "switch.rs": "on", "select.u": "manual"})
     c = drivers.release_commands(u, drivers.read(ha, u, NAMES), NAMES, ha)
     assert [(x[2]["entity_id"], x[2].get("value", x[2].get("option"))) for x in c] == [
-        ("number.d", 0), ("select.f", "stop"), ("switch.rs", None), ("select.u", "anti_feed")]
+        ("number.c", 0), ("number.d", 0), ("select.f", "stop"), ("switch.rs", None), ("select.u", "anti_feed")]
 
 def test_freigabe_signed_limit_script():
     ha = FakeHA({"number.p": "250", "select.m": "Passive", "number.l": "400"})
@@ -284,3 +293,23 @@ def test_systempruefung_rueckfall(tmp_path):
     assert by()[("Sicherheit", "Not-Aus-Schalter")]["status"] == "ok"
     u["mode"] = ""
     assert by()[("Speicher A", "Rückfall-Modus")]["status"] == "warn"            # ohne Betriebsmodus kein Rückfall möglich
+
+
+# ---------------- Freigabe darf sich nicht auf einen veralteten Zwischenspeicher verlassen ----------------
+@pytest.mark.asyncio
+async def test_freigabe_setzt_null_und_modus_auch_bei_veraltetem_zustand(tmp_path):
+    """Direkt nach einem Schreibvorgang kann der bekannte Zustand noch alt sein (Meldung des Geräts kommt verzögert).
+    Die Freigabe muss trotzdem 0 W und den Rückfall-Modus senden."""
+    m, ctrl, ha, tasks = await live(tmp_path)
+    try:
+        assert await wait_for(lambda: m.states["number.pwr_a"]["state"] == "280", 8)
+        ctrl.cfg["units"][0]["fallback_mode"] = "self_consumption"
+        # veralteter Zwischenspeicher: SOLASI glaubt, der Speicher stehe schon auf 0 W und im Rückfall-Modus
+        ha.states["number.pwr_a"] = {**ha.states["number.pwr_a"], "state": "0"}
+        ha.states["select.mode_a"] = {**ha.states["select.mode_a"], "state": "self_consumption"}
+        assert m.states["select.mode_a"]["state"] == "third_party_control" and m.states["number.pwr_a"]["state"] == "280"
+        await ctrl.kill("Test", "manual")
+        assert m.states["number.pwr_a"]["state"] == "0", m.calls
+        assert m.states["select.mode_a"]["state"] == "self_consumption", m.calls
+    finally:
+        await stop(m, tasks)
