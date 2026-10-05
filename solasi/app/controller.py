@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 
 import drivers
+import energy
 import watchdog
 from ha import is_num, num
 from learn import BaseLoadLearner, is_night
@@ -848,6 +849,7 @@ class Controller:
         main = {
             "friendly_name": "SOLASI", "icon": "mdi:solar-power", "mode": mode,
             "enabled": st.get("enabled"), "dry_run": st.get("dry_run"),
+            "flows": st.get("flows"),
             "pv_w": st.get("pv_w"), "house_w": st.get("house_w"), "grid_w": st.get("grid_w"),
             "battery_w": st.get("bat_w"), "target_w": st.get("t_target"),
             "surplus_w": st.get("surplus_w"), "avg_soc": st.get("avg_soc"),
@@ -894,7 +896,9 @@ class Controller:
         house = snap["house_w"]
         if house is None and snap["has_out"]:
             house = max(snap["grid_w"] + snap["out_w"] + snap["extra_pv"], 0)
+        pv_total = (snap["pv_w"] + snap["extra_pv"]) if (snap["has_pv"] or snap["extra_pv"]) else None
         self.status = {
+            "flows": energy.flows(pv_total, snap.get("bat_w"), d["grid_w"]),
             "pv_w": round(snap["pv_w"] + snap["extra_pv"]) if (snap["has_pv"] or snap["extra_pv"]) else None,
             "bat_w": None if snap.get("bat_w") is None else round(snap["bat_w"]),   # Batterie: + Entladen, - Laden
             "house_w": None if house is None else round(house),

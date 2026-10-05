@@ -2,7 +2,7 @@ const {JSDOM}=require("jsdom");const fs=require("fs");const path=require("path")
 const html=fs.readFileSync(path.join(APP,"static","index.html"),"utf8");
 const cfg=JSON.parse(require("child_process").execSync(`python3 -c "import json,controller;print(json.dumps(controller.DEFAULT_CONFIG))"`,{cwd:APP,env:{...process.env,SOLASI_DATA:require("os").tmpdir()}}).toString());
 cfg.grid.entity="sensor.grid";const saved=[];let replayBody=null;const calls=[];let failDevice=false;
-const status={safety:{state:"active",reason:"",since:null},pv_w:3000,bat_w:-1100,house_w:1380,connected:true,enabled:true,dry_run:true,surplus_enabled:true,surplus_dry_run:true,meter_ok:true,grid_w:400,net_balance:400,net_dis:400,t_target:390,eco_active:false,avg_soc:60,blocked_w:0,want:"Entladen",surplus_w:1620,
+const status={flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},safety:{state:"active",reason:"",since:null},pv_w:780,bat_w:-260,house_w:529,connected:true,enabled:true,dry_run:true,surplus_enabled:true,surplus_dry_run:true,meter_ok:true,grid_w:400,net_balance:400,net_dis:400,t_target:390,eco_active:false,avg_soc:60,blocked_w:0,want:"Entladen",surplus_w:1620,
  units:[{name:"Speicher A",pv:540,soc:80,set:0,real:0,plan:280,force:false,available:false,mode:"self_consumption",dir:"discharge"},{name:"Speicher B",soc:40,set:0,real:0,plan:110,force:true,available:true,mode:"third_party_control",dir:"discharge"}],
  slots:[{name:"Wallbox",ent:"switch.wb",num:"number.wb",state:"on",own_w:1380,num_v:6}],
  events:[{ts:"12:00:01",level:"test",msg:"Test: Speicher A: 0 W → 280 W"},{ts:"12:00:00",level:"error",msg:"<b>x</b>"}]};
@@ -48,9 +48,17 @@ const w=dom.window,d=w.document;
  ok(d.querySelector("#p-status").textContent.includes("390 W")&&d.querySelector("#p-status").textContent.includes("Abregelung"),"Status zeigt Sollwert + Abregelung");
  ok(d.querySelector(".headline").textContent.includes("Im Test: Die Speicher versorgen dein Haus mit 390 W"),"Überschrift in Klartext");
  const fl=d.querySelector(".flow svg").textContent;
- ok(fl.includes("3000 W")&&fl.includes("1100 W")&&fl.includes("1380 W")&&fl.includes("lädt"),"Energiefluss zeigt PV, Speicher (lädt), Haus");
- ok(d.querySelectorAll(".flow .line.active").length===3,"drei aktive Flusslinien");
- ok(d.querySelectorAll(".flow .line.active.rev").length===2,"Speicher-Linie (lädt) und Netz-Linie (Bezug) laufen Richtung Haus bzw. Speicher");
+ ok(fl.includes("780 W")&&fl.includes("260 W")&&fl.includes("529 W")&&fl.includes("lädt")&&fl.includes("Bezug"),"Energiefluss zeigt Solar 780, Speicher 260 (lädt), Haus 529, Netz Bezug");
+ // Linien: Solar -> Haus (520 W), Solar -> Speicher (260 W), Netz -> Haus (9 W); Speicher <-> Haus ist ruhig
+ const lines=[...d.querySelectorAll(".flow svg path.line")];
+ ok(lines.length===4,"vier Linien: Solar-Haus, Solar-Speicher, Speicher-Haus, Netz-Haus");
+ const cls=i=>lines[i].getAttribute("class");
+ ok(cls(0).includes("active")&&!cls(0).includes("rev"),"Solar -> Haus ist aktiv");
+ ok(cls(1).includes("active")&&!cls(1).includes("rev"),"Solar -> Speicher ist aktiv (Überschuss lädt den Speicher)");
+ ok(!cls(2).includes("active"),"Speicher <-> Haus ist ruhig (Speicher wird aus der PV geladen, nicht über das Haus)");
+ ok(cls(3).includes("active")&&cls(3).includes("rev"),"Netz -> Haus läuft Richtung Haus (Bezug)");
+ const ev=[...d.querySelectorAll(".flow svg .edge-val")].map(e=>e.textContent);
+ ok(ev.length===3&&ev.includes("520 W")&&ev.includes("260 W")&&ev.includes("9 W"),"Linien tragen ihre Werte: 520 W, 260 W, 9 W");
  ok(d.getElementById("modetext").textContent==="Testmodus"&&d.getElementById("conntext").textContent==="Verbunden","Status-Pillen");
  ok(d.querySelector(".bat svg rect[fill*=ok]")!==null,"Batterie-Symbol grün bei hohem Ladestand");
  ok(d.querySelector("#p-status").textContent.includes("Wallbox"),"Überschuss-Slot im Status");
@@ -128,6 +136,18 @@ const w=dom.window,d=w.document;
  w.showPage("log");ok(d.querySelectorAll("#subnav button").length===3&&d.querySelector("#nav button.act").dataset.g==="system","System: Selbsttest, Protokoll, Dashboard-Karte");
  d.querySelector('#nav [data-g="eval"]').click();ok(d.getElementById("p-stats").classList.contains("act"),"Hauptbereich öffnet die erste Unterseite");
 
+ // --- Energiefluss in weiteren Lagen ---
+ const draw=async(o)=>{Object.assign(status,o);await new Promise(r=>setTimeout(r,2300));return [...d.querySelectorAll(".flow svg path.line")].map(l=>l.getAttribute("class"));};
+ w.showPage("status");
+ let L=await draw({pv_w:0,bat_w:300,grid_w:100,house_w:400,flows:{solar_house:0,solar_battery:0,battery_house:300,grid_house:100}});
+ ok(!L[0].includes("active")&&!L[1].includes("active")&&L[2].includes("active")&&!L[2].includes("rev")&&L[3].includes("rev"),"Nachts: Speicher -> Haus (vorwärts) und Netz -> Haus, keine Solar-Linien");
+ L=await draw({pv_w:0,bat_w:-600,grid_w:700,house_w:100,flows:{solar_house:0,solar_battery:0,battery_house:-600,grid_house:700}});
+ ok(L[2].includes("active")&&L[2].includes("rev")&&L[3].includes("rev"),"Netzladen: Netz -> Haus und Haus -> Speicher (rückwärts auf der Speicher-Linie)");
+ L=await draw({pv_w:1500,bat_w:0,grid_w:-700,house_w:800,flows:{solar_house:1500,solar_battery:0,battery_house:0,grid_house:-700}});
+ ok(L[0].includes("active")&&!L[1].includes("active")&&L[3].includes("active")&&!L[3].includes("rev"),"Einspeisung: Solar -> Haus und Haus -> Netz (vorwärts)");
+ L=await draw({flows:null,pv_w:null,bat_w:null,house_w:null,grid_w:0});
+ ok(L.every(c=>!c.includes("active")),"Ohne Flusswerte: alle Linien ruhig, nichts erfunden");
+ Object.assign(status,{pv_w:780,bat_w:-260,house_w:529,grid_w:9,flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9}});
  // --- Kill-Switch ---
  w.showPage("status");await new Promise(r=>setTimeout(r,2300));
  const kb=d.getElementById("killbtn");

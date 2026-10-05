@@ -149,6 +149,12 @@ Hersteller-App, um Solar, Laden und Entladen zu finden. Die Felder schlagen dies
 Die Batterie wird dabei nicht entladen. Der Eco-Modus begrenzt nur den Anteil aus der Batterie, die PV kommt zusätzlich direkt ins Haus.
 Das setzt voraus, dass der Speicher im externen Modus die PV zuerst nutzt. Bitte im Testmodus beobachten, dann live mit dem Not-Aus in Reichweite prüfen.
 
+## Energiefluss lesen
+
+Die Grafik verteilt die gemessenen Werte auf ihre Linien. Die Ladeleistung der Batterie kommt zuerst aus der Solarleistung (Linie **Solar → Speicher**),
+der Rest der Solarleistung geht ins Haus. Reicht die Solarleistung nicht für die Ladung, kommt der Rest aus dem Netz und läuft über das Haus in den Speicher.
+Der Speicher gibt beim Entladen über die Linie **Speicher → Haus** ab. Die Verteilung ist aus den Messwerten abgeleitet, die Anlage meldet sie nicht selbst.
+
 ## Selbsttest und Systemprüfung
 
 **System → Selbsttest** enthält zwei Dinge:

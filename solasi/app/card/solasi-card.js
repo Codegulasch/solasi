@@ -34,6 +34,7 @@
     .lbl{fill:var(--secondary-text-color);font-size:13px;font-weight:600}
     .val{fill:var(--primary-text-color);font-size:17px;font-weight:700}
     .small{fill:var(--secondary-text-color);font-size:11.5px}
+    .evl{fill:var(--secondary-text-color);font-size:12px;font-weight:650}
     .line{stroke:var(--divider-color,#dddddd);stroke-width:4;stroke-linecap:round;fill:none}
     .line.on{stroke-dasharray:3 11;animation:dash 1s linear infinite}
     .line.rev{animation-direction:reverse}
@@ -58,10 +59,12 @@
   `;
 
   function flowSVG(a) {
-    const pv = num(a.pv_w), bat = num(a.battery_w), grid = num(a.grid_w) ?? 0, house = num(a.house_w);
+    const pv = num(a.pv_w), bat = num(a.battery_w), grid = num(a.grid_w) ?? 0, house = num(a.house_w), f = a.flows || {};
     const act = v => v != null && Math.abs(v) >= 5;
-    const line = (x1, y1, x2, y2, val, fwd, col) =>
-      `<path d="M${x1} ${y1} L${x2} ${y2}" class="line ${act(val) ? "on" + (fwd ? "" : " rev") : ""}" ${act(val) ? `style="stroke:${col}"` : ""}/>`;
+    // Linie mit Wert; fwd: Fluss in Richtung des Pfads (von x1,y1 nach x2,y2)
+    const edge = (d, val, fwd, col, lx, ly, anchor) =>
+      `<path d="${d}" class="line ${act(val) ? "on" + (fwd ? "" : " rev") : ""}" ${act(val) ? `style="stroke:${col}"` : ""}/>` +
+      (act(val) ? `<text x="${lx}" y="${ly}" text-anchor="${anchor}" class="evl">${Math.round(Math.abs(val))} W</text>` : "");
     const node = (x, y, icon, label, val, sub, col, side) =>
       `<g><circle cx="${x}" cy="${y}" r="38" fill="${col}" fill-opacity=".15" stroke="${col}" stroke-width="2.5"/>
         <text x="${x}" y="${y + 10}" text-anchor="middle" font-size="30">${icon}</text>
@@ -72,10 +75,12 @@
              ${sub ? `<text x="${x}" y="${y + 98}" text-anchor="middle" class="small">${sub}</text>` : ""}`}</g>`;
     const batSub = bat == null ? "" : bat >= 5 ? "entlädt" : bat <= -5 ? "lädt" : "ruht";
     const gridSub = grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen";
+    const bh = f.battery_house;
     return `<svg viewBox="0 0 640 330" role="img" aria-label="Energiefluss">
-      ${line(320, 92, 320, 160, pv, true, "var(--sc-sun)")}
-      ${line(116, 196, 282, 196, bat, bat != null && bat > 0, "var(--sc-bat)")}
-      ${line(358, 196, 524, 196, grid, grid < 0, "var(--sc-grid)")}
+      ${edge("M320 92 L320 158", f.solar_house, true, "var(--sc-sun)", 332, 130, "start")}
+      ${edge("M288.6 75.4 L143.4 174.6", f.solar_battery, true, "var(--sc-sun)", 204, 114, "end")}
+      ${edge("M150 196 L282 196", bh, bh != null && bh > 0, "var(--sc-bat)", 216, 186, "middle")}
+      ${edge("M358 196 L490 196", f.grid_house, f.grid_house != null && f.grid_house < 0, "var(--sc-grid)", 424, 186, "middle")}
       ${node(320, 54, "☀️", "Solar", W(pv), "", "var(--sc-sun)", true)}
       ${node(112, 196, "🔋", "Speicher", bat == null ? "–" : W(Math.abs(bat)), batSub, "var(--sc-bat)")}
       ${node(320, 196, "🏠", "Haus", W(house), "", "var(--sc-home)")}

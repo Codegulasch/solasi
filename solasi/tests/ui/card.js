@@ -5,7 +5,7 @@ const dom=new JSDOM("<!DOCTYPE html><body></body>",{runScripts:"outside-only",pr
 const w=dom.window;w.addEventListener("error",e=>errors.push(e.message));
 w.eval(src);
 const ok=(c,m)=>{if(!c){console.log("FAIL:",m);process.exitCode=1}else console.log("ok  :",m)};
-const attrs={mode:"test",pv_w:3000,battery_w:-1100,house_w:1380,grid_w:400,target_w:390,surplus_w:1620,avg_soc:62,eco_active:true,meter_ok:true,blocked_w:1380,
+const attrs={mode:"test",flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},pv_w:780,battery_w:-260,house_w:529,grid_w:9,target_w:390,surplus_w:1620,avg_soc:62,eco_active:true,meter_ok:true,blocked_w:1380,
  units:[{name:"Speicher A",pv:540,soc:80,set:280,force:false,available:true},{name:"<img src=x onerror=alert(1)>",soc:-1,set:0,force:true,available:false}],
  slots:[{name:"Wallbox",state:"on",own_w:1380}]};
 const mk=(cfg,states)=>{const el=w.document.createElement("solasi-card");w.document.body.appendChild(el);el.setConfig(cfg);el.hass={states};return el;};
@@ -18,8 +18,10 @@ ok(w.customCards.some(c=>c.type==="solasi-card"),"Karte erscheint im Karten-Ausw
 ok(w.customElements.get("solasi-card").getStubConfig().entity==="sensor.solasi","Standard-Entität sensor.solasi");
 
 let el=mk({},st("Entladen",attrs));
-ok(txt(el).includes("3000 W")&&txt(el).includes("1100 W")&&txt(el).includes("1380 W")&&txt(el).includes("lädt")&&txt(el).includes("Bezug"),"Diagramm zeigt PV, Speicher (lädt), Haus, Netz (Bezug)");
-ok(q(el,".line.on").length===3&&q(el,".line.on.rev").length===2,"3 aktive Linien, davon 2 rückwärts (Speicher lädt, Netz-Bezug)");
+ok(txt(el).includes("780 W")&&txt(el).includes("260 W")&&txt(el).includes("529 W")&&txt(el).includes("lädt")&&txt(el).includes("Bezug"),"Diagramm zeigt Solar 780, Speicher 260 (lädt), Haus 529, Netz Bezug");
+const ln=[...q(el,"path.line")];
+ok(ln.length===4&&ln[0].getAttribute("class").includes("on")&&ln[1].getAttribute("class").includes("on")&&!ln[2].getAttribute("class").includes("on")&&ln[3].getAttribute("class").includes("rev"),"Linien: Solar->Haus und Solar->Speicher aktiv, Speicher<->Haus ruhig, Netz->Haus (Bezug)");
+ok([...q(el,".evl")].map(e=>e.textContent).sort().join()==="260 W,520 W,9 W","Linien tragen ihre Werte (520, 260, 9 W)");
 ok(q(el,".headline")[0].textContent.startsWith("Im Test: Die Speicher versorgen dein Haus mit 390 W"),"Überschrift im Testmodus");
 ok(q(el,".pill.test").length===1&&txt(el).includes("Testmodus"),"Modus-Pille");
 ok(txt(el).includes("Wallbox")&&txt(el).includes("1620 W")&&txt(el).includes("Eco-Modus")&&txt(el).includes("Entladung gesperrt für 1380 W"),"Überschuss, Eco-Tag, Sperre");

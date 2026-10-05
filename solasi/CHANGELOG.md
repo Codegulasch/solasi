@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.0.3
+- **Energiefluss zeigt, wohin die Solarleistung geht:** Vorher endeten alle Linien sternförmig am Haus, es sah aus, als ginge die gesamte Solarleistung ins Haus
+  und der Speicher würde vom Haus geladen. Jetzt gibt es eine eigene Linie **Solar → Speicher**. Beispiel: 780 W Solar, Speicher lädt 260 W, Netz 9 W Bezug →
+  520 W Solar → Haus, 260 W Solar → Speicher, 9 W Netz → Haus. Jede Linie trägt ihren Wert. Beim Laden aus dem Netz läuft die Ladeleistung über das Haus in den Speicher.
+  Gilt für die Weboberfläche und die Dashboard-Karte (neues Attribut `flows` an `sensor.solasi`).
+
 ## 1.0.2
 - **Behoben: Beim ersten Einrichten fehlten die Vorschläge ab „Beim Stoppen: Modus setzen auf“.** Die Listen für Ladestand, Leistungs- und PV-Sensoren
   und die Rückfall-Optionen wurden nur gefüllt, wenn beim Aufbau der Seite schon eine Leistungs-Entität bzw. ein Betriebsmodus eingetragen war. Jetzt stehen
