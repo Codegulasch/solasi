@@ -113,6 +113,8 @@ def build_app(ctrl, store, ha):
             return web.json_response({"ok": False, "error": str(e)}, status=400)
         ctrl.event("info", "Einstellungen gespeichert")
         now_live = bool(store.cfg["enabled"]) and not store.cfg["dry_run"]
+        if now_live and not was_live:
+            ctrl._mode_try.clear()           # Live-Steuerung eingeschaltet: Modus sofort setzen
         if was_live and not now_live and store.cfg["safety"]["release_on_disable"] and not ctrl.stopped:
             ctrl.event("info", "Live-Steuerung beendet: Speicher werden freigegeben")
             asyncio.create_task(ctrl.release_all("Steuerung ausgeschaltet", force=True))

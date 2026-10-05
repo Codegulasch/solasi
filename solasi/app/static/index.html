@@ -338,6 +338,7 @@ function renderControl(){
     field(f+"thresholds","Schwellen verwenden","bool",{hint:"Aus = es wird schon bei kleinsten Abweichungen geregelt."})+
     field(f+"ac_charge","Laden aus Fremd-Überschuss erlauben","bool",{hint:"Z. B. von einer anderen PV-Anlage am Zähler."})+
     field(f+"strict_zero","Strenge Nulleinspeisung bei vollem Speicher","bool",{hint:"Voller Speicher wird auf „Entladen“ gestellt, damit er die PV drosselt (nur bei Speichertypen, die das können)."})+
+    field(f+"enforce_mode","Externe Steuerung automatisch einschalten","bool",{hint:"Sobald SOLASI live steuert, stellt es den Betriebsmodus des Speichers auf die Option für externe Steuerung (bei Anker „third_party_control“): beim Start, nach „Fortsetzen“ und wenn der Modus von außen verstellt wird, auch wenn gerade nichts zu regeln ist. Zum Zurückgeben dient der Not-Aus."})+
     field(f+"pv_passthrough","PV direkt ins Haus geben, auch bei leerem Speicher","bool",{hint:"Liegt der Ladestand unter dem Minimum, darf der Speicher trotzdem so viel abgeben, wie seine Module gerade liefern. Die Batterie wird dabei nicht entladen. Braucht den PV-Sensor je Speicher."})+
     field(f+"failsafe","Failsafe","bool",{hint:"Bei Zähler-Ausfall gehen die Speicher auf 0 W. Außerdem wird 0 W erneut gesendet, wenn die echte Leistung noch fließt."}))+
    fs("🎚️ Regelung",

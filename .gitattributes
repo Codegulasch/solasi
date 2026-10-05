@@ -1,0 +1,6 @@
+# Einheitliche Zeilenenden (LF), damit Skripte und Konfigurationen auf Windows, macOS und Linux gleich funktionieren
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.zip binary
+*.ico binary

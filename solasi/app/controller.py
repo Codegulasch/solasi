@@ -59,7 +59,8 @@ DEFAULT_CONFIG = {
     "grid": {"entity": "", "invert": False, "max_age": 60},
     "units": [default_unit("Speicher A"), default_unit("Speicher B")],
     "features": {"eco": True, "thresholds": True, "ac_charge": True,
-                 "strict_zero": True, "failsafe": True, "pv_passthrough": True},
+                 "strict_zero": True, "failsafe": True, "pv_passthrough": True,
+                 "enforce_mode": True},
     "control": {"min_gap": 5, "heartbeat": 10, "split": "soc",
                 "total_max_dis": 800, "total_max_chg": 2000,
                 "threshold_on": 120, "threshold_off": 80,
@@ -310,6 +311,7 @@ class Controller:
         self._wd_hash = load_json(self._wd_path, {}).get("hash", "")
         self.watchdog = {"state": "unbekannt", "detail": "Noch nicht abgeglichen", "json": "", "managed": False}
         self._hb_stopped = False
+        self._mode_try = {}          # Speicher -> Zeitpunkt des letzten Versuchs, den Modus zu setzen
         self._releasing = False
         self._shutdown = False
         self.stats = Stats(data_path("stats.json"))
@@ -494,16 +496,23 @@ class Controller:
         uc = u["cfg"]
         p = u["p"]
 
-        # 1) Voraussetzungen schaffen (Fernsteuerung einschalten, Arbeitsmodus setzen)
-        if d["meter_ok"] and (p != 0 or u["force"]):
-            did = False
-            for dom, svc, data, what in drivers.guard_commands(uc, names, self.ha):
-                did = await self.act(dry, what, dom, svc, data) or did
-            if did and uc.get("num"):
-                for _ in range(20):                       # Entität wird oft erst im Zielmodus verfügbar
-                    if is_num(self.ha.state(uc["num"])):
-                        break
-                    await asyncio.sleep(0.5)
+        # 1) Voraussetzungen schaffen (Fernsteuerung einschalten, Arbeitsmodus auf externe Steuerung setzen).
+        #    Mit „Modus automatisch setzen“ passiert das sofort beim Start, nach „Fortsetzen“ und wenn der Modus von außen
+        #    verstellt wird, nicht erst, wenn ein Sollwert anliegt. Dann höchstens alle mode_retry_s Sekunden.
+        needed = p != 0 or u["force"]
+        if d["meter_ok"] and (needed or f.get("enforce_mode", True)):
+            cmds = drivers.guard_commands(uc, names, self.ha)
+            now_g = time.monotonic()
+            if cmds and (needed or now_g - self._mode_try.get(u["k"], -1e9) >= self.mode_retry_s):
+                self._mode_try[u["k"]] = now_g
+                did = False
+                for dom, svc, data, what in cmds:
+                    did = await self.act(dry, what, dom, svc, data) or did
+                if did and uc.get("num"):
+                    for _ in range(20):                   # Entität wird oft erst im Zielmodus verfügbar
+                        if is_num(self.ha.state(uc["num"])):
+                            break
+                        await asyncio.sleep(0.5)
 
         # 2) Sollwert schreiben
         s = drivers.read(self.ha, uc, names, self._script_mem)
@@ -631,6 +640,7 @@ class Controller:
         self._meter_bad_since = None
         self._clear_since = None
         self._fail_times.clear()
+        self._mode_try.clear()               # Modus sofort wieder auf externe Steuerung setzen, ohne Sperrzeit
         self.event("info", "▶ SOLASI läuft wieder")
         self.wake.set()
         return True
@@ -746,6 +756,7 @@ class Controller:
             await asyncio.sleep(self.heartbeat_interval)
 
     heartbeat_interval = 30
+    mode_retry_s = 30         # so selten wird versucht, einen von außen verstellten Modus zurückzusetzen
     resume_clear_s = 300      # so lange muss alles in Ordnung sein, bevor automatisch fortgesetzt wird
 
     # ---------- Lernen, Statistik, Selbsttest ----------

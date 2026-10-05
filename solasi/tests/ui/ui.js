@@ -185,6 +185,7 @@ const w=dom.window,d=w.document;
  ok(cfg.units[0].power_basis==="battery","Messart wird übernommen");
  await go("control");
  ok(d.getElementById("f_features_pv_passthrough")!==null,"Schalter PV-Durchleitung vorhanden");
+ ok(d.getElementById("f_features_enforce_mode")!==null&&d.getElementById("f_features_enforce_mode").checked===true,"Schalter „Externe Steuerung automatisch einschalten“ vorhanden und standardmäßig an");
  w.showPage("units");await new Promise(r=>setTimeout(r,50));
  const drvSel=d.getElementById("f_units_0_driver");
  ok(drvSel&&[...drvSel.options].map(o=>o.value).join()==="anker,signed,modal,limit,script","Speichertyp-Auswahl mit fünf Treibern");

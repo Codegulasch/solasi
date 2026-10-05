@@ -202,6 +202,7 @@ Mit der Annahme „Firmware drosselt PV bei vollem Speicher“ kannst du beide M
 | Eco-Modus | Begrenzt die Gesamtentladung ab einem mittleren SOC auf die Grundlast |
 | Schwellen & Hysterese | Ein-/Ausschaltschwellen, SOC-Hysterese, getrennte Offsets für Laden und Entladen |
 | AC-Laden | Fremd-Überschuss (z. B. andere PV-Anlage) darf den Akku laden |
+| Externe Steuerung automatisch | Beim Start, nach „Fortsetzen“ und wenn der Modus von außen verstellt wird, setzt SOLASI den Betriebsmodus des Speichers auf die Option für externe Steuerung (bei Anker `third_party_control`), auch wenn gerade nichts zu regeln ist. Zum Zurückgeben dient der Not-Aus oder das Ausschalten der Live-Steuerung |
 | Strenge Nulleinspeisung | Voller Speicher wird auf Entladen 0 W bzw. Hausbedarf gestellt, damit die PV gedrosselt wird |
 | Failsafe | Fällt der Zähler aus, werden die Geräte auf 0 W gesetzt; Real-Power-Check |
 | Überschuss | Bis zu 3 Verbraucher mit eigenen Schwellen, Verzögerungen, Mindestlaufzeiten, SOC-Bedingung, Zusatzbedingung |

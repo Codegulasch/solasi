@@ -25,7 +25,7 @@ copy_dir solasi
 [ -n "$old_url" ] && sedi "s#^url:.*#${old_url}#" solasi/config.yaml
 copy_dir .github
 copy_dir tools
-for f in repository.yaml LICENSE README.md .gitignore; do
+for f in repository.yaml LICENSE README.md .gitignore .gitattributes; do
   [ -f "$f" ] || { [ -f "$src/$f" ] && cp "$src/$f" "$f" && echo "Neu angelegt: $f"; }
 done
 chmod +x tools/*.sh

@@ -167,9 +167,10 @@ def guard_commands(u, names, ha):
         return cmds
     o = opts(u, names)
     k = u.get("name", "Speicher")
-    if u.get("enable") and ha.state(u["enable"]) != "on":
+    unusable = (None, "unavailable", "unknown")      # nicht erreichbare Entitäten lassen sich nicht schalten
+    if u.get("enable") and ha.state(u["enable"]) not in unusable and ha.state(u["enable"]) != "on":
         cmds.append(("homeassistant", "turn_on", {"entity_id": u["enable"]}, f"{k}: Fernsteuerung einschalten"))
-    if u.get("mode") and o["mode"] and ha.state(u["mode"]) != o["mode"]:
+    if u.get("mode") and o["mode"] and ha.state(u["mode"]) not in unusable and ha.state(u["mode"]) != o["mode"]:
         cmds.append(("select", "select_option", {"entity_id": u["mode"], "option": o["mode"]},
                      f"{k}: Modus auf '{o['mode']}' setzen"))
     return cmds

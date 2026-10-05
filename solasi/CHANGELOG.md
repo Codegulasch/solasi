@@ -1,5 +1,17 @@
 # Änderungen
 
+## 1.0.5
+- **Werkzeuge für Windows:** `tools/sync_from_zip.ps1` und `tools/release.ps1` (PowerShell) spielen ein neues Paket ein und veröffentlichen es, ohne Bash, `unzip` oder Python.
+- **`.gitattributes`:** einheitliche Zeilenenden (LF), damit Skripte und Konfigurationen auf Windows nicht mit falschen Zeilenenden ausgecheckt werden.
+- Die App selbst ist unverändert gegenüber 1.0.4.
+
+## 1.0.4
+- **Externe Steuerung automatisch einschalten:** Sobald SOLASI live steuert, stellt es den Betriebsmodus des Speichers auf die Option für externe Steuerung
+  (bei Anker „third_party_control“), auch wenn gerade nichts zu regeln ist. Vorher geschah das erst, wenn ein Sollwert anlag. Es passiert beim Start,
+  beim Einschalten der Live-Steuerung, nach „Fortsetzen“ und wenn der Modus von außen verstellt wird (dann höchstens alle 30 Sekunden). Bei Speichern mit
+  Fernsteuerungs-Schalter (z. B. RS485) wird dieser vorher eingeschaltet. Nicht erreichbare Entitäten werden übersprungen. Im Testmodus, bei „Regelung aus“,
+  im Not-Aus-Zustand und bei Zählerausfall wird nichts geändert. Abschaltbar unter *Regelung → Funktionen*.
+
 ## 1.0.3
 - **Energiefluss zeigt, wohin die Solarleistung geht:** Vorher endeten alle Linien sternförmig am Haus, es sah aus, als ginge die gesamte Solarleistung ins Haus
   und der Speicher würde vom Haus geladen. Jetzt gibt es eine eigene Linie **Solar → Speicher**. Beispiel: 780 W Solar, Speicher lädt 260 W, Netz 9 W Bezug →
