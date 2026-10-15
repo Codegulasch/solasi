@@ -1,9 +1,10 @@
 # Änderungen
 
+## 1.3.1
+- **Zählerkacheln anordnen:** unter *Betrieb → Zähler → Reihenfolge der Kacheln* (Tagesverbrauch, jeder Zähler, Solarertrag, Netzbezug). In der Karte gilt dieselbe Reihenfolge, oder eine eigene mit `meters_order` (im Editor mit Pfeilen). Steht der Tagesverbrauch ganz oben, bleibt er die große Kachel.
 ## 1.3.0
 - **Blöcke anordnen:** *Einstellungen → Darstellung → Anordnung* legt die Reihenfolge der Blöcke in **Übersicht** und **Statistik** fest (Pfeile, Haken zum Ausblenden, „Standard wiederherstellen“). Die Anordnung wird im Add-on gespeichert und gilt auf allen Geräten.
 - **Dashboard-Karte:** neue Option `order` und im visuellen Editor Pfeile zum Verschieben der Blöcke. Bestehende Karten sehen unverändert aus; `show_*` blendet weiter aus.
-- **Zählerkacheln anordnen:** unter *Betrieb → Zähler → Reihenfolge der Kacheln* (Tagesverbrauch, jeder Zähler, Solarertrag, Netzbezug). In der Karte gilt dieselbe Reihenfolge, oder eine eigene mit `meters_order` (im Editor mit Pfeilen). Steht der Tagesverbrauch ganz oben, bleibt er die große Kachel.
 - **Wasser in Litern:** der Verbrauch heute aller Wasserzähler (m³) wird als „+180 l heute“ angezeigt, in Add-on und Karte. Der Zählerstand bleibt in m³.
 - **Kein Springen mehr:** die Übersicht baute bisher alle 2 Sekunden alles neu auf, dabei sprang die Seite beim Scrollen, und geöffnete *Technische Details* klappten wieder zu. Jetzt werden nur geänderte Blöcke aktualisiert, die Scrollposition wird bei Höhenänderungen ausgeglichen, und während des Scrollens wird nicht neu gezeichnet. Die Karte hält ihre Höhe (auch beim Laden) und zeichnet nur bei geändertem Inhalt.
 
