@@ -12,6 +12,7 @@
  *   show_trend: true                # Tagesverlauf von Solar und Haus
  *   show_meters: true               # Reihe mit Tagesverbrauch und Zählern ganz oben
  *   meters_layout: big              # big (große Kachel links) oder even (alle gleich groß)
+ *   order: [meters, headline, flow, trend, batteries, surplus, tags]   # Reihenfolge der Blöcke (Standard wie hier)
  *   show_kill: true                 # Not-Aus-Knopf (braucht MQTT, siehe Anleitung)
  *   tap_open: true                  # Antippen öffnet SOLASI
  *   accent: ""                      # Akzentfarbe, z. B. "#3F5BD8" (leer = Standard)
@@ -20,6 +21,15 @@
   const VERSION = "__VERSION__";
   const W = v => (v == null || isNaN(v)) ? "–" : `${Math.round(v)} W`;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let lastScrollAt = 0;
+  addEventListener("scroll", () => { lastScrollAt = Date.now(); }, { passive: true, capture: true });
+  const BLOCKS = [["meters", "Zählerreihe"], ["headline", "Überschrift"], ["flow", "Energiefluss"], ["trend", "Tagesverlauf"],
+                  ["batteries", "Speicher"], ["surplus", "Überschuss"], ["tags", "Hinweise"]];
+  const blockOrder = o => {
+    const all = BLOCKS.map(b => b[0]);
+    const ord = (Array.isArray(o) ? o : []).filter((x, i, a) => all.includes(x) && a.indexOf(x) === i);
+    return [...ord, ...all.filter(x => !ord.includes(x))];
+  };
   const num = v => (v === null || v === undefined || v === "" || isNaN(Number(v))) ? null : Number(v);
 
   const STYLE = `
@@ -296,6 +306,16 @@ const SF = (() => {
   const nf = (v, dec) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
   const nd = v => Number(v).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
+  /* Wasserzähler: Tagesverbrauch in Litern (Zählerstand bleibt in m³) */
+  const isWater = m => /^m[³3]$/i.test(String(m.unit || "").trim()) && (m.icon === "wasser" || /wasser|water/i.test(String(m.name || "") + " " + String(m.entity || "")));
+  const dayText = m => {
+    if (isWater(m)) {
+      const l = Math.round(m.day * 1000);
+      return `<b>${l >= 0 ? "+" : ""}${l.toLocaleString("de-DE")} l</b> heute`;
+    }
+    return `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute`;
+  };
+
   /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
   function meters(d) {
     const tiles = [];
@@ -303,7 +323,7 @@ const SF = (() => {
     const hero = d.show_day !== false && t && t.house != null
       ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
     (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
-      sub: m.day != null && m.value != null ? `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute` : "" }));
+      sub: m.day != null && m.value != null ? dayText(m) : "" }));
     if (d.extra && t) {
       if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
       if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
@@ -363,7 +383,12 @@ const SF = (() => {
       this._hass = hass;
       const st = hass && hass.states ? hass.states[this._cfg.entity] : null;
       const key = st ? `${st.state}|${st.last_updated}` : "none";
-      if (key !== this._key) { this._key = key; this._render(); }
+      if (key === this._key) return;
+      if (Date.now() - lastScrollAt < 250) {            // nicht mitten im Scrollen neu zeichnen
+        if (!this._defer) this._defer = setTimeout(() => { this._defer = null; this._key = null; this.hass = this._hass; }, 300);
+        return;
+      }
+      this._key = key; this._render();
     }
 
     getCardSize() { return 5; }
@@ -374,7 +399,7 @@ const SF = (() => {
       if (!this._cfg) return;
       const c = this._cfg;
       const st = this._hass && this._hass.states ? this._hass.states[c.entity] : null;
-      let body;
+      let body, ready = false;
       if (!this._hass) {
         body = `<div class="msg">Lade …</div>`;
       } else if (!st) {
@@ -394,24 +419,28 @@ const SF = (() => {
           <div class="tile grid"><div class="n">Netz</div><div class="v">${W(Math.abs(g))}</div></div></div>`;
         const mc = a.meters_cfg || {};
         const mhtml = c.show_meters ? SF.meters({ items: a.meters || [], today: a.today, show_day: mc.show_day, extra: mc.extra, layout: c.meters_layout }) : "";
-        body = compact ? `${c.show_headline ? `<div class="sub">${esc(hl)}</div>` : ""}${tiles}` : `
-          ${mhtml ? `<div class="mwrap">${mhtml}</div>` : ""}
-          ${c.show_headline ? `<div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>` : ""}
-          ${flowSVG(a)}
-          ${c.show_trend ? trendSVG(a) : ""}
-          ${c.show_batteries && (a.units || []).length ? `<div class="units">${a.units.map(u => {
+        const parts = {
+          meters: mhtml ? `<div class="mwrap">${mhtml}</div>` : "",
+          headline: c.show_headline ? `<div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>` : "",
+          flow: flowSVG(a),
+          trend: c.show_trend ? trendSVG(a) : "",
+          batteries: c.show_batteries && (a.units || []).length ? `<div class="units">${a.units.map(u => {
             const soc = u.soc < 0 ? null : u.soc;
             return `<div class="unit"><div class="n">${esc(u.name)}</div><div class="s">${soc == null ? "–" : soc + " %"}</div>
               <div class="bar"><div style="width:${soc || 0}%;background:${socColor(soc)}"></div></div>
               <div class="d">${u.pv != null ? "Solar " + Math.round(u.pv) + " W · " : ""}${Math.round(u.set)} W gesetzt${u.force ? " · Abregelung" : ""}${u.available === false ? " · nicht verfügbar" : ""}</div></div>`;
-          }).join("")}</div>` : ""}
-          ${c.show_surplus && a.surplus_w != null ? `<div class="surplus"><div class="row"><span>Überschuss</span><b>${W(a.surplus_w)}</b></div>
-            ${(a.slots || []).map(s => `<div class="row"><span>${esc(s.name)}</span><span>${s.state ? esc(s.state) + " · " : ""}<b>${W(s.own_w)}</b></span></div>`).join("")}</div>` : ""}
-          ${c.show_tags ? `<div class="tags">
+          }).join("")}</div>` : "",
+          surplus: c.show_surplus && a.surplus_w != null ? `<div class="surplus"><div class="row"><span>Überschuss</span><b>${W(a.surplus_w)}</b></div>
+            ${(a.slots || []).map(s => `<div class="row"><span>${esc(s.name)}</span><span>${s.state ? esc(s.state) + " · " : ""}<b>${W(s.own_w)}</b></span></div>`).join("")}</div>` : "",
+          tags: c.show_tags ? `<div class="tags">
             ${a.eco_active ? '<span class="tag warn">🌙 Eco-Modus</span>' : ""}
             <span class="tag ${a.meter_ok === false ? "bad" : "ok"}">Zähler ${a.meter_ok === false ? "Ausfall" : "in Ordnung"}</span>
             <span class="tag">Sollwert ${W(a.target_w)}</span>
-            ${a.blocked_w ? `<span class="tag">Entladung gesperrt für ${Math.round(a.blocked_w)} W</span>` : ""}</div>` : ""}`;
+            ${a.blocked_w ? `<span class="tag">Entladung gesperrt für ${Math.round(a.blocked_w)} W</span>` : ""}</div>` : ""
+        };
+        body = compact ? `${c.show_headline ? `<div class="sub">${esc(hl)}</div>` : ""}${tiles}`
+          : blockOrder(c.order).map(id => parts[id] || "").join("\n");
+        ready = true;
         this._pill = pill;
       }
       const pill = st && this._pill && st.state !== "unavailable" ? `<span class="pill ${this._pill[1]}">${esc(this._pill[0])}</span>` : "";
@@ -422,11 +451,41 @@ const SF = (() => {
       const when = st && st.last_updated ? `<span class="when">${ago(st.last_updated)}</span>` : "";
       const canOpen = c.tap_open && a2.addon_slug;
       const head = c.title || killBtn ? `<div class="head"><span class="t">${esc(c.title)}</span>${pill}${when}${killBtn}</div>` : "";
-      this.shadowRoot.innerHTML = `<style>${STYLE}${c.accent ? `ha-card{--sc-sun:${esc(c.accent)}}` : ""}</style><ha-card class="${canOpen ? "tap" : ""}">
+      const html = `<style>${STYLE}${c.accent ? `ha-card{--sc-sun:${esc(c.accent)}}` : ""}</style><ha-card class="${canOpen ? "tap" : ""}">
         ${head}${body}</ha-card>`;
+      this._paint(html, ready);
       this._slug = canOpen ? a2.addon_slug : "";
       this._kill = ks ? a2.kill_switch : "";
       this._stopped = stopped;
+    }
+
+    /* Zeichnet nur bei Änderung und hält die Höhe, damit die Seite nicht springt:
+       die Karte wird nie kleiner als zuvor (gleiche Breite), und beim Laden gilt die zuletzt bekannte Höhe. */
+    _paint(html, ready) {
+      const root = this.shadowRoot;
+      const key = `sc-h:${this._cfg.entity}:${this._cfg.size}:${(this._cfg.order || []).join(",")}`;
+      const w = this.offsetWidth || 0;
+      if (this._hk !== key || (this._hw && w && Math.abs(this._hw - w) > 2)) { this._hk = key; this._minH = 0; }
+      if (!this._minH && !ready) {
+        try { const v = JSON.parse(localStorage.getItem(key) || "null"); if (v && v.w && Math.abs(v.w - w) <= 2) this._minH = v.h; } catch (e) { /* ohne Speicher */ }
+      }
+      const full = `${html}<!--${this._minH || 0}-->`;
+      if (full === this._last) return;
+      this._last = full;
+      const old = this.getBoundingClientRect();
+      root.innerHTML = html;
+      const card = root.querySelector("ha-card");
+      if (card && this._minH) card.style.minHeight = this._minH + "px";
+      const h = card ? Math.ceil(card.getBoundingClientRect().height) : 0;
+      if (ready && h > (this._minH || 0)) {
+        this._minH = h; this._hw = w;
+        try { localStorage.setItem(key, JSON.stringify({ h, w })); } catch (e) { /* ohne Speicher */ }
+      }
+      if (ready) this._hw = w;
+      // Wuchs die Karte oberhalb des sichtbaren Bereichs, Scrollposition ausgleichen
+      const now = this.getBoundingClientRect();
+      const dh = now.height - old.height;
+      if (dh && old.bottom <= 0 && old.height) window.scrollBy(0, dh);
     }
 
     connectedCallback() {
@@ -453,6 +512,15 @@ const SF = (() => {
   class SOLASICardEditor extends HTMLElement {
     setConfig(config) { this._cfg = config || {}; this._build(); }
     set hass(h) { this._hass = h; if (this._form) this._form.hass = h; }
+    _drawOrder() {
+      const names = Object.fromEntries(BLOCKS), o = blockOrder(this._cfg.order);
+      this._ord.innerHTML = `<div style="margin:14px 0 6px;font-weight:600">Reihenfolge der Blöcke</div>` + o.map((id, i) =>
+        `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--divider-color,#ddd)">
+          <span>${esc(names[id])}</span><span>
+          <button type="button" data-mv="-1" data-id="${id}" ${i === 0 ? "disabled" : ""} aria-label="nach oben">↑</button>
+          <button type="button" data-mv="1" data-id="${id}" ${i === o.length - 1 ? "disabled" : ""} aria-label="nach unten">↓</button></span></div>`).join("") +
+        `<div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px">Ein- und Ausblenden über die Schalter oben.</div>`;
+    }
     _build() {
       if (!this._form) {
         this._form = document.createElement("ha-form");
@@ -478,7 +546,21 @@ const SF = (() => {
           this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._cfg }, bubbles: true, composed: true }));
         });
         this.appendChild(this._form);
+        this._ord = document.createElement("div");
+        this._ord.className = "sc-order";
+        this._ord.addEventListener("click", ev => {
+          const b = ev.target.closest && ev.target.closest("button[data-mv]");
+          if (!b) return;
+          const o = blockOrder(this._cfg.order), i = o.indexOf(b.dataset.id), j = i + Number(b.dataset.mv);
+          if (i < 0 || j < 0 || j >= o.length) return;
+          [o[i], o[j]] = [o[j], o[i]];
+          this._cfg = { ...this._cfg, order: o };
+          this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._cfg }, bubbles: true, composed: true }));
+          this._drawOrder();
+        });
+        this.appendChild(this._ord);
       }
+      this._drawOrder();
       this._form.hass = this._hass;
       this._form.data = { entity: "sensor.solasi", title: "SOLASI", size: "large", show_headline: true, show_meters: true, meters_layout: "big", show_trend: true, show_batteries: true,
         show_surplus: true, show_tags: true, show_kill: true, tap_open: true, accent: "", ...this._cfg };

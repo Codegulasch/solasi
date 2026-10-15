@@ -209,6 +209,16 @@ const SF = (() => {
   const nf = (v, dec) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
   const nd = v => Number(v).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
+  /* Wasserzähler: Tagesverbrauch in Litern (Zählerstand bleibt in m³) */
+  const isWater = m => /^m[³3]$/i.test(String(m.unit || "").trim()) && (m.icon === "wasser" || /wasser|water/i.test(String(m.name || "") + " " + String(m.entity || "")));
+  const dayText = m => {
+    if (isWater(m)) {
+      const l = Math.round(m.day * 1000);
+      return `<b>${l >= 0 ? "+" : ""}${l.toLocaleString("de-DE")} l</b> heute`;
+    }
+    return `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute`;
+  };
+
   /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
   function meters(d) {
     const tiles = [];
@@ -216,7 +226,7 @@ const SF = (() => {
     const hero = d.show_day !== false && t && t.house != null
       ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
     (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
-      sub: m.day != null && m.value != null ? `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute` : "" }));
+      sub: m.day != null && m.value != null ? dayText(m) : "" }));
     if (d.extra && t) {
       if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
       if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });

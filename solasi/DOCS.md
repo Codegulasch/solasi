@@ -210,14 +210,18 @@ Unter *Betrieb → Zähler* zeigst du weitere Zähler aus Home Assistant in SOLA
 
 - **Tagesverbrauch:** die große Kachel zeigt, was das Haus heute verbraucht hat. Sie lässt sich abschalten.
 - **Zähler hinzufügen:** wähle den Sensor, gib Name, Symbol und Farbe an. Es sind bis zu acht Zähler möglich. Geeignet sind Sensoren, die nur hochzählen. Einheit und Nachkommastellen übernimmt SOLASI vom Sensor.
-- **Verbrauch heute:** bei jedem Zähler lässt sich die Differenz zum Tagesbeginn anzeigen, zum Beispiel „+0,18 m³ heute“. SOLASI merkt sich dafür den ersten Wert des Tages. Beim ersten Start mitten am Tag zählt der Verbrauch ab diesem Zeitpunkt. Wird ein Zähler getauscht oder zurückgesetzt, beginnt die Zählung neu.
+- **Verbrauch heute:** bei jedem Zähler lässt sich die Differenz zum Tagesbeginn anzeigen, zum Beispiel „+0,18 kWh heute“. **Wasserzähler** (Einheit m³, Symbol Wassertropfen oder „Wasser“ im Namen) zeigen den Verbrauch heute in **Litern** („+180 l heute“); der Zählerstand bleibt in m³. SOLASI merkt sich dafür den ersten Wert des Tages. Beim ersten Start mitten am Tag zählt der Verbrauch ab diesem Zeitpunkt. Wird ein Zähler getauscht oder zurückgesetzt, beginnt die Zählung neu.
 - **Solarertrag und Netzbezug heute** lassen sich als weitere Kacheln dazuschalten.
+
+## Blöcke anordnen
+
+Unter *Einstellungen → Darstellung → Anordnung* legst du die Reihenfolge der Blöcke in **Übersicht** (Kennzahlen, Zähler, Energiefluss, Verlauf, Speicher, Überschuss, Protokoll) und **Statistik** (Zeitraum, Kennzahlen, Diagramm) fest. Mit den Pfeilen verschiebst du einen Block, mit dem Haken blendest du ihn aus. Die Anordnung wird mit *Speichern* abgelegt und gilt auf allen Geräten. *Standard wiederherstellen* setzt sie zurück. Auf breiten Bildschirmen verteilt SOLASI die Blöcke in der gewählten Reihenfolge auf zwei Spalten, am Handy stehen sie untereinander.
 
 ## Dashboard-Karte
 
 SOLASI installiert beim Start die Karte `solasi-card` und trägt sie als Dashboard-Ressource ein. Unter **System → Dashboard-Karte** siehst du den Stand und findest bei Bedarf die manuelle Anleitung.
 
-Alle Optionen lassen sich auch im visuellen Editor einstellen. Der Not-Aus-Knopf erscheint nur, wenn der Schalter *Not-Aus* existiert, also mit MQTT.
+Alle Optionen lassen sich auch im visuellen Editor einstellen, die Reihenfolge der Blöcke mit Pfeilen unter den Schaltern. Ein Block, der nicht in `order` steht, kommt in Standardreihenfolge hinten dran; ausgeblendet wird weiter mit den `show_*`-Optionen. Der Not-Aus-Knopf erscheint nur, wenn der Schalter *Not-Aus* existiert, also mit MQTT.
 
 Karte hinzufügen: Dashboard bearbeiten → *Karte hinzufügen* → **SOLASI** wählen, oder „Manuell“:
 
@@ -232,6 +236,7 @@ show_tags: true              # Eco, Zähler, Sollwert
 size: large                  # large oder compact (vier Kacheln, ohne Diagramm)
 show_meters: true            # Reihe mit Tagesverbrauch und Zählern ganz oben
 meters_layout: big           # big (große Kachel links) oder even (alle gleich groß)
+order: [meters, headline, flow, trend, batteries, surplus, tags]   # Reihenfolge der Blöcke (Standard wie hier)
 show_trend: true             # Verlauf der letzten 24 Stunden
 show_kill: true              # Not-Aus-Knopf mit Rückfrage (benötigt MQTT)
 tap_open: true               # Antippen öffnet SOLASI

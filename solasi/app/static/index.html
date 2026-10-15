@@ -177,6 +177,10 @@ body.first main{margin:0 auto}
 .kpi b em{font-size:15px;font-style:normal;color:var(--muted);font-weight:600;margin-left:3px}
 .kpi small{color:var(--muted);font-size:12.5px}
 .kpi.k-sun b{color:var(--sun)}.kpi.k-bat b{color:var(--bat)}.kpi.k-grid b{color:var(--grid)}.kpi.k-home b{color:var(--home)}
+#p-status{overflow-anchor:none}
+.ordrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}.ordrow button{padding:2px 10px;margin-left:4px}.ordrow label{display:flex;gap:8px;align-items:center}
+.cols+[data-blk=kpis]{margin-top:14px}
+.cols.one{grid-template-columns:minmax(0,1fr)}
 .cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:start}
 .stack{display:flex;flex-direction:column;gap:14px;min-width:0}
 .card h2{margin:0 0 10px;font-size:12.5px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
@@ -705,7 +709,7 @@ const NAV_FOOT=[["setup","Einrichtung"],["control","Einstellungen"]];
 const TITLES={status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",stats:"Statistik",replay:"Replay",selftest:"Selbsttest",log:"Protokoll",
   card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung"};
 const SET_SUB=[["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]];
-const SETTINGS_PAGES=["units","control","surplus","extras","meters"];
+const SETTINGS_PAGES=["units","control","surplus","extras","meters","look"];
 const SET_GROUP=SET_SUB.map(x=>x[0]);
 const TAB_ITEMS=[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"]];
 let curPage="status";
@@ -763,6 +767,24 @@ function renderLook(){
     <div class="f"><label for="look_start">Startseite</label><div><select id="look_start">${LOOK_START.map(([k,l])=>`<option value="${k}" ${k===st?"selected":""}>${l}</option>`).join("")}</select></div><div class="hint">Diese Seite öffnet SOLASI beim Aufrufen.</div></div>
     <div class="f"><label>Dichte</label><div class="seg" id="look_dens" role="group" aria-label="Dichte">${[["compact","Kompakt"],["normal","Normal"],["large","Groß"]].map(([k,l])=>`<button type="button" data-d="${k}" aria-pressed="${k===d}">${l}</button>`).join("")}</div><div class="hint">Schriftgröße und Abstände.</div></div>
   </div></details>`;
+  $("#p-look").insertAdjacentHTML("beforeend",
+    [["status","Übersicht",STATUS_BLOCKS],["stats","Statistik",STATS_BLOCKS]].map(([k,t,bl])=>{
+      const u=uiBlocks(k,bl),names=Object.fromEntries(bl);
+      return `<details class="fsec" open><summary>Anordnung · ${t} <span class="sub">gilt für alle Geräte, mit „Speichern“</span></summary><div class="fbody"><div class="ordlist" data-k="${k}">${
+        u.full.map((id,i)=>`<div class="ordrow"><label><input type="checkbox" data-show="${id}" ${u.hidden.includes(id)?"":"checked"}> ${esc(names[id])}</label>
+          <span><button type="button" data-mv="-1" data-id="${id}" aria-label="nach oben" ${i===0?"disabled":""}>↑</button><button type="button" data-mv="1" data-id="${id}" aria-label="nach unten" ${i===u.full.length-1?"disabled":""}>↓</button></span></div>`).join("")}</div>
+        <div class="sub" style="margin-top:8px">Mit den Pfeilen verschieben, mit dem Haken ein- oder ausblenden. Ausgeblendete Blöcke bleiben in der Reihenfolge erhalten.</div>
+        <p><button type="button" data-reset="${k}" style="background:var(--chip);color:var(--fg);border:0;border-radius:10px;padding:7px 14px;cursor:pointer">Standard wiederherstellen</button></p></div></details>`;}).join(""));
+  $("#p-look").querySelectorAll(".ordlist").forEach(box=>{
+    const k=box.dataset.k,bl=k==="status"?STATUS_BLOCKS:STATS_BLOCKS;
+    const store=(order,hidden)=>{cfg.ui=cfg.ui||{};cfg.ui[k+"_order"]=order;cfg.ui[k+"_hidden"]=hidden;markDirty();renderLook();if(k==="status"&&lastStatus)renderStatus(lastStatus);};
+    box.addEventListener("click",e=>{const b=e.target.closest("[data-mv]");if(!b)return;
+      const u=uiBlocks(k,bl),o=[...u.full],i=o.indexOf(b.dataset.id),j=i+ +b.dataset.mv;
+      if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];store(o,u.hidden);});
+    box.addEventListener("change",e=>{const c=e.target.closest("[data-show]");if(!c)return;
+      const u=uiBlocks(k,bl),h=u.hidden.filter(x=>x!==c.dataset.show);if(!c.checked)h.push(c.dataset.show);store(u.full,h);});});
+  $("#p-look").querySelectorAll("[data-reset]").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.reset;cfg.ui=cfg.ui||{};cfg.ui[k+"_order"]=[];cfg.ui[k+"_hidden"]=[];markDirty();renderLook();if(k==="status"&&lastStatus)renderStatus(lastStatus);}));
   $("#look_start").addEventListener("change",e=>{lookSet("start",e.target.value);toast("Startseite gespeichert")});
   $("#look_dens").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;lookSet("density",b.dataset.d);applyDensity();renderLook()});
 }
@@ -823,25 +845,27 @@ async function loadSelfcheck(){
 // ---------- Statistik ----------
 let statsDays=30;
 async function loadStats(){
-  $("#p-stats").innerHTML=`<div class="card">Lade …</div>`;
+  if(!$("#p-stats").firstElementChild)$("#p-stats").innerHTML=`<div class="card">Lade …</div>`;
   let r;try{r=await (await fetch("api/stats?days="+statsDays)).json();}catch(e){$("#p-stats").innerHTML=`<div class="card">Statistik nicht verfügbar.</div>`;return;}
   const t=r.total,pc=v=>v==null?"–":Math.round(v*100)+" %",eur=v=>v.toLocaleString("de-DE",{style:"currency",currency:"EUR"});
   if(!r.days.length){$("#p-stats").innerHTML=`<div class="card welcome"><div style="font-size:40px">📊</div><h2>Noch keine Daten</h2><div class="sub">SOLASI sammelt ab jetzt. Die ersten Werte erscheinen nach einigen Minuten.<br>Für Hausverbrauch und Eigenversorgung werden die echten Lade-/Entladesensoren (oder ein Hausverbrauchs-Sensor) gebraucht.</div></div>`;return;}
   const tile=(l,v,s)=>`<div class="card"><h3>${l}</h3><div class="big">${v}</div><div class="sub">${s||""}</div></div>`;
-  let h=`<div class="hero"><div class="headline">Die letzten ${r.days.length} Tage</div>
+  const SB={};
+  SB.period=`<div class="hero"><div class="headline">Die letzten ${r.days.length} Tage</div>
     <div class="sub">Zeitraum:
-      ${[7,30,90].map(d=>`<button class="primary" style="padding:3px 12px;margin-left:6px;${statsDays===d?"":"background:var(--chip);color:var(--fg)"}" data-days="${d}">${d} Tage</button>`).join("")}</div></div>
-    <div class="grid">
+      ${[7,30,90].map(d=>`<button class="primary" style="padding:3px 12px;margin-left:6px;${statsDays===d?"":"background:var(--chip);color:var(--fg)"}" data-days="${d}">${d} Tage</button>`).join("")}</div></div>`;
+  SB.tiles=`<div class="grid">
       ${tile("Autarkie",pc(t.autarky),"Anteil des Verbrauchs ohne Netzbezug")}
       ${tile("Eigenverbrauch",pc(t.selfcons),"Anteil der PV, der nicht eingespeist wird")}
       ${tile("Selbst gedeckt",eur(t.saved_eur),`${Math.max(t.house-t.imp,0).toFixed(1)} kWh zum Bezugspreis`)}
       ${tile("Aus dem Speicher",eur(t.battery_eur),`${t.bat_dis.toFixed(1)} kWh entladen`)}
       ${tile("Netzbezug",t.imp.toFixed(1)+" kWh","")}
       ${tile("Einspeisung",t.exp.toFixed(1)+" kWh",`Vergütung ${eur(t.feedin_eur)}`)}
-    </div>
-    <div class="card" style="margin-top:14px">${barChart(r.days,[{key:"house",name:"Verbrauch",color:"#94a3b8"},{key:"pv",name:"PV",color:"#f59e0b"},{key:"imp",name:"Netzbezug",color:"#6366f1"},{key:"exp",name:"Einspeisung",color:"#14b8a6"}])}</div>
+    </div>`;
+  SB.chart=`<div class="card">${barChart(r.days,[{key:"house",name:"Verbrauch",color:"#94a3b8"},{key:"pv",name:"PV",color:"#f59e0b"},{key:"imp",name:"Netzbezug",color:"#6366f1"},{key:"exp",name:"Einspeisung",color:"#14b8a6"}])}</div>
     <div class="sub" style="margin-top:8px">Die Werte sind Näherungen aus den Messwerten im Regeltakt. Eigenversorgung und Beträge nutzen die Preise aus „Einstellungen → Sicherheit & Meldungen“.</div>`;
-  $("#p-stats").innerHTML=h;
+  const h=`<div class="stack">${uiBlocks("stats",STATS_BLOCKS).visible.map(id=>SB[id]).join("")}</div>`;
+  patchEl($("#p-stats"),h);
   document.querySelectorAll("#p-stats [data-days]").forEach(b=>b.addEventListener("click",()=>{statsDays=+b.dataset.days;loadStats();}));
 }
 
@@ -1303,6 +1327,16 @@ const SF = (() => {
   const nf = (v, dec) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
   const nd = v => Number(v).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
+  /* Wasserzähler: Tagesverbrauch in Litern (Zählerstand bleibt in m³) */
+  const isWater = m => /^m[³3]$/i.test(String(m.unit || "").trim()) && (m.icon === "wasser" || /wasser|water/i.test(String(m.name || "") + " " + String(m.entity || "")));
+  const dayText = m => {
+    if (isWater(m)) {
+      const l = Math.round(m.day * 1000);
+      return `<b>${l >= 0 ? "+" : ""}${l.toLocaleString("de-DE")} l</b> heute`;
+    }
+    return `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute`;
+  };
+
   /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
   function meters(d) {
     const tiles = [];
@@ -1310,7 +1344,7 @@ const SF = (() => {
     const hero = d.show_day !== false && t && t.house != null
       ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
     (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
-      sub: m.day != null && m.value != null ? `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute` : "" }));
+      sub: m.day != null && m.value != null ? dayText(m) : "" }));
     if (d.extra && t) {
       if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
       if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
@@ -1368,14 +1402,61 @@ function kpiHtml(s){
     <div class="kpi k-grid"><span>Netz</span><b>${Math.abs(g)}<em>W</em></b><small>${g>=5?"Bezug":g<=-5?"Einspeisung":"ausgeglichen"}${t?" · heute "+kwh(t.imp):""}</small></div>
     <div class="kpi"><span>Autarkie heute</span><b>${aut==null?"–":aut}<em>%</em></b><small>${t&&t.selfcons!=null?"Eigenverbrauch "+Math.round(t.selfcons*100)+" %":"&nbsp;"}</small></div></div>`;
 }
+
+// ---------- Anordnung und ruhiges Aktualisieren ----------
+const STATUS_BLOCKS=[["kpis","Kennzahlen (Solar, Haus, Speicher, Netz)"],["meters","Heute und Zähler"],["hero","Energiefluss"],["trend","Verlauf der letzten 24 Stunden"],["units","Speicher"],["surplus","Überschuss"],["log","Protokoll"]];
+const STATS_BLOCKS=[["period","Zeitraum"],["tiles","Kennzahlen"],["chart","Diagramm je Tag"]];
+function uiBlocks(kind,blocks){
+  const ui=(cfg&&cfg.ui)||{},all=blocks.map(b=>b[0]);
+  const ord=(Array.isArray(ui[kind+"_order"])?ui[kind+"_order"]:[]).filter((x,i,a)=>all.includes(x)&&a.indexOf(x)===i);
+  const full=[...ord,...all.filter(x=>!ord.includes(x))];
+  const hid=Array.isArray(ui[kind+"_hidden"])?ui[kind+"_hidden"]:[];
+  return {full,hidden:hid,visible:full.filter(x=>!hid.includes(x))};
+}
+let lastScrollAt=0;
+addEventListener("scroll",()=>{lastScrollAt=Date.now()},{passive:true,capture:true});
+const scrolling=()=>Date.now()-lastScrollAt<250;
+/* Setzt HTML nur, wenn es sich geändert hat. Liegt der Block über dem sichtbaren Bereich,
+   wird die Höhenänderung ausgeglichen, damit die Seite nicht springt (Safari kennt kein Scroll-Anchoring). */
+function patchEl(el,html){
+  if(!el||el._html===html)return false;
+  const r=el.getBoundingClientRect(),h0=el.offsetHeight;
+  const open=[...el.querySelectorAll("details")].map(d=>d.open);
+  el.innerHTML=html;el._html=html;
+  el.querySelectorAll("details").forEach((d,i)=>{if(open[i])d.open=true});
+  const dh=el.offsetHeight-h0;
+  if(dh&&r.bottom<=0)window.scrollBy(0,dh);
+  return true;
+}
+function rawStatus(html){const el=$("#p-status");el._sig=null;el._html=null;patchEl(el,html);el._sig=null;}
+function layoutBlocks(root,B,order,weights){
+  const shown=order.filter(id=>B[id]);
+  const segs=[];let cur=null;
+  shown.forEach(id=>{
+    if(id==="kpis"){cur=null;segs.push({full:id});}
+    else{if(!cur){cur={ids:[]};segs.push(cur);}cur.ids.push(id);}});
+  segs.forEach(sg=>{
+    if(!sg.ids)return;
+    const tot=sg.ids.reduce((a,i)=>a+(weights[i]||2),0),target=tot*0.6;
+    let acc=0;sg.left=[];sg.right=[];
+    sg.ids.forEach(i=>{const w=weights[i]||2;((acc+w/2)<=target?sg.left:sg.right).push(i);acc+=w;});
+    if(!sg.left.length&&sg.right.length){sg.left=sg.right;sg.right=[];}});
+  const sig=JSON.stringify(segs);
+  const blk=id=>`<div data-blk="${id}"></div>`;
+  if(root._sig!==sig){
+    root._sig=sig;root._html=null;
+    root.innerHTML=`<div data-blk="banners"></div>`+segs.map(sg=>sg.full?blk(sg.full):
+      `<div class="cols${sg.right.length?"":" one"}"><div class="stack">${sg.left.map(blk).join("")}</div>${sg.right.length?`<div class="stack">${sg.right.map(blk).join("")}</div>`:""}</div>`).join("");}
+  root.querySelectorAll("[data-blk]").forEach(el=>patchEl(el,B[el.dataset.blk]||""));
+}
 let firstRun=false,wizDismissed=false;
 function renderStatus(s){
   lastStatus=s;renderBadges(s);loadToday();
   const needSetup=cfg&&!cfg.grid.entity;
   if(needSetup&&!wizDismissed&&!firstRun){firstRun=true;showPage("setup");}
   if(needSetup){
-    $("#p-status").innerHTML=`<div class="card"><p class="headline">SOLASI ist noch nicht eingerichtet</p><div class="sub">Der Einrichtungsassistent führt dich in wenigen Schritten durch Zähler und Speicher.</div>
-      <p><button class="primary" onclick="firstRun=false;showPage('setup')">Einrichtung starten</button></p></div>`;
+    rawStatus(`<div class="card"><p class="headline">SOLASI ist noch nicht eingerichtet</p><div class="sub">Der Einrichtungsassistent führt dich in wenigen Schritten durch Zähler und Speicher.</div>
+      <p><button class="primary" onclick="firstRun=false;showPage('setup')">Einrichtung starten</button></p></div>`);
     return;}
   let banners="";
   if(s.safety&&s.safety.state==="stopped")banners+=`<div class="banner bad">⛔ <span><b>SOLASI ist gestoppt</b> (${esc(s.safety.reason)}${s.safety.since?`, seit ${esc(s.safety.since)}`:""}). Die Speicher wurden an ihren eigenen Modus zurückgegeben und werden nicht mehr gesteuert.
@@ -1385,45 +1466,48 @@ function renderStatus(s){
   else if(s.dry_run)banners+=`<div class="banner test">🧪 <span><b>Testmodus:</b> SOLASI rechnet nur, gesendet wird nichts. Das Protokoll zeigt, was passieren würde.</span></div>`;
   if(s.enabled&&s.meter_ok===false)banners+=`<div class="banner bad">⚠️ <span><b>Der Zähler liefert keinen Wert.</b> Zur Sicherheit stehen die Speicher auf 0 W, bis er zurück ist. Prüfe in Home Assistant, ob der Zähler-Sensor verfügbar ist.
     <button class="primary" style="margin-left:10px" onclick="showPage('selftest')">Selbsttest öffnen</button></span></div>`;
-  if(!s.units){$("#p-status").innerHTML=banners+`<div class="card">Noch keine Daten. Bitte Zähler und Speicher einrichten und speichern.</div>`;return;}
+  if(!s.units){rawStatus(banners+`<div class="card">Noch keine Daten. Bitte Zähler und Speicher einrichten und speichern.</div>`);return;}
   const [hl,sub]=headline(s);
   const mv=s.meter_view,mh=mv?SF.meters({items:mv.items,today:mv.today,show_day:mv.show_day,extra:mv.extra}):"";
-  let left=(mh?`<div class="card"><h2>Heute und Zähler <a onclick="showPage('meters')">Verwalten</a></h2>${mh}</div>`:"")+`<div class="hero" style="margin:0"><div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>
+  const B={banners};
+  B.kpis=kpiHtml(s);
+  B.meters=mh?`<div class="card"><h2>Heute und Zähler <a onclick="showPage('meters')">Verwalten</a></h2>${mh}</div>`:"";
+  B.hero=`<div class="hero" style="margin:0"><div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>
     <div class="flow">${flowSVG(s)}</div>
     <div>${s.eco_active?'<span class="tag warn">🌙 Eco-Modus aktiv</span>':''}${s.blocked_w?`<span class="tag">Entladung gesperrt für ${s.blocked_w} W</span>`:''}<span class="tag ${s.meter_ok?"ok":"bad"}">Zähler ${s.meter_ok?"in Ordnung":"Ausfall"}</span>
     <span class="tag">Gesamtsollwert ${s.t_target} W</span>
     ${s.curtail&&s.curtail.state==="ok"?'<span class="tag ok">Abregelung bestätigt</span>':''}
     ${s.curtail&&s.curtail.state==="fehlgeschlagen"?'<span class="tag bad">Abregelung greift nicht</span>':''}
-    ${s.eco_active&&s.learned_base_load?`<span class="tag">Grundlast gelernt: ${s.learned_base_load} W</span>`:''}</div></div>
-    <div class="card trendbox"><h2>Verlauf · letzte 24 Stunden <a onclick="showPage('stats')">Statistik</a></h2>${SF.trend(s.trend||{})||'<div class="empty">Der Verlauf füllt sich in den nächsten Minuten.</div>'}</div>`;
-  let right=`<div class="card"><h2>Speicher <a onclick="showPage('units')">Verwalten</a></h2>`;
+    ${s.eco_active&&s.learned_base_load?`<span class="tag">Grundlast gelernt: ${s.learned_base_load} W</span>`:''}</div></div>`;
+  B.trend=`<div class="card trendbox"><h2>Verlauf · letzte 24 Stunden <a onclick="showPage('stats')">Statistik</a></h2>${SF.trend(s.trend||{})||'<div class="empty">Der Verlauf füllt sich in den nächsten Minuten.</div>'}</div>`;
+  let un=`<div class="card"><h2>Speicher <a onclick="showPage('units')">Verwalten</a></h2>`;
   const modeTxt=m=>({third_party_control:"Extern gesteuert",self_consumption:"Eigenverbrauch"})[m]||m||"–";
   const dirTxt=d=>({discharge:"gibt ab",charge:"lädt",idle:"ruht",standby:"ruht"})[String(d||"").toLowerCase()]||d||"–";
   s.units.forEach(u=>{
     const soc=u.soc<0?null:u.soc;
-    right+=`<div class="urow"><div class="bat">${battery(soc)}</div><b>${esc(u.name)}</b><span class="w">${u.real} W</span>
+    un+=`<div class="urow"><div class="bat">${battery(soc)}</div><b>${esc(u.name)}</b><span class="w">${u.real} W</span>
       <span class="sub">${soc==null?"":soc+" % geladen · "}${esc(dirTxt(u.dir))} ${u.real} W${u.pv!=null?` · Solar ${u.pv} W`:""}</span>
       <span class="pills2">${u.available?'<span class="tag ok">bereit</span>':'<span class="tag warn">Leistung nicht verfügbar</span>'}${s.dry_run?'<span class="tag test">Test</span>':''}${u.force?'<span class="tag test">Abregelung (voll)</span>':''}<span class="tag">${esc(modeTxt(u.mode))}</span></span>
       <details class="udet"><summary>Technische Details</summary><dl><dt>Eingestellt</dt><dd>${u.set} W</dd><dt>Neu</dt><dd>${u.plan} W</dd><dt>Richtung</dt><dd>${esc(u.dir||"–")}</dd><dt>Modus</dt><dd>${esc(u.mode||"–")}</dd></dl></details></div>`;});
-  right+=`</div>`;
+  B.units=un+`</div>`;
+  B.surplus="";
   if(s.surplus_enabled){
-    right+=`<div class="card"><h2>Überschuss${s.surplus_dry_run?" · Test":""} <a onclick="showPage('surplus')">Verwalten</a></h2>
+    let sp=`<div class="card"><h2>Überschuss${s.surplus_dry_run?" · Test":""} <a onclick="showPage('surplus')">Verwalten</a></h2>
       <div class="sub" style="margin-bottom:4px">${W(s.surplus_w)} frei für Verbraucher</div>`;
     (s.slots||[]).forEach(sl=>{
-      right+=`<div class="cons"><b>${esc(sl.name)}</b>${sl.state?`<span class="tag ${sl.state==="on"?"ok":""}">${esc(sl.state)}</span>`:""}<span class="sub">${sl.num_v!=null?`Vorgabe ${sl.num_v} · `:""}${sl.own_w} W</span></div>`;});
-    right+=`</div>`;}
-  right+=`<div class="card"><h2>Protokoll <a onclick="showPage('log')">Alle</a></h2><div class="mini" id="minilog"></div></div>`;
-  $("#p-status").innerHTML=banners+kpiHtml(s)+`<div class="cols"><div class="stack">${left}</div><div class="stack">${right}</div></div>`;
+      sp+=`<div class="cons"><b>${esc(sl.name)}</b>${sl.state?`<span class="tag ${sl.state==="on"?"ok":""}">${esc(sl.state)}</span>`:""}<span class="sub">${sl.num_v!=null?`Vorgabe ${sl.num_v} · `:""}${sl.own_w} W</span></div>`;});
+    B.surplus=sp+`</div>`;}
+  const mrow=e=>`<div class="${e.level}"><i></i><span class="t">${e.ts}</span><span class="m">${esc(e.msg)}</span></div>`;
+  B.log=`<div class="card"><h2>Protokoll <a onclick="showPage('log')">Alle</a></h2><div class="mini" id="minilog">${(s.events||[]).slice(0,6).map(mrow).join("")||"<div>Noch keine Einträge.</div>"}</div></div>`;
+  layoutBlocks($("#p-status"),B,uiBlocks("status",STATUS_BLOCKS).visible,{meters:2,hero:5,trend:3,units:1+(s.units||[]).length,surplus:s.surplus_enabled?1+(s.slots||[]).length*.5:0,log:2});
   renderLog(s.events);
 }
 function renderLog(ev){
   const row=e=>`<div class="${e.level}"><span class="t">${e.ts}</span><span>${esc(e.msg)}</span></div>`;
-  $("#log").innerHTML=(ev||[]).map(row).join("")||"<div>Noch keine Einträge.</div>";
-  const mrow=e=>`<div class="${e.level}"><i></i><span class="t">${e.ts}</span><span class="m">${esc(e.msg)}</span></div>`;
-  const m=document.getElementById("minilog");if(m)m.innerHTML=(ev||[]).slice(0,6).map(mrow).join("")||"<div>Noch keine Einträge.</div>";
+  patchEl($("#log"),(ev||[]).map(row).join("")||"<div>Noch keine Einträge.</div>");
 }
 async function poll(){
-  try{const s=await (await fetch("api/status")).json();renderStatus(s);renderLog(s.events);}
+  try{const s=await (await fetch("api/status")).json();if(scrolling()){lastStatus=s;return;}renderStatus(s);renderLog(s.events);}
   catch(e){$("#connpill").className="pill";$("#conntext").textContent="Getrennt";}
 }
 loadAll().then(()=>{

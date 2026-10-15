@@ -80,7 +80,7 @@ ed.querySelector("ha-form").dispatchEvent(new w.CustomEvent("value-changed",{det
 ok(got&&got.size==="compact"&&got.title==="Mein Solar","Editor meldet Änderungen zurück");
 // ---- Zählerreihe ----
 el=mk({},st("Entladen",attrs));
-ok(q(el,".sfm").length===1&&txt(el).includes("Tagesverbrauch")&&txt(el).includes("8,4")&&txt(el).includes("552,62")&&txt(el).includes("13.141,74")&&txt(el).includes("+0,18 m³"),"Zählerreihe: Tagesverbrauch, Zähler, Tageswert");
+ok(q(el,".sfm").length===1&&txt(el).includes("Tagesverbrauch")&&txt(el).includes("8,4")&&txt(el).includes("552,62")&&txt(el).includes("13.141,74")&&txt(el).includes("+180 l")&&!txt(el).includes("0,18 m³"),"Zählerreihe: Tagesverbrauch, Zähler, Tageswert");
 ok(q(el,".mwrap").length===1&&q(el,".mwrap")[0].nextElementSibling&&q(el,".mwrap")[0].nextElementSibling.classList.contains("headline"),"Reihe steht ganz oben, vor der Überschrift");
 ok(q(el,".sfm b").length===1&&q(el,".sfm")[0].innerHTML.includes("&lt;b&gt;x"),"Zählernamen werden maskiert");
 el=mk({show_meters:false},st("Entladen",attrs));
@@ -93,4 +93,25 @@ el=mk({},st("Entladen",{...attrs,meters:undefined,today:undefined}));
 ok(q(el,".sfm").length===0,"Ältere Version ohne Zählerdaten: keine Reihe");
 el=mk({size:"compact"},st("Entladen",attrs));
 ok(q(el,".sfm").length===0,"Kompakt zeigt keine Zählerreihe");
+// ---- Reihenfolge, Liter, ruhiges Zeichnen ----
+const pos=(el,sel)=>{const n=el.shadowRoot.querySelector(sel);return n?[...el.shadowRoot.querySelectorAll("ha-card *")].indexOf(n):-1};
+el=mk({},st("Entladen",attrs));
+ok(pos(el,".mwrap")<pos(el,".headline")&&pos(el,".headline")<pos(el,"svg[aria-label=Energiefluss]")&&pos(el,"svg[aria-label=Energiefluss]")<pos(el,".units")&&pos(el,".units")<pos(el,".tags"),"Standardreihenfolge unverändert");
+el=mk({order:["tags","batteries","headline"]},st("Entladen",attrs));
+ok(pos(el,".tags")<pos(el,".units")&&pos(el,".units")<pos(el,".headline")&&pos(el,".headline")<pos(el,".mwrap")&&pos(el,".mwrap")<pos(el,"svg[aria-label=Energiefluss]"),"order: genannte Blöcke zuerst, Rest in Standardreihenfolge");
+el=mk({order:["tags","tags","quatsch"],show_tags:false},st("Entladen",attrs));
+ok(q(el,".tags").length===0&&q(el,".headline").length===1,"order: Doppelte und Unbekannte werden ignoriert, show_* gilt weiter");
+ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverbrauch in Litern");
+{const a2=JSON.parse(JSON.stringify(attrs));a2.meters=[{name:"Gaszähler",value:100,dec:1,unit:"m³",icon:"gas",color:"gas",day:0.5},{name:"Kaltwasser",value:5,dec:3,unit:"m³",icon:"zaehler",color:"zaehl",day:1.2345},{name:"Wasser",value:5,dec:1,unit:"l",icon:"wasser",color:"water",day:3}];
+ const t=txt(mk({},st("Entladen",a2)));
+ ok(t.includes("+0,5 m³")&&t.includes("+1.235 l")&&t.includes("+3 l")&&t.includes("5,000 m³".replace(",",","))||t.includes("5,000"),"Gas bleibt m³; Wasser nach Name erkannt (1.235 l); Zählerstand bleibt m³");}
+{const e2=w.customElements.get("solasi-card").getConfigElement();w.document.body.appendChild(e2);e2.setConfig({});
+ let got2=null;e2.addEventListener("config-changed",e=>got2=e.detail.config);
+ e2.querySelector('button[data-mv="1"][data-id="meters"]').click();
+ ok(got2&&got2.order[0]==="headline"&&got2.order[1]==="meters","Editor: Block nach unten verschieben");
+ e2.querySelector('button[data-mv="-1"][data-id="tags"]').click();
+ ok(got2.order.indexOf("tags")===got2.order.indexOf("surplus")-1,"Editor: Block nach oben verschieben");}
+{const e3=mk({},st("Entladen",attrs));const h1=e3.shadowRoot.querySelector("ha-card");
+ e3.hass={states:st("Entladen",attrs)};   // gleicher Inhalt, nur neue last_updated
+ ok(e3.shadowRoot.querySelector("ha-card")===h1,"Gleicher Inhalt: kein Neuaufbau der Karte");}
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

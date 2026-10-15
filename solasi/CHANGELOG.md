@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.3.0
+- **Blöcke anordnen:** *Einstellungen → Darstellung → Anordnung* legt die Reihenfolge der Blöcke in **Übersicht** und **Statistik** fest (Pfeile, Haken zum Ausblenden, „Standard wiederherstellen“). Die Anordnung wird im Add-on gespeichert und gilt auf allen Geräten.
+- **Dashboard-Karte:** neue Option `order` und im visuellen Editor Pfeile zum Verschieben der Blöcke. Bestehende Karten sehen unverändert aus; `show_*` blendet weiter aus.
+- **Wasser in Litern:** der Verbrauch heute aller Wasserzähler (m³) wird als „+180 l heute“ angezeigt, in Add-on und Karte. Der Zählerstand bleibt in m³.
+- **Kein Springen mehr:** die Übersicht baute bisher alle 2 Sekunden alles neu auf, dabei sprang die Seite beim Scrollen, und geöffnete *Technische Details* klappten wieder zu. Jetzt werden nur geänderte Blöcke aktualisiert, die Scrollposition wird bei Höhenänderungen ausgeglichen, und während des Scrollens wird nicht neu gezeichnet. Die Karte hält ihre Höhe (auch beim Laden) und zeichnet nur bei geändertem Inhalt.
+
 ## 1.2.2
 - **Zählerreihe in Übersicht und Dashboard-Karte:** eine eigene Reihe ganz oben, getrennt vom Energiefluss. Sie zeigt den **Tagesverbrauch** (Haus heute) und beliebige **Zähler** aus Home Assistant, zum Beispiel Zählerstand Strom oder Wasserzähler.
   Bei jedem Zähler lässt sich der **Verbrauch heute** einblenden („+0,18 m³ heute“). SOLASI merkt sich dafür den Stand zu Beginn des Tages. Optional kommen Solarertrag und Netzbezug heute dazu.

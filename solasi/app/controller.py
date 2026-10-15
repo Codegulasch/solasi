@@ -73,6 +73,8 @@ DEFAULT_CONFIG = {
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
     "meters": {"show_day": True, "extra": False, "items": []},
+    # Anordnung der Blöcke in Übersicht und Statistik (leer = Standardreihenfolge, gilt für alle Geräte)
+    "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
     "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
     "safety": {"kill_entity": "", "release_on_stop": True, "release_on_disable": True,
                "auto_meter_min": 5, "auto_errors": True, "resume_auto": False,
@@ -85,6 +87,27 @@ DEFAULT_CONFIG = {
                   default_slot(3, 1000, 50, 98)],
     },
 }
+
+
+UI_BLOCKS = {
+    "status": ["kpis", "meters", "hero", "trend", "units", "surplus", "log"],
+    "stats": ["period", "tiles", "chart"],
+}
+
+
+def clean_ui(ui):
+    """Nur bekannte Blöcke, keine Doppelten; ungültige Eingaben werden zu leeren Listen."""
+    out = {}
+    ui = ui if isinstance(ui, dict) else {}
+    for kind, allowed in UI_BLOCKS.items():
+        for suffix in ("order", "hidden"):
+            raw = ui.get(f"{kind}_{suffix}")
+            seen = []
+            for x in raw if isinstance(raw, list) else []:
+                if isinstance(x, str) and x in allowed and x not in seen:
+                    seen.append(x)
+            out[f"{kind}_{suffix}"] = seen
+    return out
 
 
 def deep_merge(base, over):
@@ -626,6 +649,8 @@ class Controller:
 
     async def save_config(self, data):
         was_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
+        if isinstance(data, dict) and "ui" in data:
+            data = {**data, "ui": clean_ui(data["ui"])}
         self.store.save(data)
         self._meters_view = None             # geänderte Zähler sofort neu lesen
         now_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
