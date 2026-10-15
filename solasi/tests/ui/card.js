@@ -20,10 +20,11 @@ ok(w.customElements.get("solasi-card").getStubConfig().entity==="sensor.solasi",
 
 let el=mk({},st("Entladen",attrs));
 ok(txt(el).includes("780 W")&&txt(el).includes("260 W")&&txt(el).includes("529 W")&&txt(el).includes("lädt")&&txt(el).includes("Bezug"),"Diagramm zeigt Solar 780, Speicher 260 (lädt), Haus 529, Netz Bezug");
-const ln=[...q(el,"path.line")];
-ok(ln.length===4&&ln[0].getAttribute("class").includes("on")&&ln[1].getAttribute("class").includes("on")&&!ln[2].getAttribute("class").includes("on")&&ln[3].getAttribute("class").includes("rev"),"Linien: Solar->Haus und Solar->Speicher aktiv, Speicher<->Haus ruhig, Netz->Haus (Bezug)");
-ok([...q(el,".evl")].map(e=>e.textContent).sort().join()==="260 W,520 W,9 W","Linien tragen ihre Werte (520, 260, 9 W)");
-ok(q(el,".headline")[0].textContent.startsWith("Im Test: Die Speicher versorgen dein Haus mit 390 W"),"Überschrift im Testmodus");
+const FH=require("./flowhelp"),fs1=()=>el.shadowRoot.querySelector("svg");
+const ln=FH.lines(fs1());
+ok(ln.sh==="fwd"&&ln.sb==="fwd"&&ln.bh===null&&ln.gh==="fwd","Linien: Solar->Haus und Solar->Speicher aktiv, Speicher<->Haus ruhig, Netz->Haus (Bezug)");
+ok(FH.chips(fs1()).sort().join()==="260 W,520 W,9 W","Linien tragen ihre Werte (520, 260, 9 W)");
+ok(q(el,".headline")[0].textContent.startsWith("Im Test: Solar versorgt dein Haus und lädt den Speicher"),"Überschrift im Testmodus");
 ok(q(el,".pill.test").length===1&&txt(el).includes("Testmodus"),"Modus-Pille");
 ok(txt(el).includes("Wallbox")&&txt(el).includes("1620 W")&&txt(el).includes("Eco-Modus")&&txt(el).includes("Entladung gesperrt für 1380 W"),"Überschuss, Eco-Tag, Sperre");
 ok(q(el,".unit").length===2&&txt(el).includes("Abregelung")&&txt(el).includes("nicht verfügbar")&&txt(el).includes("Solar 540 W"),"Speicher-Kacheln inkl. Abregelung und Solarleistung");
@@ -43,13 +44,13 @@ ok(q(el,".headline")[0].textContent==="SOLASI ist gestoppt"&&txt(el).includes("V
 el=mk({},st("Zähler-Ausfall",{...attrs,mode:"live",meter_ok:false}));
 ok(q(el,".headline")[0].textContent==="Zähler ohne Meldung"&&q(el,".tag.bad").length===1,"Zähler-Ausfall");
 el=mk({},st("Leerlauf",{mode:"live",grid_w:0,target_w:0,units:[],slots:[]}));
-ok(txt(el).includes("Alles ausgeglichen")&&q(el,".line.on").length===0&&txt(el).includes("ausgeglichen"),"Leerlauf: keine Animation, fehlende PV/Haus = –");
+ok(txt(el).includes("Alles ausgeglichen")&&FH.lines(fs1()).sh===null&&txt(el).includes("ausgeglichen"),"Leerlauf: keine Animation, fehlende PV/Haus = –");
 // ---- Größen, Verlauf, Not-Aus, Antippen, Editor ----
 el=mk({size:"compact"},st("Entladen",attrs));
 ok(q(el,".tile").length===4&&q(el,"svg").length===0&&txt(el).includes("780 W"),"Kompakt: vier Kacheln, kein Diagramm");
 const withTrend={...attrs,trend:{pv:[0,100,400,900,700,200],house:[300,320,310,500,450,400]}};
 el=mk({},st("Entladen",withTrend));
-ok(q(el,".trend svg").length===1&&txt(el).includes("letzte 24 Stunden"),"Tagesverlauf wird gezeichnet");
+ok(q(el,".trend svg").length===1&&txt(el).includes("Verlauf"),"Tagesverlauf wird gezeichnet");
 el=mk({show_trend:false},st("Entladen",withTrend));
 ok(q(el,".trend").length===0,"Tagesverlauf abschaltbar");
 const calls=[];

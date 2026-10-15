@@ -67,6 +67,8 @@ Links steht die Seitenleiste, am Handy eine Leiste unten (der Rest steckt im Men
 Die Kopfleiste zeigt Verbindung und Modus (**Live**, **Testmodus**, **Beobachten** oder **Gestoppt**) und enthält die Schalter **Regelung** und **Testmodus** sowie den **Not-Aus**, der vor dem Auslösen nachfragt.
 Ein Hinweisband erscheint, wenn etwas Aufmerksamkeit braucht. Unter *Einstellungen → Darstellung* wählst du Startseite und Dichte; beides gilt nur für das jeweilige Gerät.
 
+**Der Verlauf** unter dem Energiefluss zeigt die letzten 24 Stunden: Solar als Fläche, Haus als Linie, der Punkt ist der aktuelle Wert. Die Dashboard-Karte zeigt dieselbe Grafik.
+
 **Den Energiefluss lesen:** Die Ladeleistung der Batterie kommt zuerst aus der Solarleistung (Linie *Solar → Speicher*), der Rest geht ins Haus. Reicht die Solarleistung nicht, kommt der Rest der Ladung aus dem Netz
 und läuft über das Haus in den Speicher. Beim Entladen gibt der Speicher über die Linie *Speicher → Haus* ab. Die Verteilung ist aus den Messwerten abgeleitet, die Anlage meldet sie nicht selbst.
 Unbekannte Werte zeigt SOLASI als „–“, nie als 0 W.
@@ -219,7 +221,7 @@ show_batteries: true         # Ladestand je Speicher
 show_surplus: true           # Überschuss und Verbraucher
 show_tags: true              # Eco, Zähler, Sollwert
 size: large                  # large oder compact (vier Kacheln, ohne Diagramm)
-show_trend: true             # Tagesverlauf der letzten 24 Stunden
+show_trend: true             # Verlauf der letzten 24 Stunden
 show_kill: true              # Not-Aus-Knopf mit Rückfrage (benötigt MQTT)
 tap_open: true               # Antippen öffnet SOLASI
 accent: ""                   # Akzentfarbe, z. B. "#3F5BD8"

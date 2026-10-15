@@ -26,7 +26,10 @@
       --sc-sun:var(--solasi-sun,#f59e0b);--sc-bat:var(--solasi-battery,#14b8a6);
       --sc-grid:var(--solasi-grid,#6366f1);--sc-home:var(--solasi-home,#64748b);
       --sc-ok:var(--success-color,#1f9d63);--sc-warn:var(--warning-color,#d97706);--sc-bad:var(--error-color,#e5484d);
-      --sc-test:var(--solasi-test,#8b5cf6)}
+      --sc-test:var(--solasi-test,#8b5cf6);
+      --sf-card:var(--ha-card-background,var(--card-background-color,#fff));--sf-fg:var(--primary-text-color);--sf-muted:var(--secondary-text-color);
+      --sf-line:var(--divider-color,#ddd);--sf-sun:var(--sc-sun);--sf-bat:var(--sc-bat);--sf-grid:var(--sc-grid);--sf-home:var(--sc-home);
+      --sf-ok:var(--sc-ok);--sf-warn:var(--sc-warn);--sf-bad:var(--sc-bad)}
     .head{display:flex;align-items:center;gap:8px;margin-bottom:2px}
     .head .t{font-size:16px;font-weight:600;color:var(--primary-text-color)}
     .pill{margin-left:auto;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;
@@ -34,7 +37,7 @@
     .pill.live{color:var(--sc-ok)}.pill.test{color:var(--sc-test)}.pill.observe{color:var(--sc-warn)}.pill.bad,.pill.stopped{color:var(--sc-bad)}
     .headline{font-size:17px;font-weight:650;color:var(--primary-text-color);margin-top:4px}
     .sub{font-size:12.5px;color:var(--secondary-text-color);margin-top:1px}
-    svg{width:100%;height:auto;display:block;max-height:300px;margin-top:4px}
+    svg{width:100%;height:auto;display:block;max-height:340px;margin-top:4px}
     svg text{font-family:inherit}
     .lbl{fill:var(--secondary-text-color);font-size:13px;font-weight:600}
     .val{fill:var(--primary-text-color);font-size:17px;font-weight:700}
@@ -72,64 +75,194 @@
     .tile .v{font-size:22px;font-weight:700;color:var(--primary-text-color)}
     .tile.sun .v{color:var(--sc-sun)}.tile.bat .v{color:var(--sc-bat)}.tile.grid .v{color:var(--sc-grid)}.tile.home .v{color:var(--sc-home)}
     .trend{margin-top:6px}
-    .trend svg{max-height:56px;margin:0}
-    .trend .leg{font-size:11.5px;color:var(--secondary-text-color);display:flex;gap:12px;margin-top:2px}
+    .trend svg{max-height:none;margin:0}
+    .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--secondary-text-color);margin-bottom:2px}
   `;
 
-  function flowSVG(a) {
-    const pv = num(a.pv_w), bat = num(a.battery_w), grid = num(a.grid_w) ?? 0, house = num(a.house_w), f = a.flows || {};
-    const act = v => v != null && Math.abs(v) >= 5;
-    // Linie mit Wert; fwd: Fluss in Richtung des Pfads (von x1,y1 nach x2,y2)
-    const edge = (d, val, fwd, col, lx, ly, anchor) =>
-      `<path d="${d}" class="line ${act(val) ? "on" + (fwd ? "" : " rev") : ""}" ${act(val) ? `style="stroke:${col}"` : ""}/>` +
-      (act(val) ? `<text x="${lx}" y="${ly}" text-anchor="${anchor}" class="evl">${Math.round(Math.abs(val))} W</text>` : "");
-    const node = (x, y, icon, label, val, sub, col, side) =>
-      `<g><circle cx="${x}" cy="${y}" r="38" fill="${col}" fill-opacity=".15" stroke="${col}" stroke-width="2.5"/>
-        <text x="${x}" y="${y + 10}" text-anchor="middle" font-size="30">${icon}</text>
-        ${side
-          ? `<text x="${x + 52}" y="${y - 2}" class="lbl">${label}</text><text x="${x + 52}" y="${y + 20}" class="val">${val}</text>`
-          : `<text x="${x}" y="${y + 62}" text-anchor="middle" class="lbl">${label}</text>
-             <text x="${x}" y="${y + 82}" text-anchor="middle" class="val">${val}</text>
-             ${sub ? `<text x="${x}" y="${y + 98}" text-anchor="middle" class="small">${sub}</text>` : ""}`}</g>`;
-    const batSub = bat == null ? "" : bat >= 5 ? "entlädt" : bat <= -5 ? "lädt" : "ruht";
+/*FLOW-BEGIN*/
+/* Gemeinsame Zeichnungen für Oberfläche und Dashboard-Karte: Energiefluss, Verlauf, Überschrift.
+   Quelle für beide Stellen. Nach Änderungen `python tools/sync_flow.py` ausführen, das kopiert
+   diesen Block in solasi/app/static/index.html und solasi/app/card/solasi-card.js.
+   Farben kommen aus Variablen, die jede Stelle selbst setzt:
+   --sf-card --sf-fg --sf-muted --sf-line --sf-sun --sf-bat --sf-grid --sf-home --sf-ok --sf-warn --sf-bad */
+const SF = (() => {
+  const fmt = v => Math.round(v).toLocaleString("de-DE");
+  const wl = v => (v == null || isNaN(v)) ? "–" : fmt(v) + " W";
+  const TW = 150, TH = 76;
+  const T = { sun: { x: 245, y: 12 }, bat: { x: 20, y: 152 }, grid: { x: 470, y: 152 }, home: { x: 245, y: 252 } };
+  // Linien in Flussrichtung: Solar→Haus, Solar→Speicher, Speicher→Haus, Netz→Haus
+  const L = {
+    sh: { pts: [[320, 88], [320, 140], [320, 200], [320, 252]], col: "--sf-sun" },
+    sb: { pts: [[245, 50], [140, 50], [95, 92], [95, 152]], col: "--sf-sun" },
+    bh: { pts: [[95, 228], [95, 275], [150, 290], [245, 290]], col: "--sf-bat" },
+    gh: { pts: [[545, 228], [545, 270], [490, 290], [395, 290]], col: "--sf-grid" }
+  };
+  const bez = (p, t) => { const u = 1 - t; return [0, 1].map(i => u * u * u * p[0][i] + 3 * u * u * t * p[1][i] + 3 * u * t * t * p[2][i] + t * t * t * p[3][i]); };
+  const pd = p => `M${p[0][0]} ${p[0][1]}C${p[1][0]} ${p[1][1]} ${p[2][0]} ${p[2][1]} ${p[3][0]} ${p[3][1]}`;
+  const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const socCol = s => s == null || s < 0 ? "var(--sf-muted)" : s < 20 ? "var(--sf-bad)" : s < 45 ? "var(--sf-warn)" : "var(--sf-ok)";
+  const CSS = `<style>
+    .sf-l{font-size:12.5px;font-weight:700;letter-spacing:.08em;fill:var(--sf-muted);text-transform:uppercase}
+    .sf-v{font-size:22px;font-weight:800;fill:var(--sf-fg)}
+    .sf-s{font-size:12.5px;font-weight:500;fill:var(--sf-muted)}
+    .sf-c{font-size:12.5px;font-weight:700;fill:var(--sf-fg)}
+    .sf-a{font-size:13px;fill:var(--sf-muted)}
+    .sf-g{stroke:var(--sf-line);stroke-width:1;fill:none}
+    .sf-i{fill:none;stroke:var(--sf-line);stroke-width:2.5;stroke-linecap:round}
+    .sf-o{fill:none;stroke-linecap:round}
+    svg text{font-family:inherit}</style>`;
+
+  const ICON = {
+    sun: c => `<g fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"><circle cx="16" cy="16" r="5.5"/><path d="M16 3v3.5M16 25.5V29M3 16h3.5M25.5 16H29M6.8 6.8l2.5 2.5M22.7 22.7l2.5 2.5M25.2 6.8l-2.5 2.5M9.3 22.7l-2.5 2.5"/></g>`,
+    home: c => `<g fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 15.5 16 5l12 10.5"/><path d="M7 13.5V27h18V13.5"/><path d="M13.5 27v-7h5v7"/></g>`,
+    grid: c => `<g fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M16 3v26M9 29l7-17 7 17M10.5 12h11M12.5 19.5h7"/></g>`,
+    bat: (c, soc) => {
+      const w = soc == null || soc < 0 ? 0 : Math.max(0, Math.min(100, soc)) / 100 * 17;
+      return `<g fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"><rect x="3" y="9" width="23" height="14" rx="3.5"/><path d="M28.5 13.5v5" stroke-linecap="round"/></g>` +
+        (w ? `<rect x="6" y="12" width="${w.toFixed(1)}" height="8" rx="1.8" style="fill:${socCol(soc)}"/>` : "");
+    }
+  };
+
+  function tile(k, label, val, sub, col, icon) {
+    const t = T[k];
+    return `<g><rect x="${t.x}" y="${t.y}" width="${TW}" height="${TH}" rx="18" style="fill:var(--sf-card)"/>
+      <rect x="${t.x}" y="${t.y}" width="${TW}" height="${TH}" rx="18" style="fill:var(${col});fill-opacity:.13;stroke:var(${col});stroke-width:1.6"/>
+      <g transform="translate(${t.x + 14} ${t.y + 14})">${icon}</g>
+      <text x="${t.x + 54}" y="${t.y + 27}" class="sf-l">${label}</text>
+      <text x="${t.x + 54}" y="${t.y + 50}" class="sf-v">${val}</text>
+      ${sub ? `<text x="${t.x + 54}" y="${t.y + 66}" class="sf-s">${sub}</text>` : ""}</g>`;
+  }
+
+  /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}} */
+  function flow(d) {
+    const f = d.f || {}, v = { sh: f.sh, sb: f.sb, bh: f.bh, gh: f.gh };
+    let idle = "", live = "", dots = "", chips = "";
+    for (const k in L) {
+      const x = L[k], val = v[k] == null ? 0 : v[k];
+      idle += `<path d="${pd(x.pts)}" class="sf-i"/>`;
+      if (Math.abs(val) < 5) continue;
+      const pts = val >= 0 ? x.pts : [...x.pts].reverse();
+      const a = Math.abs(val), w = Math.min(6.5, 2.6 + a / 450);
+      live += `<path d="${pd(pts)}" class="sf-o" style="stroke:var(${x.col});stroke-opacity:.5;stroke-width:${w.toFixed(1)}"/>`;
+      const dur = Math.max(1.6, Math.min(4, 4.2 - a / 450));
+      for (let i = 0; i < 3; i++) {
+        if (reduced()) {
+          const [px, py] = bez(pts, .2 + i * .3);
+          dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(w / 2 + 1.6).toFixed(1)}" style="fill:var(${x.col})"/>`;
+        } else {
+          dots += `<circle r="${(w / 2 + 1.8).toFixed(1)}" style="fill:var(${x.col})"><animateMotion dur="${dur.toFixed(2)}s" begin="${(-i * dur / 3).toFixed(2)}s" repeatCount="indefinite" path="${pd(pts)}"/></circle>`;
+        }
+      }
+      const [mx, my] = bez(x.pts, .5), txt = fmt(a) + " W", cw = txt.length * 7.8 + 16;
+      chips += `<rect x="${(mx - cw / 2).toFixed(1)}" y="${(my - 11).toFixed(1)}" width="${cw.toFixed(1)}" height="22" rx="11" style="fill:var(--sf-card);stroke:var(${x.col});stroke-opacity:.55"/>
+        <text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" class="sf-c">${txt}</text>`;
+    }
+    const bat = d.bat, grid = d.grid == null ? 0 : d.grid, soc = d.soc != null && d.soc >= 0 ? Math.round(d.soc) : null;
+    const batSub = bat == null ? "" : bat >= 5 ? "gibt ab" : bat <= -5 ? "lädt" : "ruht";
     const gridSub = grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen";
-    const bh = f.battery_house;
-    return `<svg viewBox="0 0 640 330" role="img" aria-label="Energiefluss">
-      ${edge("M320 92 L320 158", f.solar_house, true, "var(--sc-sun)", 332, 130, "start")}
-      ${edge("M288.6 75.4 L143.4 174.6", f.solar_battery, true, "var(--sc-sun)", 204, 114, "end")}
-      ${edge("M150 196 L282 196", bh, bh != null && bh > 0, "var(--sc-bat)", 216, 186, "middle")}
-      ${edge("M358 196 L490 196", f.grid_house, f.grid_house != null && f.grid_house < 0, "var(--sc-grid)", 424, 186, "middle")}
-      ${node(320, 54, "☀️", "Solar", W(pv), "", "var(--sc-sun)", true)}
-      ${node(112, 196, "🔋", "Speicher", bat == null ? "–" : W(Math.abs(bat)), batSub, "var(--sc-bat)")}
-      ${node(320, 196, "🏠", "Haus", W(house), "", "var(--sc-home)")}
-      ${node(528, 196, "⚡", "Netz", W(Math.abs(grid)), gridSub, "var(--sc-grid)")}
+    return `<svg viewBox="0 0 640 340" role="img" aria-label="Energiefluss">${CSS}${idle}${live}${dots}${chips}
+      ${tile("sun", "Solar", wl(d.pv), d.pv != null && d.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"))}
+      ${tile("bat", "Speicher", bat == null ? "–" : wl(Math.abs(bat)), batSub ? batSub + (soc != null ? " · " + soc + " %" : "") : (soc != null ? soc + " %" : ""), "--sf-bat", ICON.bat("var(--sf-bat)", soc))}
+      ${tile("grid", "Netz", wl(Math.abs(grid)), gridSub, "--sf-grid", ICON.grid("var(--sf-grid)"))}
+      ${tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"))}
     </svg>`;
   }
+
+  /* Überschrift aus den Flüssen; ohne Flüsse aus dem Sollwert. d: {f, grid, soc, target} */
+  function headline(d) {
+    const f = d.f, s = d.soc != null && d.soc >= 0 ? ` · mittlerer Ladestand ${Math.round(d.soc)} %` : "";
+    const g = d.grid == null ? 0 : d.grid;
+    const gs = Math.abs(g) < 30 ? "Netzbezug nahe null" : g > 0 ? `Netzbezug ${fmt(g)} W` : `Einspeisung ${fmt(-g)} W`;
+    if (f) {
+      const sh = f.sh >= 5, sb = f.sb >= 5, bh = f.bh >= 5, gh = f.gh >= 5;
+      if (sh && sb) return ["Solar versorgt dein Haus und lädt den Speicher", gs + s];
+      if (sh && bh && gh) return ["Solar, Speicher und Netz versorgen dein Haus", `Der Verbrauch ist höher als die Abgabe der Speicher${s}`];
+      if (sh && bh) return ["Solar und Speicher versorgen dein Haus", gs + s];
+      if (bh) return [`Der Speicher versorgt dein Haus mit ${fmt(f.bh)} W`, gs + s];
+      if (sb) return [`Überschuss lädt den Speicher mit ${fmt(f.sb)} W`, (Math.abs(g) < 30 ? "Einspeisung wird vermieden" : gs) + s];
+      if (sh && !gh) return ["Solar versorgt dein Haus", gs + s];
+    }
+    const t = d.target == null ? 0 : d.target;
+    if (t > 0) return [`Die Speicher versorgen dein Haus mit ${fmt(t)} W`, `Netzbezug wird auf nahe null geregelt${s}`];
+    if (t < 0) return [`Überschuss lädt die Speicher mit ${fmt(-t)} W`, `Einspeisung wird vermieden${s}`];
+    return ["Alles ausgeglichen", `Gerade ist keine Regelung nötig${s}`];
+  }
+
+  /* Glatte Kurve durch die Punkte (Catmull-Rom als Bézier), Werte ohne Überschwingen unter 0 */
+  function smooth(P, floorY) {
+    if (P.length < 2) return "";
+    let s = `M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = Math.min(floorY, p1[1] + (p2[1] - p0[1]) / 6);
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = Math.min(floorY, p2[1] - (p3[1] - p1[1]) / 6);
+      s += `C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    }
+    return s;
+  }
+
+  /* d: {t:[Sekunden]|null, pv:[W], house:[W]}; Werte im Abstand von 5 Minuten, das letzte ist „jetzt“ */
+  function trend(d) {
+    const pv = d.pv || [], hs = d.house || [], n = Math.max(pv.length, hs.length);
+    if (n < 3) return "";
+    const end = Date.now() / 1000;
+    const ts = d.t && d.t.length === n ? d.t : Array.from({ length: n }, (_, i) => end - (n - 1 - i) * 300);
+    const t1 = Math.max(ts[n - 1], ts[0] + 600), t0 = Math.max(ts[0], t1 - 86400);
+    const X0 = 44, X1 = 626, Y0 = 18, Y1 = 150;
+    const all = [...pv, ...hs].filter(v => v != null);
+    const mx = Math.max(...all, 100);
+    const step = [250, 500, 1000, 2000, 2500, 5000, 10000].find(s => mx / s <= 3.2) || 10000;
+    const top = Math.ceil(mx / step) * step;
+    const X = t => X0 + (t - t0) / (t1 - t0) * (X1 - X0), Y = v => Y1 - Math.min(v, top) / top * (Y1 - Y0);
+    const pts = arr => { const o = []; let last = 0; for (let i = 0; i < n; i++) { if (ts[i] < t0) continue; if (arr[i] != null) last = arr[i]; o.push([X(ts[i]), Y(last)]); } return o; };
+    const P = pts(pv), H = pts(hs);
+    let grid = "";
+    for (let v = 0; v <= top; v += step) {
+      const y = Y(v).toFixed(1), lab = v === 0 ? "0" : v >= 1000 ? (v / 1000).toLocaleString("de-DE") + "k" : String(v);
+      grid += `<path d="M${X0} ${y}H${X1}" class="sf-g"${v ? ' stroke-dasharray="2 5"' : ""}/><text x="${X0 - 8}" y="${(+y + 4).toFixed(1)}" text-anchor="end" class="sf-a">${lab}</text>`;
+    }
+    const span = (t1 - t0) / 3600, every = span <= 4 ? 1 : span <= 12 ? 3 : 6;
+    let ticks = "";
+    const first = new Date(t0 * 1000); first.setMinutes(0, 0, 0);
+    for (let h = new Date(first.getTime() + 3600000); h.getTime() / 1000 < t1 - 900; h = new Date(h.getTime() + 3600000)) {
+      if (h.getHours() % every) continue;
+      const x = X(h.getTime() / 1000);
+      if (x < X0 + 14 || x > X1 - 22) continue;
+      ticks += `<text x="${x.toFixed(1)}" y="${Y1 + 20}" text-anchor="middle" class="sf-a">${h.getHours()} Uhr</text>`;
+    }
+    const area = P.length > 1 ? `${smooth(P, Y1)}L${P[P.length - 1][0].toFixed(1)} ${Y1}L${P[0][0].toFixed(1)} ${Y1}Z` : "";
+    const nowP = P[P.length - 1];
+    return `<svg viewBox="0 0 640 196" role="img" aria-label="Verlauf der letzten Stunden: Solar und Haus">${CSS}${grid}${ticks}
+      <path d="${area}" style="fill:var(--sf-sun);fill-opacity:.2;stroke:none"/>
+      <path d="${smooth(P, Y1)}" class="sf-o" style="stroke:var(--sf-sun);stroke-width:2.4;stroke-linejoin:round"/>
+      <path d="${smooth(H, Y1)}" class="sf-o" style="stroke:var(--sf-home);stroke-width:2.4;stroke-linejoin:round"/>
+      <circle cx="${nowP[0].toFixed(1)}" cy="${nowP[1].toFixed(1)}" r="4.5" style="fill:var(--sf-sun);stroke:var(--sf-card);stroke-width:2"/>
+      <g transform="translate(${X0} 186)"><circle cx="5" cy="-4" r="5" style="fill:var(--sf-sun)"/><text x="16" y="0" class="sf-c">Solar</text>
+      <circle cx="78" cy="-4" r="5" style="fill:var(--sf-home)"/><text x="89" y="0" class="sf-c">Haus</text></g></svg>`;
+  }
+
+  return { flow, trend, headline, wl };
+})();
+/*FLOW-END*/
+  function flowData(a) {
+    const f = a.flows;
+    return { pv: num(a.pv_w), house: num(a.house_w), bat: num(a.battery_w), grid: num(a.grid_w) ?? 0, soc: num(a.avg_soc), target: num(a.target_w),
+      f: f ? { sh: f.solar_house, sb: f.solar_battery, bh: f.battery_house, gh: f.grid_house } : null };
+  }
+  const flowSVG = a => SF.flow(flowData(a));
 
   function headline(a, state) {
     const t = num(a.target_w) ?? 0, soc = a.avg_soc, prefix = a.mode === "test" ? "Im Test: " : "";
     if (a.mode === "stopped") return ["SOLASI ist gestoppt", a.stop_reason ? `${a.stop_reason}. Die Speicher laufen im eigenen Modus.` : "Die Speicher laufen im eigenen Modus."];
     if (a.mode === "observe") return ["SOLASI beobachtet nur", "Die Regelung ist aus, es wird nichts gesendet."];
     if (a.meter_ok === false) return ["Zähler ohne Meldung", "Zur Sicherheit gehen die Speicher auf 0 W."];
-    const s = soc != null ? ` · mittlerer Ladestand ${soc} %` : "";
-    if (t > 0) return [`${prefix}Die Speicher versorgen dein Haus mit ${Math.abs(t)} W`, `Netzbezug wird auf nahe null geregelt${s}`];
-    if (t < 0) return [`${prefix}Überschuss lädt die Speicher mit ${Math.abs(t)} W`, `Einspeisung wird vermieden${s}`];
-    return [`${prefix}Alles ausgeglichen`, `Gerade ist keine Regelung nötig${s}`];
+    const [h, sub] = SF.headline(flowData(a));
+    return [prefix + h, sub];
   }
 
   function trendSVG(a) {
-    const t = a.trend || {}, pv = t.pv || [], hs = t.house || [];
-    const n = Math.max(pv.length, hs.length);
-    if (n < 3) return "";
-    const all = [...pv, ...hs].filter(v => v != null);
-    const hi = Math.max(...all, 100);
-    const X = i => (i / (n - 1)) * 560, Y = v => 50 - (v / hi) * 46;
-    const path = arr => arr.map((v, i) => v == null ? null : `${i && arr[i - 1] != null ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).filter(Boolean).join("");
-    const area = pv.length > 1 && pv.every(v => v != null) ? `<path d="${path(pv)}L${X(pv.length - 1).toFixed(1)} 50L0 50Z" fill="var(--sc-sun)" fill-opacity=".18"/>` : "";
-    return `<div class="trend"><svg viewBox="0 0 560 54" preserveAspectRatio="none" role="img" aria-label="Verlauf der letzten 24 Stunden">
-      ${area}<path d="${path(pv)}" fill="none" stroke="var(--sc-sun)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-      <path d="${path(hs)}" fill="none" stroke="var(--sc-home)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
-      <div class="leg"><span style="color:var(--sc-sun)">● Solar</span><span style="color:var(--sc-home)">● Haus</span><span>letzte 24 Stunden</span></div></div>`;
+    const svg = SF.trend(a.trend || {});
+    return svg ? `<div class="trend"><div class="eyebrow">Verlauf</div>${svg}</div>` : "";
   }
 
   function ago(ts) {

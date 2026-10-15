@@ -259,3 +259,10 @@ def test_trend_mittelt_je_fuenf_minuten_und_begrenzt(tmp_path):
     ctrl.trend_every = 300
     ctrl._trend_add(None, None)                       # fehlende Werte brechen nichts
     assert len(ctrl.trend) == 3
+
+
+def test_trend_series_hat_zeitstempel(tmp_path):
+    ctrl = mk_ctrl(tmp_path); ctrl.trend_every = 0; ctrl.trend = []
+    ctrl._trend_add(100, 300); ctrl._trend_add(200, 310)
+    s = ctrl.trend_series()
+    assert len(s["t"]) == len(s["pv"]) == len(s["house"]) == 2 and s["pv"] == [100, 200]

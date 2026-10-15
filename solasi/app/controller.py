@@ -811,6 +811,10 @@ class Controller:
     trend_every = 300
     trend_keep = 288
 
+    def trend_series(self):
+        """Verlauf für Oberfläche und Karte: Zeit (Sekunden), Solar, Haus."""
+        return {"t": [p[0] for p in self.trend], "pv": [p[1] for p in self.trend], "house": [p[2] for p in self.trend]}
+
     def _trend_add(self, pv, house):
         """Kurzer Tagesverlauf für die Dashboard-Karte (Mittel je 5 Minuten, letzte 24 Stunden)."""
         acc = getattr(self, "_trend_acc", None)
@@ -920,7 +924,7 @@ class Controller:
             "units": st.get("units", []), "slots": st.get("slots", []),
             "stop_reason": st.get("safety", {}).get("reason", "") if stopped else "",
             "addon_slug": self.addon_slug,
-            "trend": {"pv": [p[1] for p in self.trend], "house": [p[2] for p in self.trend]},
+            "trend": self.trend_series(),
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
         }
         out = {"sensor.solasi": (state, main)}
@@ -980,6 +984,7 @@ class Controller:
             "avg_soc": round(d["avg_soc"], 1), "blocked_w": round(d["blocked_w"]),
             "curtail": dict(self.curtail), "learned_base_load": self.learner.value, "safety": dict(self.safety),
             "base_load_used": round(self.base_load_effective()),
+            "trend": self.trend_series(),
             "want": "Entladen" if d["want_dis"] else "Laden" if d["want_chg"] else "Leerlauf",
             "surplus_w": None if d["surplus_w"] is None else round(d["surplus_w"]),
             "units": [{

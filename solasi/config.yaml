@@ -1,5 +1,5 @@
 name: "SOLASI"
-version: "1.2.0"
+version: "1.2.1"
 slug: solasi
 description: "SOLASI – Nulleinspeisung und Energieregelung für Heimspeicher (Anker SOLIX, Marstek u. a.) mit Eco-Modus, Überschusssteuerung, Not-Aus und Live-Übersicht"
 url: "https://github.com/DEIN-NAME/solasi"

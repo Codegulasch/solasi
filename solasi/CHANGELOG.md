@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.2.1
+- **Neue Energiefluss-Grafik** in der Übersicht und in der Dashboard-Karte, beide aus demselben Code und deshalb gleich: Kacheln mit eigenen Symbolen (Sonne, Akku mit Ladestand, Haus, Netzmast), weiche Kurven statt Winkeln, wandernde Punkte in Flussrichtung und Linien, die mit der Leistung dicker werden.
+- **Verlauf der letzten 24 Stunden** (Solar als Fläche, Haus als Linie, aktueller Wert als Punkt) in der Übersicht und in der Karte. Die Zeitachse nutzt jetzt echte Uhrzeiten.
+- **Überschrift aus dem Energiefluss:** z. B. „Solar versorgt dein Haus und lädt den Speicher“ statt nur nach dem Sollwert.
+- **Speicher-Karte** in Klartext („80 % geladen · gibt 270 W ab“, „Extern gesteuert“). Die Rohwerte stehen unter *Technische Details*.
+- **Protokoll in der Übersicht** ruhiger gestaltet.
 ## 1.2.0
 - **Neues Layout:** Seitenleiste mit den Bereichen *Betrieb*, *Auswertung* und *System*, dazu eine Kopfleiste mit Status, **Regelung**, **Testmodus** und **Not-Aus** (mit Rückfrage). Das Design bleibt gleich.
 - **Neue Übersicht:** Kennzahlen, Energiefluss, Speicher, Überschuss und Protokoll auf einen Blick, plus ein Hinweisband, wenn etwas Aufmerksamkeit braucht.
