@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.2.2
+- **Zählerreihe in Übersicht und Dashboard-Karte:** eine eigene Reihe ganz oben, getrennt vom Energiefluss. Sie zeigt den **Tagesverbrauch** (Haus heute) und beliebige **Zähler** aus Home Assistant, zum Beispiel Zählerstand Strom oder Wasserzähler.
+  Bei jedem Zähler lässt sich der **Verbrauch heute** einblenden („+0,18 m³ heute“). SOLASI merkt sich dafür den Stand zu Beginn des Tages. Optional kommen Solarertrag und Netzbezug heute dazu.
+- **Neue Seite *Betrieb → Zähler*:** Sensor, Name, Symbol und Farbe je Zähler, bis zu acht Zähler, mit Vorschau.
+- **Karte:** neue Optionen `show_meters` und `meters_layout` (große Kachel links oder alle gleich groß), auch im visuellen Editor.
+- Die Zählerreihe passt sich der Breite an: in schmalen Karten stehen die Kacheln untereinander.
+- Mehr Abstand zwischen Zählerreihe und Energiefluss.
 ## 1.2.1
 - **Neue Energiefluss-Grafik** in der Übersicht und in der Dashboard-Karte, beide aus demselben Code und deshalb gleich: Kacheln mit eigenen Symbolen (Sonne, Akku mit Ladestand, Haus, Netzmast), weiche Kurven statt Winkeln, wandernde Punkte in Flussrichtung und Linien, die mit der Leistung dicker werden.
 - **Verlauf der letzten 24 Stunden** (Solar als Fläche, Haus als Linie, aktueller Wert als Punkt) in der Übersicht und in der Karte. Die Zeitachse nutzt jetzt echte Uhrzeiten.

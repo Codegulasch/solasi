@@ -6,7 +6,7 @@ const w=dom.window;w.addEventListener("error",e=>errors.push(e.message));
 w.eval(src);
 const ok=(c,m)=>{if(!c){console.log("FAIL:",m);
 process.exitCode=1}else console.log("ok  :",m)};
-const attrs={mode:"test",flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},pv_w:780,battery_w:-260,house_w:529,grid_w:9,target_w:390,surplus_w:1620,avg_soc:62,eco_active:true,meter_ok:true,blocked_w:1380,
+const attrs={meters:[{name:"Wasserzähler Haus",value:552.62,dec:2,unit:"m³",icon:"wasser",color:"water",day:0.18},{name:"<b>x</b>",value:13141.74,dec:2,unit:"kWh",icon:"zaehler",color:"zaehl",day:null}],today:{house:8.4,pv:6.4,imp:1.2},meters_cfg:{show_day:true,extra:false},mode:"test",flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},pv_w:780,battery_w:-260,house_w:529,grid_w:9,target_w:390,surplus_w:1620,avg_soc:62,eco_active:true,meter_ok:true,blocked_w:1380,
  units:[{name:"Speicher A",pv:540,soc:80,set:280,force:false,available:true},{name:"<img src=x onerror=alert(1)>",soc:-1,set:0,force:true,available:false}],
  slots:[{name:"Wallbox",state:"on",own_w:1380}]};
 const mk=(cfg,states)=>{const el=w.document.createElement("solasi-card");w.document.body.appendChild(el);el.setConfig(cfg);el.hass={states};return el;};
@@ -20,7 +20,7 @@ ok(w.customElements.get("solasi-card").getStubConfig().entity==="sensor.solasi",
 
 let el=mk({},st("Entladen",attrs));
 ok(txt(el).includes("780 W")&&txt(el).includes("260 W")&&txt(el).includes("529 W")&&txt(el).includes("lädt")&&txt(el).includes("Bezug"),"Diagramm zeigt Solar 780, Speicher 260 (lädt), Haus 529, Netz Bezug");
-const FH=require("./flowhelp"),fs1=()=>el.shadowRoot.querySelector("svg");
+const FH=require("./flowhelp"),fs1=()=>el.shadowRoot.querySelector('svg[aria-label="Energiefluss"]');
 const ln=FH.lines(fs1());
 ok(ln.sh==="fwd"&&ln.sb==="fwd"&&ln.bh===null&&ln.gh==="fwd","Linien: Solar->Haus und Solar->Speicher aktiv, Speicher<->Haus ruhig, Netz->Haus (Bezug)");
 ok(FH.chips(fs1()).sort().join()==="260 W,520 W,9 W","Linien tragen ihre Werte (520, 260, 9 W)");
@@ -31,7 +31,7 @@ ok(q(el,".unit").length===2&&txt(el).includes("Abregelung")&&txt(el).includes("n
 ok(!el.shadowRoot.innerHTML.includes("<img")&&el.shadowRoot.innerHTML.includes("&lt;img"),"HTML in Namen wird maskiert (kein XSS)");
 
 el=mk({title:"",show_batteries:false,show_surplus:false,show_tags:false,show_headline:false},st("Leerlauf",attrs));
-ok(q(el,".head").length===0&&q(el,".unit").length===0&&q(el,".surplus").length===0&&q(el,".tags").length===0&&q(el,".headline").length===0&&q(el,"svg").length===1,"Optionen blenden Teile aus, Diagramm bleibt");
+ok(q(el,".head").length===0&&q(el,".unit").length===0&&q(el,".surplus").length===0&&q(el,".tags").length===0&&q(el,".headline").length===0&&q(el,'svg[aria-label="Energiefluss"]').length===1,"Optionen blenden Teile aus, Diagramm bleibt");
 
 el=mk({entity:"sensor.gibtsnicht"},st("x",{}));
 ok(txt(el).includes("sensor.gibtsnicht")&&txt(el).includes("nicht gefunden"),"Hinweis bei fehlender Entität");
@@ -78,4 +78,19 @@ ok(ed.querySelector("ha-form")&&ed.querySelector("ha-form").schema.length>=10&&e
 let got=null;ed.addEventListener("config-changed",e=>got=e.detail.config);
 ed.querySelector("ha-form").dispatchEvent(new w.CustomEvent("value-changed",{detail:{value:{size:"compact"}}}));
 ok(got&&got.size==="compact"&&got.title==="Mein Solar","Editor meldet Änderungen zurück");
+// ---- Zählerreihe ----
+el=mk({},st("Entladen",attrs));
+ok(q(el,".sfm").length===1&&txt(el).includes("Tagesverbrauch")&&txt(el).includes("8,4")&&txt(el).includes("552,62")&&txt(el).includes("13.141,74")&&txt(el).includes("+0,18 m³"),"Zählerreihe: Tagesverbrauch, Zähler, Tageswert");
+ok(q(el,".mwrap").length===1&&q(el,".mwrap")[0].nextElementSibling&&q(el,".mwrap")[0].nextElementSibling.classList.contains("headline"),"Reihe steht ganz oben, vor der Überschrift");
+ok(q(el,".sfm b").length===1&&q(el,".sfm")[0].innerHTML.includes("&lt;b&gt;x"),"Zählernamen werden maskiert");
+el=mk({show_meters:false},st("Entladen",attrs));
+ok(q(el,".sfm").length===0&&q(el,".mwrap").length===0,"Zählerreihe abschaltbar");
+el=mk({meters_layout:"even"},st("Entladen",attrs));
+ok(q(el,".sfm.even").length===1&&q(el,".sfm.big").length===0,"Anordnung: alle gleich groß");
+el=mk({},st("Entladen",{...attrs,meters_cfg:{show_day:false,extra:true}}));
+ok(!txt(el).includes("Tagesverbrauch")&&txt(el).includes("Solarertrag heute")&&txt(el).includes("Netzbezug heute"),"Ohne Tageskachel, mit Solar und Netz heute");
+el=mk({},st("Entladen",{...attrs,meters:undefined,today:undefined}));
+ok(q(el,".sfm").length===0,"Ältere Version ohne Zählerdaten: keine Reihe");
+el=mk({size:"compact"},st("Entladen",attrs));
+ok(q(el,".sfm").length===0,"Kompakt zeigt keine Zählerreihe");
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

@@ -58,7 +58,7 @@ Links steht die Seitenleiste, am Handy eine Leiste unten (der Rest steckt im Men
 
 | Bereich | Inhalt |
 |---|---|
-| **Betrieb** | *Übersicht* (Kennzahlen, Energiefluss, Speicher, Überschuss, Protokoll), *Speicher*, *Überschuss* |
+| **Betrieb** | *Übersicht* (Kennzahlen, Zähler, Energiefluss, Speicher, Überschuss, Protokoll), *Speicher*, *Überschuss*, *Zähler* |
 | **Auswertung** | *Statistik* und *Replay* |
 | **System** | *Selbsttest*, *Protokoll*, *Dashboard-Karte*, *Entitäten (MQTT)* |
 | **Einrichtung** | Zähler und Speicher einrichten, auch als Assistent beim ersten Start |
@@ -204,6 +204,15 @@ Das Replay ist eine **Näherung**. Der „Modell-Check“ zeigt, wie weit die Si
 - **Abregelung bei vollem Speicher:** SOLASI beobachtet bei vollen Speichern und Sonne, ob trotzdem eingespeist wird. Nach drei Minuten Einspeisung gilt die Abregelung als *nicht wirksam*, dann dürfen Verbraucher früher laufen
   und du bekommst eine Meldung. Bleibt der Zähler ausgeglichen, gilt sie als *bestätigt*.
 
+## Zähler und Tagesverbrauch
+
+Unter *Betrieb → Zähler* zeigst du weitere Zähler aus Home Assistant in SOLASI und in der Dashboard-Karte, zum Beispiel **Zählerstand Strom** (kWh) oder **Wasserzähler** (m³). Die Reihe steht ganz oben, getrennt vom Energiefluss.
+
+- **Tagesverbrauch:** die große Kachel zeigt, was das Haus heute verbraucht hat. Sie lässt sich abschalten.
+- **Zähler hinzufügen:** wähle den Sensor, gib Name, Symbol und Farbe an. Es sind bis zu acht Zähler möglich. Geeignet sind Sensoren, die nur hochzählen. Einheit und Nachkommastellen übernimmt SOLASI vom Sensor.
+- **Verbrauch heute:** bei jedem Zähler lässt sich die Differenz zum Tagesbeginn anzeigen, zum Beispiel „+0,18 m³ heute“. SOLASI merkt sich dafür den ersten Wert des Tages. Beim ersten Start mitten am Tag zählt der Verbrauch ab diesem Zeitpunkt. Wird ein Zähler getauscht oder zurückgesetzt, beginnt die Zählung neu.
+- **Solarertrag und Netzbezug heute** lassen sich als weitere Kacheln dazuschalten.
+
 ## Dashboard-Karte
 
 SOLASI installiert beim Start die Karte `solasi-card` und trägt sie als Dashboard-Ressource ein. Unter **System → Dashboard-Karte** siehst du den Stand und findest bei Bedarf die manuelle Anleitung.
@@ -221,6 +230,8 @@ show_batteries: true         # Ladestand je Speicher
 show_surplus: true           # Überschuss und Verbraucher
 show_tags: true              # Eco, Zähler, Sollwert
 size: large                  # large oder compact (vier Kacheln, ohne Diagramm)
+show_meters: true            # Reihe mit Tagesverbrauch und Zählern ganz oben
+meters_layout: big           # big (große Kachel links) oder even (alle gleich groß)
 show_trend: true             # Verlauf der letzten 24 Stunden
 show_kill: true              # Not-Aus-Knopf mit Rückfrage (benötigt MQTT)
 tap_open: true               # Antippen öffnet SOLASI

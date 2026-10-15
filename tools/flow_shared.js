@@ -2,7 +2,7 @@
    Quelle für beide Stellen. Nach Änderungen `python tools/sync_flow.py` ausführen, das kopiert
    diesen Block in solasi/app/static/index.html und solasi/app/card/solasi-card.js.
    Farben kommen aus Variablen, die jede Stelle selbst setzt:
-   --sf-card --sf-fg --sf-muted --sf-line --sf-sun --sf-bat --sf-grid --sf-home --sf-ok --sf-warn --sf-bad */
+   --sf-card --sf-tile --sf-fg --sf-muted --sf-line --sf-sun --sf-bat --sf-grid --sf-home --sf-ok --sf-warn --sf-bad */
 const SF = (() => {
   const fmt = v => Math.round(v).toLocaleString("de-DE");
   const wl = v => (v == null || isNaN(v)) ? "–" : fmt(v) + " W";
@@ -159,5 +159,75 @@ const SF = (() => {
       <circle cx="78" cy="-4" r="5" style="fill:var(--sf-home)"/><text x="89" y="0" class="sf-c">Haus</text></g></svg>`;
   }
 
-  return { flow, trend, headline, wl };
+
+  /* ---- Zählerreihe: Tagesverbrauch, eigene Zähler (Strom, Wasser, Gas …), optional Solar und Netz heute ---- */
+  const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const MCOL = { zaehl: "#e8548a", water: "#3b8eea", water2: "#34b36b", sun: "var(--sf-sun)", bat: "var(--sf-bat)", grid: "var(--sf-grid)", home: "var(--sf-home)", accent: "var(--sf-sun)" };
+  const MI = {
+    haus: '<path d="M3.5 11 12 4l8.5 7M6 9.5V20h12V9.5M10 20v-5h4v5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/>',
+    zaehler: '<rect x="3" y="5.5" width="18" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8 9.5v5M8 9.5 6.6 10.6M13 9.5h2.4l-2.4 5h2.6M17 9.5v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    wasser: '<path d="M12 3.2c3.6 4.5 6 7.3 6 10.3a6 6 0 0 1-12 0c0-3 2.4-5.8 6-10.3z" fill="currentColor"/>',
+    blitz: '<path d="M13.2 2.5 5.5 13.6h5.3L9.8 21.5 18.5 9.8h-5.4z" fill="currentColor"/>',
+    gas: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.5 1 2.3 1.8 2.5C10.5 8.5 11 5.5 12 3z" fill="currentColor"/>',
+    waerme: '<path d="M10 14.2V5a2 2 0 0 1 4 0v9.2a4 4 0 1 1-4 0z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="16.5" r="1.6" fill="currentColor"/>',
+    sonne: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></g>',
+    netz: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v19M7 21.5l5-12.5 5 12.5M8 9h8M9.5 15h5"/></g>'
+  };
+  const MCSS = `<style>
+    .sfm-w{container-type:inline-size}
+    .sfm{display:grid;gap:10px;font-family:inherit}
+    .sfm.even{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+    .sfm.big{grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr)}
+    .sfm-r{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
+    .sfm-t{display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-radius:14px;padding:12px 14px;min-width:0;background:var(--sf-tile,rgba(128,128,128,.12))}
+    .sfm-h{display:grid}
+    .sfm-h .sfm-t{justify-content:center;gap:8px;padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--sf-sun) 18%,var(--sf-tile,transparent)),var(--sf-tile,transparent) 85%)}
+    .sfm-hd{display:flex;align-items:center;gap:9px;min-width:0;width:100%}
+    .sfm-ic{flex:none;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c)}
+    .sfm-h .sfm-ic{width:38px;height:38px;border-radius:12px}
+    .sfm-ic svg{width:18px;height:18px}.sfm-h .sfm-ic svg{width:22px;height:22px}
+    .sfm-n{font-size:13px;line-height:1.25;color:var(--sf-muted);font-weight:600;min-width:0;overflow-wrap:anywhere}
+    .sfm-v{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--sf-fg);white-space:nowrap}
+    .sfm-h .sfm-v{font-size:28px}
+    .sfm-v small{font-size:12.5px;font-weight:600;color:var(--sf-muted);margin-left:3px}
+    .sfm-d{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:nowrap}
+    .sfm-d b{color:var(--sf-ok);font-weight:700}
+    .sfm.even .sfm-h .sfm-t{height:100%}
+    .sfm.big .sfm-r .sfm-t{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+    .sfm.big .sfm-r .sfm-hd{width:auto;flex:1}
+    .sfm.big .sfm-r .sfm-val{text-align:right;flex:none}
+    .sfm.big .sfm-r .sfm-v{font-size:18px}
+    @container (max-width:440px){
+      .sfm.big{grid-template-columns:minmax(0,1fr)}
+      .sfm.big .sfm-h .sfm-t{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;height:auto}
+      .sfm.big .sfm-h .sfm-hd{width:auto;flex:1}.sfm.big .sfm-h .sfm-val{text-align:right;flex:none}
+      .sfm.big .sfm-h .sfm-v{font-size:24px}
+      .sfm.even .sfm-h .sfm-t{padding:12px 14px;gap:5px}.sfm.even .sfm-h .sfm-v{font-size:22px}
+      .sfm.even .sfm-h .sfm-ic{width:30px;height:30px;border-radius:10px}.sfm.even .sfm-h .sfm-ic svg{width:18px;height:18px}
+      .sfm.even{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }</style>`;
+  const nf = (v, dec) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  const nd = v => Number(v).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+  /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
+  function meters(d) {
+    const tiles = [];
+    const t = d.today;
+    const hero = d.show_day !== false && t && t.house != null
+      ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
+    (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
+      sub: m.day != null && m.value != null ? `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute` : "" }));
+    if (d.extra && t) {
+      if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
+      if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
+    }
+    if (!hero && !tiles.length) return "";
+    const tile = x => `<div class="sfm-t" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
+      <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
+    if (hero && tiles.length && d.layout !== "even")
+      return `${MCSS}<div class="sfm-w"><div class="sfm big"><div class="sfm-h">${tile(hero)}</div><div class="sfm-r">${tiles.map(tile).join("")}</div></div></div>`;
+    return `${MCSS}<div class="sfm-w"><div class="sfm even">${(hero ? [hero, ...tiles] : tiles).map(x => x === hero ? `<div class="sfm-h">${tile(x)}</div>` : tile(x)).join("")}</div></div>`;
+  }
+
+  return { flow, trend, headline, wl, meters };
 })();

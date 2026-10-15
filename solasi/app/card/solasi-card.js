@@ -10,6 +10,8 @@
  *   show_tags: true                 # Eco, Zähler, Sollwert
  *   size: large                     # large oder compact (nur Kacheln)
  *   show_trend: true                # Tagesverlauf von Solar und Haus
+ *   show_meters: true               # Reihe mit Tagesverbrauch und Zählern ganz oben
+ *   meters_layout: big              # big (große Kachel links) oder even (alle gleich groß)
  *   show_kill: true                 # Not-Aus-Knopf (braucht MQTT, siehe Anleitung)
  *   tap_open: true                  # Antippen öffnet SOLASI
  *   accent: ""                      # Akzentfarbe, z. B. "#3F5BD8" (leer = Standard)
@@ -27,6 +29,7 @@
       --sc-grid:var(--solasi-grid,#6366f1);--sc-home:var(--solasi-home,#64748b);
       --sc-ok:var(--success-color,#1f9d63);--sc-warn:var(--warning-color,#d97706);--sc-bad:var(--error-color,#e5484d);
       --sc-test:var(--solasi-test,#8b5cf6);
+      --sf-tile:var(--secondary-background-color,#f3f3f3);
       --sf-card:var(--ha-card-background,var(--card-background-color,#fff));--sf-fg:var(--primary-text-color);--sf-muted:var(--secondary-text-color);
       --sf-line:var(--divider-color,#ddd);--sf-sun:var(--sc-sun);--sf-bat:var(--sc-bat);--sf-grid:var(--sc-grid);--sf-home:var(--sc-home);
       --sf-ok:var(--sc-ok);--sf-warn:var(--sc-warn);--sf-bad:var(--sc-bad)}
@@ -65,6 +68,8 @@
     .msg{padding:18px 6px;color:var(--secondary-text-color);text-align:center;font-size:14px}
     .surplus{margin-top:8px}
     ha-card.tap{cursor:pointer}
+    .mwrap{margin:8px 0 18px;padding-bottom:18px;border-bottom:1px solid var(--divider-color,#e0e0e0)}
+    .mwrap + .headline{margin-top:0}
     .kill{border:1px solid var(--sc-bad);background:none;color:var(--sc-bad);border-radius:999px;padding:3px 11px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
     .kill.arm{background:var(--sc-bad);color:#fff}
     .kill.go{border-color:var(--sc-ok);color:var(--sc-ok)}
@@ -84,7 +89,7 @@
    Quelle für beide Stellen. Nach Änderungen `python tools/sync_flow.py` ausführen, das kopiert
    diesen Block in solasi/app/static/index.html und solasi/app/card/solasi-card.js.
    Farben kommen aus Variablen, die jede Stelle selbst setzt:
-   --sf-card --sf-fg --sf-muted --sf-line --sf-sun --sf-bat --sf-grid --sf-home --sf-ok --sf-warn --sf-bad */
+   --sf-card --sf-tile --sf-fg --sf-muted --sf-line --sf-sun --sf-bat --sf-grid --sf-home --sf-ok --sf-warn --sf-bad */
 const SF = (() => {
   const fmt = v => Math.round(v).toLocaleString("de-DE");
   const wl = v => (v == null || isNaN(v)) ? "–" : fmt(v) + " W";
@@ -241,7 +246,77 @@ const SF = (() => {
       <circle cx="78" cy="-4" r="5" style="fill:var(--sf-home)"/><text x="89" y="0" class="sf-c">Haus</text></g></svg>`;
   }
 
-  return { flow, trend, headline, wl };
+
+  /* ---- Zählerreihe: Tagesverbrauch, eigene Zähler (Strom, Wasser, Gas …), optional Solar und Netz heute ---- */
+  const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const MCOL = { zaehl: "#e8548a", water: "#3b8eea", water2: "#34b36b", sun: "var(--sf-sun)", bat: "var(--sf-bat)", grid: "var(--sf-grid)", home: "var(--sf-home)", accent: "var(--sf-sun)" };
+  const MI = {
+    haus: '<path d="M3.5 11 12 4l8.5 7M6 9.5V20h12V9.5M10 20v-5h4v5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/>',
+    zaehler: '<rect x="3" y="5.5" width="18" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8 9.5v5M8 9.5 6.6 10.6M13 9.5h2.4l-2.4 5h2.6M17 9.5v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    wasser: '<path d="M12 3.2c3.6 4.5 6 7.3 6 10.3a6 6 0 0 1-12 0c0-3 2.4-5.8 6-10.3z" fill="currentColor"/>',
+    blitz: '<path d="M13.2 2.5 5.5 13.6h5.3L9.8 21.5 18.5 9.8h-5.4z" fill="currentColor"/>',
+    gas: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.5 1 2.3 1.8 2.5C10.5 8.5 11 5.5 12 3z" fill="currentColor"/>',
+    waerme: '<path d="M10 14.2V5a2 2 0 0 1 4 0v9.2a4 4 0 1 1-4 0z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="16.5" r="1.6" fill="currentColor"/>',
+    sonne: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></g>',
+    netz: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v19M7 21.5l5-12.5 5 12.5M8 9h8M9.5 15h5"/></g>'
+  };
+  const MCSS = `<style>
+    .sfm-w{container-type:inline-size}
+    .sfm{display:grid;gap:10px;font-family:inherit}
+    .sfm.even{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+    .sfm.big{grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr)}
+    .sfm-r{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
+    .sfm-t{display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-radius:14px;padding:12px 14px;min-width:0;background:var(--sf-tile,rgba(128,128,128,.12))}
+    .sfm-h{display:grid}
+    .sfm-h .sfm-t{justify-content:center;gap:8px;padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--sf-sun) 18%,var(--sf-tile,transparent)),var(--sf-tile,transparent) 85%)}
+    .sfm-hd{display:flex;align-items:center;gap:9px;min-width:0;width:100%}
+    .sfm-ic{flex:none;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c)}
+    .sfm-h .sfm-ic{width:38px;height:38px;border-radius:12px}
+    .sfm-ic svg{width:18px;height:18px}.sfm-h .sfm-ic svg{width:22px;height:22px}
+    .sfm-n{font-size:13px;line-height:1.25;color:var(--sf-muted);font-weight:600;min-width:0;overflow-wrap:anywhere}
+    .sfm-v{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--sf-fg);white-space:nowrap}
+    .sfm-h .sfm-v{font-size:28px}
+    .sfm-v small{font-size:12.5px;font-weight:600;color:var(--sf-muted);margin-left:3px}
+    .sfm-d{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:nowrap}
+    .sfm-d b{color:var(--sf-ok);font-weight:700}
+    .sfm.even .sfm-h .sfm-t{height:100%}
+    .sfm.big .sfm-r .sfm-t{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+    .sfm.big .sfm-r .sfm-hd{width:auto;flex:1}
+    .sfm.big .sfm-r .sfm-val{text-align:right;flex:none}
+    .sfm.big .sfm-r .sfm-v{font-size:18px}
+    @container (max-width:440px){
+      .sfm.big{grid-template-columns:minmax(0,1fr)}
+      .sfm.big .sfm-h .sfm-t{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;height:auto}
+      .sfm.big .sfm-h .sfm-hd{width:auto;flex:1}.sfm.big .sfm-h .sfm-val{text-align:right;flex:none}
+      .sfm.big .sfm-h .sfm-v{font-size:24px}
+      .sfm.even .sfm-h .sfm-t{padding:12px 14px;gap:5px}.sfm.even .sfm-h .sfm-v{font-size:22px}
+      .sfm.even .sfm-h .sfm-ic{width:30px;height:30px;border-radius:10px}.sfm.even .sfm-h .sfm-ic svg{width:18px;height:18px}
+      .sfm.even{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }</style>`;
+  const nf = (v, dec) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  const nd = v => Number(v).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+  /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
+  function meters(d) {
+    const tiles = [];
+    const t = d.today;
+    const hero = d.show_day !== false && t && t.house != null
+      ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
+    (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
+      sub: m.day != null && m.value != null ? `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute` : "" }));
+    if (d.extra && t) {
+      if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
+      if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
+    }
+    if (!hero && !tiles.length) return "";
+    const tile = x => `<div class="sfm-t" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
+      <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
+    if (hero && tiles.length && d.layout !== "even")
+      return `${MCSS}<div class="sfm-w"><div class="sfm big"><div class="sfm-h">${tile(hero)}</div><div class="sfm-r">${tiles.map(tile).join("")}</div></div></div>`;
+    return `${MCSS}<div class="sfm-w"><div class="sfm even">${(hero ? [hero, ...tiles] : tiles).map(x => x === hero ? `<div class="sfm-h">${tile(x)}</div>` : tile(x)).join("")}</div></div>`;
+  }
+
+  return { flow, trend, headline, wl, meters };
 })();
 /*FLOW-END*/
   function flowData(a) {
@@ -278,7 +353,7 @@ const SF = (() => {
 
     setConfig(config) {
       this._cfg = { entity: "sensor.solasi", title: "SOLASI", show_headline: true, show_batteries: true,
-                    show_surplus: true, show_tags: true, size: "large", show_trend: true, show_kill: true,
+                    show_surplus: true, show_tags: true, size: "large", show_trend: true, show_meters: true, meters_layout: "big", show_kill: true,
                     tap_open: true, accent: "", ...(config || {}) };
       this._key = null;
       this._render();
@@ -317,7 +392,10 @@ const SF = (() => {
           <div class="tile home"><div class="n">Haus</div><div class="v">${W(a.house_w)}</div></div>
           <div class="tile bat"><div class="n">Speicher</div><div class="v">${b == null ? "–" : W(Math.abs(b))}</div></div>
           <div class="tile grid"><div class="n">Netz</div><div class="v">${W(Math.abs(g))}</div></div></div>`;
+        const mc = a.meters_cfg || {};
+        const mhtml = c.show_meters ? SF.meters({ items: a.meters || [], today: a.today, show_day: mc.show_day, extra: mc.extra, layout: c.meters_layout }) : "";
         body = compact ? `${c.show_headline ? `<div class="sub">${esc(hl)}</div>` : ""}${tiles}` : `
+          ${mhtml ? `<div class="mwrap">${mhtml}</div>` : ""}
           ${c.show_headline ? `<div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>` : ""}
           ${flowSVG(a)}
           ${c.show_trend ? trendSVG(a) : ""}
@@ -379,13 +457,15 @@ const SF = (() => {
       if (!this._form) {
         this._form = document.createElement("ha-form");
         this._form.computeLabel = s => ({ entity: "Entität", title: "Titel", size: "Größe", show_headline: "Überschrift zeigen",
-          show_trend: "Tagesverlauf zeigen", show_batteries: "Speicher zeigen", show_surplus: "Überschuss zeigen", show_tags: "Hinweise zeigen",
+          show_trend: "Tagesverlauf zeigen", show_meters: "Zählerreihe zeigen", meters_layout: "Anordnung der Zähler", show_batteries: "Speicher zeigen", show_surplus: "Überschuss zeigen", show_tags: "Hinweise zeigen",
           show_kill: "Not-Aus-Knopf zeigen", tap_open: "Antippen öffnet SOLASI", accent: "Akzentfarbe (z. B. #3F5BD8)" }[s.name] || s.name);
         this._form.schema = [
           { name: "entity", selector: { entity: { domain: "sensor" } } },
           { name: "title", selector: { text: {} } },
           { name: "size", selector: { select: { mode: "box", options: [{ value: "large", label: "Groß" }, { value: "compact", label: "Kompakt" }] } } },
           { name: "show_headline", selector: { boolean: {} } },
+          { name: "show_meters", selector: { boolean: {} } },
+          { name: "meters_layout", selector: { select: { mode: "box", options: [{ value: "big", label: "Große Kachel links" }, { value: "even", label: "Alle gleich groß" }] } } },
           { name: "show_trend", selector: { boolean: {} } },
           { name: "show_batteries", selector: { boolean: {} } },
           { name: "show_surplus", selector: { boolean: {} } },
@@ -400,7 +480,7 @@ const SF = (() => {
         this.appendChild(this._form);
       }
       this._form.hass = this._hass;
-      this._form.data = { entity: "sensor.solasi", title: "SOLASI", size: "large", show_headline: true, show_trend: true, show_batteries: true,
+      this._form.data = { entity: "sensor.solasi", title: "SOLASI", size: "large", show_headline: true, show_meters: true, meters_layout: "big", show_trend: true, show_batteries: true,
         show_surplus: true, show_tags: true, show_kill: true, tap_open: true, accent: "", ...this._cfg };
     }
   }

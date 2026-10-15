@@ -18,10 +18,11 @@ import energy
 import watchdog
 from ha import is_num, num
 from learn import BaseLoadLearner, is_night
+from meters import Meters
 from mqtt import MqttBridge
 from notify import Notifier
 from stats import Stats
-from util import data_path, load_json, save_json
+from util import data_path, load_json, now_local, save_json
 
 log = logging.getLogger("solasi.ctrl")
 
@@ -71,6 +72,7 @@ DEFAULT_CONFIG = {
     "notify": {"service": "", "delay_min": 2, "cooldown_min": 60, "recovery": True,
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
+    "meters": {"show_day": True, "extra": False, "items": []},
     "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
     "safety": {"kill_entity": "", "release_on_stop": True, "release_on_disable": True,
                "auto_meter_min": 5, "auto_errors": True, "resume_auto": False,
@@ -329,6 +331,9 @@ class Controller:
                      "url": "", "base_url": "", "restart_needed": False}
         self.last_snap = None
         self.mqtt = MqttBridge(self, os.environ.get("SOLASI_VERSION", "dev"))
+        self.meters = Meters(data_path("meters.json"))
+        self._meters_at = 0.0
+        self._meters_view = None
         self._trend_path = data_path("trend.json")
         self.trend = load_json(self._trend_path, {}).get("p", [])     # [Zeit, Solar, Haus] alle 5 Minuten, 24 Stunden
         self.addon_slug = ""             # für „Antippen öffnet SOLASI“ in der Dashboard-Karte
@@ -622,6 +627,7 @@ class Controller:
     async def save_config(self, data):
         was_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
         self.store.save(data)
+        self._meters_view = None             # geänderte Zähler sofort neu lesen
         now_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
         if now_live and not was_live:
             self._mode_try.clear()           # Live-Steuerung eingeschaltet: Modus sofort setzen
@@ -811,6 +817,33 @@ class Controller:
     trend_every = 300
     trend_keep = 288
 
+    def meter_view(self):
+        """Zusätzliche Zähler und Tageswerte für Oberfläche und Karte (höchstens alle 5 Sekunden neu berechnet)."""
+        now = time.monotonic()
+        if self._meters_view is not None and now - self._meters_at < 5:
+            return self._meters_view
+        mc = self.cfg.get("meters") or {}
+
+        def lookup(eid):
+            st = self.ha.states.get(eid)
+            if not st:
+                return None
+            at = st.get("attributes") or {}
+            val = st.get("state")
+            if val in (None, "unknown", "unavailable"):
+                val = None
+            return val, at.get("unit_of_measurement") or "", at.get("friendly_name") or ""
+
+        day = self.stats.days.get(now_local().strftime("%Y-%m-%d"))
+        k = Stats.kpis(day) if day else None
+        self._meters_view = {
+            "items": self.meters.compute(mc.get("items"), lookup, now_local().strftime("%Y-%m-%d")),
+            "today": None if k is None else {"house": k["house"], "pv": k["pv"], "imp": k["imp"], "autarky": k["autarky"]},
+            "show_day": bool(mc.get("show_day", True)), "extra": bool(mc.get("extra", False)),
+        }
+        self._meters_at = now
+        return self._meters_view
+
     def trend_series(self):
         """Verlauf für Oberfläche und Karte: Zeit (Sekunden), Solar, Haus."""
         return {"t": [p[0] for p in self.trend], "pv": [p[1] for p in self.trend], "house": [p[2] for p in self.trend]}
@@ -926,6 +959,8 @@ class Controller:
             "addon_slug": self.addon_slug,
             "trend": self.trend_series(),
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
+            "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
+            "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"]},
         }
         out = {"sensor.solasi": (state, main)}
         if self.mqtt.active:
@@ -984,7 +1019,7 @@ class Controller:
             "avg_soc": round(d["avg_soc"], 1), "blocked_w": round(d["blocked_w"]),
             "curtail": dict(self.curtail), "learned_base_load": self.learner.value, "safety": dict(self.safety),
             "base_load_used": round(self.base_load_effective()),
-            "trend": self.trend_series(),
+            "trend": self.trend_series(), "meter_view": self.meter_view(),
             "want": "Entladen" if d["want_dis"] else "Laden" if d["want_chg"] else "Leerlauf",
             "surplus_w": None if d["surplus_w"] is None else round(d["surplus_w"]),
             "units": [{

@@ -6,7 +6,8 @@ const status={flows:{solar_house:520,solar_battery:260,battery_house:0,grid_hous
  units:[{name:"Speicher A",pv:540,soc:80,set:0,real:0,plan:280,force:false,available:false,mode:"self_consumption",dir:"discharge"},{name:"Speicher B",soc:40,set:0,real:0,plan:110,force:true,available:true,mode:"third_party_control",dir:"discharge"}],
  slots:[{name:"Wallbox",ent:"switch.wb",num:"number.wb",state:"on",own_w:1380,num_v:6}],
  events:[{ts:"12:00:01",level:"test",msg:"Test: Speicher A: 0 W → 280 W"},{ts:"12:00:00",level:"error",msg:"<b>x</b>"}]};
-{const now=Math.floor(Date.now()/1000),n=120,t=[],pv=[],house=[];for(let i=0;i<n;i++){t.push(now-(n-1-i)*300);pv.push(Math.round(Math.max(0,Math.sin(i/n*Math.PI)*1600)));house.push(300+(i%7)*20)}status.trend={t,pv,house};}
+{const now=Math.floor(Date.now()/1000),n=120,t=[],pv=[],house=[];for(let i=0;i<n;i++){t.push(now-(n-1-i)*300);pv.push(Math.round(Math.max(0,Math.sin(i/n*Math.PI)*1600)));house.push(300+(i%7)*20)}status.trend={t,pv,house}
+status.meter_view={items:[{entity:"sensor.wh",name:"Wasserzähler Haus",value:552.62,dec:2,unit:"m³",icon:"wasser",color:"water",day:0.18},{entity:"sensor.st",name:"Zählerstand Strom",value:13141.74,dec:2,unit:"kWh",icon:"zaehler",color:"zaehl",day:null}],today:{house:8.4,pv:6.4,imp:1.2,autarky:.88},show_day:true,extra:false};;}
 const ents=[{id:"sensor.grid",name:"Netz",domain:"sensor"},{id:"sensor.extra_a",name:"Irgendein Sensor A",domain:"sensor"},{id:"sensor.extra_b",name:"Irgendein Sensor B",domain:"sensor"},{id:"number.a",name:"A",domain:"number"},{id:"switch.wb",name:"WB",domain:"switch"},{id:"select.m",name:"M",domain:"select"}];
 const errors=[];
 const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"http://localhost/",
@@ -65,6 +66,10 @@ const w=dom.window,d=w.document;
  const ur=[...d.querySelectorAll(".urow")];
  ok(ur[0].textContent.includes("Eigenverbrauch")&&ur[1].textContent.includes("Extern gesteuert")&&!ur[1].querySelector(".sub").textContent.includes("third_party"),"Speicherzeile: Klartext statt Rohwerte");
  ok(ur[1].querySelector("details")&&ur[1].querySelector("details").textContent.includes("third_party_control"),"Rohwerte unter Technische Details");
+ const ps=d.querySelector("#p-status");
+ ok(ps.querySelectorAll(".sfm").length===1&&ps.textContent.includes("Tagesverbrauch")&&ps.textContent.includes("8,4")&&ps.textContent.includes("Wasserzähler Haus")&&ps.textContent.includes("552,62")&&ps.textContent.includes("13.141,74"),"Übersicht: Tagesverbrauch und Zähler als eigene Reihe");
+ ok(ps.textContent.includes("+0,18 m³")&&ps.textContent.indexOf("+0,18")>0&&!ps.querySelector(".sfm").textContent.includes("Zählerstand Strom +"),"Tagesverbrauch des Wasserzählers, keiner beim Stromzähler ohne Wert");
+ ok(ps.querySelector(".sfm").closest(".card")&&!ps.querySelector(".sfm").closest(".hero"),"Zählerreihe getrennt vom Energiefluss");
  ok(d.getElementById("modetext").textContent==="Testmodus"&&d.getElementById("conntext").textContent==="Verbunden","Status-Pillen");
  ok(d.querySelector(".bat svg rect[fill*=ok]")!==null,"Batterie-Symbol grün bei hohem Ladestand");
  ok(d.querySelector("#p-status").textContent.includes("Wallbox"),"Überschuss-Slot im Status");
@@ -172,6 +177,24 @@ const w=dom.window,d=w.document;
  L=await draw({flows:null,pv_w:null,bat_w:null,house_w:null,grid_w:0});
  ok(Object.values(L).every(v=>v===null),"Ohne Flusswerte: alle Linien ruhig, nichts erfunden");
  Object.assign(status,{pv_w:780,bat_w:-260,house_w:529,grid_w:9,flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9}});
+ // --- Zähler-Seite ---
+ d.querySelector('#nav button[data-p="meters"]').click();
+ ok(d.getElementById("p-meters").classList.contains("act")&&d.getElementById("savebar").style.display==="flex","Zähler-Seite mit Speichern-Leiste");
+ ok(d.querySelector("#p-meters").textContent.includes("So sieht es aus")&&d.querySelector("#p-meters .sfm"),"Zähler-Seite zeigt eine Vorschau");
+ d.getElementById("addmeter").click();
+ let mc=w.eval("cfg.meters");
+ ok(mc.items.length===1&&mc.items[0].icon==="zaehler"&&mc.items[0].daily===true,"Zähler hinzufügen");
+ await new Promise(r=>setTimeout(r,20));
+ const en=d.getElementById("f_meters_items_0_entity");en.value="sensor.gas";en.dispatchEvent(new w.Event("input"));
+ const ic=d.getElementById("f_meters_items_0_icon");ic.value="gas";ic.dispatchEvent(new w.Event("change"));
+ await new Promise(r=>setTimeout(r,20));
+ mc=w.eval("cfg.meters");
+ ok(mc.items[0].entity==="sensor.gas"&&mc.items[0].icon==="gas","Sensor und Symbol werden übernommen");
+ d.getElementById("f_meters_extra").click();
+ ok(w.eval("cfg.meters.extra")===true,"Option „Solar und Netz heute“ lässt sich einschalten");
+ d.querySelector("[data-delmeter]").click();
+ ok(w.eval("cfg.meters.items.length")===0,"Zähler entfernen");
+ w.showPage("status");
  // --- Kill-Switch ---
  w.showPage("status");await new Promise(r=>setTimeout(r,2300));
  const kb=d.getElementById("killbtn");
