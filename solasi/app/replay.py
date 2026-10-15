@@ -196,7 +196,7 @@ def simulate(cfg, data, tau=6.0, curtail=False, eff=0.95):
                     "out_w": 0.0, "has_out": False, "pv_w": 0.0, "has_pv": False, "extra_pv": 0.0, "house_w": None, "custom_w": None}
             for i, u in enumerate(units):
                 snap["units"].append({"cfg": u["cfg"], "k": u["cfg"]["name"], "has": True, "soc": soc[i], "set": setv[i],
-                                      "real": abs(out[i]), "dir": "", "num_state": "0", "mode": None})
+                                      "real": abs(out[i]), "ac": out[i], "dir": "", "num_state": "0", "mode": None})
             d = decide(cfg, snap)
             for i, su in enumerate(snap["units"]):
                 p = su["p"]

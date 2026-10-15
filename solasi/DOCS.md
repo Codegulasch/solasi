@@ -18,9 +18,10 @@ Alle Einstellungen nimmst du in der Oberfläche von SOLASI vor (Seitenleiste in 
 9. [Auswertung: Statistik und Replay](#auswertung-statistik-und-replay)
 10. [Selbsttest und Energiebilanz](#selbsttest-und-energiebilanz)
 11. [Dashboard-Karte](#dashboard-karte)
-12. [Sicherung der Einstellungen](#sicherung-der-einstellungen)
-13. [Häufige Fragen und Fehlersuche](#häufige-fragen-und-fehlersuche)
-14. [Datenschutz und Haftung](#datenschutz-und-haftung)
+12. [Feste Entitäten und Energie-Dashboard (MQTT)](#feste-entitäten-und-energie-dashboard-mqtt)
+13. [Sicherung der Einstellungen](#sicherung-der-einstellungen)
+14. [Häufige Fragen und Fehlersuche](#häufige-fragen-und-fehlersuche)
+15. [Datenschutz und Haftung](#datenschutz-und-haftung)
 
 ## Voraussetzungen
 
@@ -34,7 +35,7 @@ Nutzt du bisher eine Automation oder einen Blueprint zur Nulleinspeisung, **scha
 
 ## Einrichtung Schritt für Schritt
 
-1. **SOLASI öffnen.** Die Willkommensseite führt dich zu *Einstellungen → Anlage*.
+1. **SOLASI öffnen.** Die Willkommensseite führt dich zu *Einrichtung*.
 2. **Zähler wählen.** Trage den Sensor der Netzleistung ein. Zeigt dein Zähler Einspeisung als positiven Wert, schalte „Vorzeichen umkehren“ ein.
 3. **Speicher einrichten.** Wähle den **Speichertyp** und die passenden Entitäten. Die Felder schlagen sie vor, die Sensoren desselben Geräts stehen mit aktuellem Wert vorn.
    Bei der Anker SOLIX sind das:
@@ -53,15 +54,18 @@ Die Schalter oben wirken sofort und werden automatisch gespeichert. Änderungen 
 
 ## Die Oberfläche
 
+Links steht die Seitenleiste, am Handy eine Leiste unten (der Rest steckt im Menü **Mehr**).
+
 | Bereich | Inhalt |
 |---|---|
-| **Übersicht** | Energiefluss (Solar, Speicher, Haus, Netz), Ladestand je Speicher, aktueller Sollwert, Überschuss und Verbraucher |
-| **Einstellungen** | *Anlage* (Zähler und Speicher), *Regelung*, *Überschuss*, *Sicherheit & Meldungen* |
+| **Betrieb** | *Übersicht* (Kennzahlen, Energiefluss, Speicher, Überschuss, Protokoll), *Speicher*, *Überschuss* |
 | **Auswertung** | *Statistik* und *Replay* |
-| **System** | *Selbsttest*, *Protokoll*, *Dashboard-Karte* |
+| **System** | *Selbsttest*, *Protokoll*, *Dashboard-Karte*, *Entitäten (MQTT)* |
+| **Einrichtung** | Zähler und Speicher einrichten, auch als Assistent beim ersten Start |
+| **Einstellungen** | *Regelung*, *Sicherheit & Meldungen*, *Darstellung* |
 
-Oben in der Kopfleiste siehst du die Verbindung, den Modus (**Live**, **Testmodus**, **Beobachten** oder **Gestoppt**), den **Not-Aus** und die Schalter **Experte**, **Regelung**, **Testmodus**,
-**Überschuss** und **Überschuss-Test**. Mit **Experte** erscheinen zusätzliche Feineinstellungen. Gruppen in den Einstellungen lassen sich ein- und ausklappen.
+Die Kopfleiste zeigt Verbindung und Modus (**Live**, **Testmodus**, **Beobachten** oder **Gestoppt**) und enthält die Schalter **Regelung** und **Testmodus** sowie den **Not-Aus**, der vor dem Auslösen nachfragt.
+Ein Hinweisband erscheint, wenn etwas Aufmerksamkeit braucht. Unter *Einstellungen → Darstellung* wählst du Startseite und Dichte; beides gilt nur für das jeweilige Gerät.
 
 **Den Energiefluss lesen:** Die Ladeleistung der Batterie kommt zuerst aus der Solarleistung (Linie *Solar → Speicher*), der Rest geht ins Haus. Reicht die Solarleistung nicht, kommt der Rest der Ladung aus dem Netz
 und läuft über das Haus in den Speicher. Beim Entladen gibt der Speicher über die Linie *Speicher → Haus* ab. Die Verteilung ist aus den Messwerten abgeleitet, die Anlage meldet sie nicht selbst.
@@ -69,7 +73,7 @@ Unbekannte Werte zeigt SOLASI als „–“, nie als 0 W.
 
 ## Speichertypen
 
-SOLASI ist nicht auf einen Hersteller festgelegt. Je Speicher wählst du unter *Einstellungen → Anlage* den **Speichertyp**. Typen lassen sich mischen.
+SOLASI ist nicht auf einen Hersteller festgelegt. Je Speicher wählst du unter *Einrichtung* den **Speichertyp**. Typen lassen sich mischen.
 
 | Typ | So wird gesteuert | Passt z. B. zu |
 |---|---|---|
@@ -128,7 +132,7 @@ Jede Funktion lässt sich einzeln ein- und ausschalten.
   Dafür braucht es Sensoren für Laden und Entladen oder einen Hausverbrauchs-Sensor. Der gelernte Wert steht in den Einstellungen und als `sensor.solasi_base_load`.
 
 ### Sensoren und Messart
-Unter *Einstellungen → Anlage* zeigt jeder Speicher die **Sensoren desselben Geräts mit aktuellem Wert**. Vergleiche sie mit der Hersteller-App, um Solar, Laden und Entladen zu finden.
+Unter *Einrichtung* zeigt jeder Speicher die **Sensoren desselben Geräts mit aktuellem Wert**. Vergleiche sie mit der Hersteller-App, um Solar, Laden und Entladen zu finden.
 
 **Messart der Leistungssensoren:**
 
@@ -141,7 +145,7 @@ Unter *Einstellungen → Anlage* zeigt jeder Speicher die **Sensoren desselben G
 
 ## Überschuss für Verbraucher, Wallbox und Heizstab
 
-Unter *Einstellungen → Überschuss* richtest du bis zu **drei Verbraucher** ein, die laufen, wenn mehr Solarstrom da ist, als das Haus braucht. Oben in der Kopfleiste schaltest du die Funktion mit **Überschuss** ein.
+Unter *Betrieb → Überschuss* richtest du bis zu **drei Verbraucher** ein, die laufen, wenn mehr Solarstrom da ist, als das Haus braucht. Dort schaltest du die Funktion auch ein.
 Der **Überschuss-Test** protokolliert nur, was geschaltet würde.
 
 - **Quelle des Überschusses:** *PV minus Hausverbrauch* (empfohlen, braucht PV-Sensoren), *Einspeisung ins Netz* oder ein *eigener Sensor*.
@@ -167,7 +171,7 @@ Ein Speicher im externen Modus arbeitet mit dem **letzten Sollwert** weiter, auc
    Beendest du SOLASI selbst, greift der Wächter nicht ein, weil die Speicher dann schon frei sind. SOLASI hält die Automation aktuell. Änderungen, die du von Hand an ihr vornimmst, werden überschrieben.
    Darf SOLASI keine Automation anlegen, zeigt *Sicherheit & Meldungen* den fertigen Text zum Einfügen.
 
-**Rückfall-Modus festlegen:** Trage ihn bei jedem Speicher unter *Einstellungen → Anlage* im Feld „Beim Stoppen: Modus setzen auf“ ein. Ohne ihn bleibt der Speicher im externen Modus mit 0 W.
+**Rückfall-Modus festlegen:** Trage ihn bei jedem Speicher unter *Einrichtung* im Feld „Beim Stoppen: Modus setzen auf“ ein. Ohne ihn bleibt der Speicher im externen Modus mit 0 W.
 
 **Möchtest du kurz in der Hersteller-App umstellen?** Nimm vorher den Not-Aus, sonst stellt SOLASI den Modus nach spätestens 30 Sekunden zurück.
 
@@ -202,6 +206,8 @@ Das Replay ist eine **Näherung**. Der „Modell-Check“ zeigt, wie weit die Si
 
 SOLASI installiert beim Start die Karte `solasi-card` und trägt sie als Dashboard-Ressource ein. Unter **System → Dashboard-Karte** siehst du den Stand und findest bei Bedarf die manuelle Anleitung.
 
+Alle Optionen lassen sich auch im visuellen Editor einstellen. Der Not-Aus-Knopf erscheint nur, wenn der Schalter *Not-Aus* existiert, also mit MQTT.
+
 Karte hinzufügen: Dashboard bearbeiten → *Karte hinzufügen* → **SOLASI** wählen, oder „Manuell“:
 
 ```yaml
@@ -212,13 +218,40 @@ show_headline: true          # Klartext-Überschrift
 show_batteries: true         # Ladestand je Speicher
 show_surplus: true           # Überschuss und Verbraucher
 show_tags: true              # Eco, Zähler, Sollwert
+size: large                  # large oder compact (vier Kacheln, ohne Diagramm)
+show_trend: true             # Tagesverlauf der letzten 24 Stunden
+show_kill: true              # Not-Aus-Knopf mit Rückfrage (benötigt MQTT)
+tap_open: true               # Antippen öffnet SOLASI
+accent: ""                   # Akzentfarbe, z. B. "#3F5BD8"
 ```
 
 **Entitäten für eigene Karten, Verläufe und Automationen:** `sensor.solasi` (Status, alle Werte als Attribute), `sensor.solasi_pv_power`, `sensor.solasi_house_power`, `sensor.solasi_battery_power`
-(+ entlädt, − lädt), `sensor.solasi_target_power`, `sensor.solasi_surplus_power`, `sensor.solasi_base_load`. Sie erscheinen nicht in der Entitäten-Verwaltung und werden nach einem Neustart von Home Assistant sofort neu angelegt.
+(+ entlädt, − lädt), `sensor.solasi_target_power`, `sensor.solasi_surplus_power`, `sensor.solasi_base_load`. Mit einem MQTT-Broker ersetzt SOLASI sie durch feste Entitäten (siehe unten); ohne Broker sind es einfache Sensoren, die nach einem Neustart von Home Assistant sofort neu angelegt werden.
 
 **Klappt die automatische Installation nicht?** Kopiere `solasi-card.js` nach `/config/www/solasi/` und trage unter *Einstellungen → Dashboards → ⋮ → Ressourcen* die URL `/local/solasi/solasi-card.js` als JavaScript-Modul ein
 (dafür den erweiterten Modus im Benutzerprofil einschalten). Wurde der Ordner `www` neu angelegt, starte Home Assistant einmal neu.
+
+## Feste Entitäten und Energie-Dashboard (MQTT)
+
+Mit einem MQTT-Broker (am einfachsten das Add-on **Mosquitto broker**) legt SOLASI echte Entitäten in Home Assistant an. Sie bleiben nach einem Neustart erhalten, erscheinen in der Entitäten-Verwaltung, haben einen Verlauf und lassen sich im **Energie-Dashboard** verwenden.
+
+**Einrichtung:** Mosquitto-Add-on installieren und starten, die MQTT-Integration bestätigen, SOLASI neu starten. Mehr ist nicht nötig, SOLASI findet den Broker selbst. Unter **System → Entitäten (MQTT)** siehst du, ob die Verbindung steht. Einen eigenen Broker trägst du dort ebenfalls ein.
+
+Alle Entitäten gehören zum Gerät **SOLASI** (*Einstellungen → Geräte & Dienste → MQTT*):
+
+| Art | Entitäten |
+|---|---|
+| Leistung (W) | Solarleistung, Hausverbrauch, Speicherleistung (+ entlädt, − lädt), Netzleistung (+ Bezug), Sollwert, Überschuss, Grundlast (gelernt) |
+| Ladestand | Durchschnitt aller Speicher (%) |
+| Energiezähler (kWh) | Solarertrag, Hausverbrauch, Netzbezug, Einspeisung, Speicher geladen, Speicher entladen. Sie zählen dauerhaft weiter und passen direkt ins Energie-Dashboard |
+| Schalter | **Regelung**, **Testmodus**, **Not-Aus**. Damit schaltest du SOLASI auch aus Automationen, Szenen und Sprachassistenten |
+| Hinweise | Zustand, Zählerproblem, Eco-Modus aktiv |
+
+*Energie-Dashboard:* Unter *Einstellungen → Dashboards → Energie* kannst du Netzbezug, Einspeisung, Solarertrag und den Speicher (geladen/entladen) mit diesen Zählern verknüpfen. Die Zähler beginnen bei 0, sobald SOLASI sie das erste Mal liefert.
+
+**Ohne MQTT** arbeitet SOLASI unverändert weiter: Die Karte, der Wächter und alle Funktionen laufen, und die Werte stehen als einfache Sensoren (`sensor.solasi_pv_power` usw.) bereit. Diese Sensoren sind nicht in der Entitäten-Verwaltung und fehlen nach einem Neustart von Home Assistant kurz. Sobald MQTT verbunden ist, werden sie durch die festen Entitäten ersetzt.
+
+**Not-Aus als Schalter:** *An* stoppt SOLASI und gibt die Speicher frei, *Aus* setzt die Regelung fort. Der Zustand bleibt auch nach einem Neustart erhalten.
 
 ## Sicherung der Einstellungen
 

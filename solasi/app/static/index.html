@@ -20,8 +20,6 @@
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 18px 0}
-.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px}
 .brand{display:flex;align-items:center;gap:10px}
 .brand svg{width:34px;height:34px;flex:none}
 .brand b{font-size:21px;letter-spacing:-.01em}
@@ -45,11 +43,6 @@ button.kill.resume{background:var(--ok)}
 .tg input:checked+i{background:var(--ok)}
 .tg input:checked+i:after{left:16px}
 .tg.test input:checked+i{background:var(--test)}
-nav{display:flex;gap:2px;margin-top:8px;overflow-x:auto}
-nav button{border:0;background:none;color:var(--muted);padding:10px 15px;cursor:pointer;font:inherit;font-weight:500;white-space:nowrap;border-bottom:3px solid transparent}
-nav button:hover{color:var(--fg)}
-nav button.act{color:var(--fg);border-bottom-color:var(--accent);font-weight:650}
-main{max-width:1080px;margin:0 auto;padding:18px}
 .page{display:none}.page.act{display:block}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow)}
@@ -81,15 +74,9 @@ main{max-width:1080px;margin:0 auto;padding:18px}
 @media (prefers-reduced-motion:reduce){.line.active{animation:none}}
 .bat{display:flex;align-items:center;gap:14px;margin:4px 0 10px}
 .bat svg{width:62px;height:34px;flex:none}
-.welcome{text-align:center;padding:30px 20px}
-.welcome h2{margin:6px 0 4px;font-size:24px}
 .steps{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:20px 0;text-align:left}
 .step{background:var(--chip);border-radius:14px;padding:13px 15px}
 .step b{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;margin-bottom:6px;font-size:14px}
-.subnav{display:flex;gap:6px;padding:6px 0 8px;overflow-x:auto}
-.subnav:empty{display:none}
-.subnav button{border:1px solid var(--line);background:var(--card);color:var(--muted);padding:5px 14px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
-.subnav button.act{background:var(--accent-soft);color:var(--fg);border-color:var(--accent);font-weight:650}
 details.fsec{border:1px solid var(--line);border-radius:18px;background:var(--card);margin:0 0 14px;box-shadow:var(--shadow)}
 details.fsec>summary{cursor:pointer;list-style:none;padding:13px 18px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
 details.fsec>summary::-webkit-details-marker{display:none}
@@ -132,50 +119,177 @@ details.slot[open]>summary{margin-bottom:12px}
 .legend .sub{margin-left:auto}
 #toast{position:fixed;left:50%;bottom:76px;transform:translate(-50%,20px);background:var(--fg);color:var(--bg);padding:10px 20px;border-radius:999px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:20}
 #toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- Seitenleiste, Kopfzeile, Handy-Leiste ---------- */
+html,body{min-height:100%}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;align-self:start;height:100vh;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:30}
+.side .brand{padding:16px 18px;border-bottom:1px solid var(--line)}
+.nav{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:2px}
+.nav .sec{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);opacity:.8;padding:14px 12px 4px}
+.nav .sec:first-child{padding-top:4px}
+.nav button{display:flex;align-items:center;gap:12px;border:0;background:none;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--muted);font:inherit;font-weight:500;text-align:left}
+.nav button svg,.tabbar button svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button:hover{background:var(--chip);color:var(--fg)}
+.nav button[aria-current="page"]{background:var(--accent);color:#2b1c00;font-weight:650}
+.nav .badge{margin-left:auto;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--chip);color:var(--muted)}
+.nav .badge.warn{background:var(--accent-soft);color:var(--warn)}
+.nav .sep{height:1px;background:var(--line);margin:8px 6px}
+.side-foot{border-top:1px solid var(--line);padding:12px 16px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--muted)}
+.content{min-width:0;display:flex;flex-direction:column}
+.bar{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+.bar h1{margin:0;font-size:19px;letter-spacing:-.01em;margin-right:auto}
+main{padding:20px 24px 40px;max-width:1180px;width:100%}
+main.hasset{display:grid;grid-template-columns:190px minmax(0,1fr);gap:0 18px;align-items:start}
+main.hasset>*{grid-column:2}
+main.hasset>#subnav{grid-column:1;grid-row:1/span 30;position:sticky;top:72px}
+.subnav{display:flex;flex-direction:column;gap:2px}
+.subnav:empty{display:none}
+.subnav button{border:0;background:none;text-align:left;padding:9px 12px;border-radius:10px;color:var(--muted);font:inherit;font-weight:500;cursor:pointer}
+.subnav button:hover{background:var(--chip);color:var(--fg)}
+.subnav button.act{background:var(--card);color:var(--fg);font-weight:650;box-shadow:var(--shadow)}
+#pagetools{display:none;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+#pagetools.on{display:flex}
+.tabbar{display:none}
+.scrim{display:none}
+body.first .side,body.first .tabbar,body.first .bar .tg,body.first .bar .kill,body.first #pagetools{display:none!important}
+body.first .shell{grid-template-columns:minmax(0,1fr)}
+body.first main{margin:0 auto}
+/* ---------- Übersicht ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;box-shadow:var(--shadow)}
+.kpi span{font-size:12px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.kpi b{font-size:30px;line-height:1.1;letter-spacing:-.02em}
+.kpi b em{font-size:15px;font-style:normal;color:var(--muted);font-weight:600;margin-left:3px}
+.kpi small{color:var(--muted);font-size:12.5px}
+.kpi.k-sun b{color:var(--sun)}.kpi.k-bat b{color:var(--bat)}.kpi.k-grid b{color:var(--grid)}.kpi.k-home b{color:var(--home)}
+.cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card h2{margin:0 0 10px;font-size:12.5px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.card h2 a{margin-left:auto;text-transform:none;letter-spacing:0;font-size:13px;color:var(--accent-d);text-decoration:none;font-weight:600;cursor:pointer}
+.urow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.urow:last-of-type{border:0;padding-bottom:0}
+.urow .bat{margin:0;grid-row:span 2}
+.urow .bat svg{width:46px;height:26px}
+.urow b{font-size:15px}
+.urow .w{font-weight:700}
+.urow .sub{grid-column:2/4}
+.cons{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.cons:last-child{border:0}
+.cons .sub{margin-left:auto;text-align:right}
+#minilog{max-height:230px;overflow:auto;font-size:12.5px}
+.banner button.primary{padding:4px 14px}
+/* ---------- Einstellungen: Zeilen und Karten ---------- */
+details.fsec{border-radius:18px}
+details.fsec>summary{padding:14px 18px}
+.f{padding:12px 0}
+.seg{display:inline-flex;background:var(--chip);border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:none;border-radius:8px;padding:5px 12px;font:inherit;font-weight:600;font-size:13px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
+/* ---------- Einrichtungsassistent ---------- */
+.wz{display:grid;grid-template-columns:230px minmax(0,1fr);gap:14px;align-items:start;max-width:1000px}
+.vsteps{display:flex;flex-direction:column;gap:2px;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+.vsteps div{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;color:var(--muted);font-weight:500}
+.vsteps i{width:24px;height:24px;border-radius:50%;background:var(--chip);display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:700;flex:none}
+.vsteps .done{color:var(--fg)}.vsteps .done i{background:var(--ok);color:#fff}
+.vsteps .cur{background:var(--accent-soft);color:var(--fg);font-weight:650}.vsteps .cur i{background:var(--accent);color:#2b1c00}
+.vsteps .skip{opacity:.7;font-size:13px}
+.headline{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0 0 2px;text-wrap:balance}
+.wsteps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:14px 0}
+.choice{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
+.choice button{background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left;cursor:pointer;font:inherit;color:var(--fg);min-width:0}
+.choice button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.choice b{display:block;margin-bottom:2px;overflow-wrap:anywhere}
+.choice span{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.livebox{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:10px 0}
+.livebox b{font-size:26px;letter-spacing:-.02em}
+.livebox span{color:var(--muted);font-size:13px}
+.check{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.check:last-child{border:0}
+.check .ic{font-weight:700;width:18px;flex:none}
+.check .ic.ok{color:var(--ok)}.check .ic.warn{color:var(--warn)}.check .ic.error{color:var(--bad)}
+.wfoot{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.wfoot span{color:var(--muted);font-size:13px;margin-right:auto}
+button.sec2{border:1px solid var(--line);background:var(--chip);border-radius:12px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer;color:var(--fg)}
+/* ---------- Handy ---------- */
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;max-height:88vh;border-right:0;border-top:1px solid var(--line);border-radius:22px 22px 0 0;transform:translateY(105%);transition:transform .2s;z-index:40;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .side.open{transform:none;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+  .side .brand{display:none}
+  .scrim.on{display:block;position:fixed;inset:0;background:rgb(0 0 0/.35);z-index:35}
+  .bar{position:static;padding:10px 16px}
+  .bar h1{display:none}
+  main{padding:16px 16px 96px}
+  .tabbar{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+  .tabbar button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;font:inherit;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;position:relative}
+  .tabbar button svg{width:22px;height:22px}
+  .tabbar button[aria-current="page"]{color:var(--fg)}
+  .tabbar button[aria-current="page"] svg{stroke:var(--accent-d)}
+  .tabbar button[aria-current="page"]:before{content:"";position:absolute;top:-7px;width:28px;height:3px;border-radius:2px;background:var(--accent)}
+  .cols,.wz{grid-template-columns:minmax(0,1fr)}
+  main.hasset{display:block}
+  .subnav{flex-direction:row;overflow-x:auto;gap:4px;margin-bottom:12px;position:static}
+  .subnav button{white-space:nowrap}
+  .vsteps{flex-direction:row;overflow-x:auto;padding:8px}
+  .vsteps div{white-space:nowrap;flex:none}
+  .vsteps .skip{display:none}
+  #toast{bottom:92px}
+}
+body.dens-compact{font-size:13.5px}
+body.dens-large{font-size:16.5px}
 </style>
 </head>
 <body>
-<header>
-  <div class="top">
+<div class="shell">
+  <aside class="side" id="side">
     <div class="brand">
       <svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#f97316"/></linearGradient></defs>
         <g stroke="url(#lg)" stroke-width="4" stroke-linecap="round"><path d="M32 4v8M32 52v8M4 32h8M52 32h8M12 12l6 6M46 46l6 6M12 52l6-6M46 18l6-6"/></g>
         <circle cx="32" cy="32" r="15" fill="url(#lg)"/><circle cx="32" cy="32" r="7" fill="#fff7e0"/></svg>
       <div><b>SOLASI</b><small>Dein Energie-Regler</small></div>
     </div>
-    <span class="pill" id="connpill"><i></i><span id="conntext">Verbinde …</span></span>
-    <span class="pill" id="modepill"><i></i><span id="modetext">–</span></span>
-    <button class="kill" id="killbtn" type="button" title="Stoppt SOLASI und gibt die Speicher an ihren eigenen Modus zurück">⛔ Not-Aus</button>
-    <div class="toggles">
+    <nav class="nav" id="nav" aria-label="Hauptmenü"></nav>
+    <div class="side-foot">
+      <span class="pill" id="connpill"><i></i><span id="conntext">Verbinde …</span></span>
+      <span id="mqttline"></span>
       <label class="tg" title="Zeigt zusätzliche Einstellungen für Fortgeschrittene"><input type="checkbox" id="q_expert"><i></i>Experte</label>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <div class="content">
+    <div class="bar">
+      <h1 id="title">Übersicht</h1>
+      <span class="pill" id="modepill"><i></i><span id="modetext">–</span></span>
       <label class="tg"><input type="checkbox" id="q_enabled"><i></i>Regelung</label>
       <label class="tg test"><input type="checkbox" id="q_dry"><i></i>Testmodus</label>
-      <label class="tg"><input type="checkbox" id="q_sp"><i></i>Überschuss</label>
-      <label class="tg test"><input type="checkbox" id="q_spdry"><i></i>Überschuss-Test</label>
+      <button class="kill" id="killbtn" type="button" title="Stoppt SOLASI und gibt die Speicher an ihren eigenen Modus zurück">⛔ Not-Aus</button>
     </div>
+    <main id="main">
+      <div id="subnav" class="subnav"></div>
+      <div id="pagetools">
+        <label class="tg" id="tg_sp"><input type="checkbox" id="q_sp"><i></i>Überschuss</label>
+        <label class="tg test" id="tg_spdry"><input type="checkbox" id="q_spdry"><i></i>Überschuss-Test</label>
+      </div>
+      <section class="page act" id="p-status"></section>
+      <section class="page" id="p-setup"></section>
+      <section class="page" id="p-units"></section>
+      <section class="page" id="p-control"></section>
+      <section class="page" id="p-surplus"></section>
+      <section class="page" id="p-extras"></section>
+      <section class="page" id="p-look"></section>
+      <section class="page" id="p-stats"></section>
+      <section class="page" id="p-replay"></section>
+      <section class="page" id="p-selftest"></section>
+      <section class="page" id="p-card"></section>
+      <section class="page" id="p-mqtt"></section>
+      <section class="page" id="p-log"><div class="card"><div class="log" id="log"></div></div></section>
+      <div class="savebar" id="savebar"><span class="msg" id="savemsg">Änderungen gelten erst nach „Speichern“.</span>
+        <button class="primary" id="save">Speichern</button></div>
+    </main>
   </div>
-  <nav id="nav">
-    <button data-g="status" class="act">☀️ Übersicht</button>
-    <button data-g="settings">⚙️ Einstellungen</button>
-    <button data-g="eval">📊 Auswertung</button>
-    <button data-g="system">🩺 System</button>
-  </nav>
-  <div id="subnav" class="subnav"></div>
-</header>
-<main>
-  <section class="page act" id="p-status"></section>
-  <section class="page" id="p-units"></section>
-  <section class="page" id="p-control"></section>
-  <section class="page" id="p-surplus"></section>
-  <section class="page" id="p-extras"></section>
-  <section class="page" id="p-stats"></section>
-  <section class="page" id="p-replay"></section>
-  <section class="page" id="p-selftest"></section>
-  <section class="page" id="p-card"></section>
-  <section class="page" id="p-log"><div class="card"><div class="log" id="log"></div></div></section>
-  <div class="savebar" id="savebar"><span class="msg" id="savemsg">Änderungen gelten erst nach „Speichern“.</span>
-    <button class="primary" id="save">Speichern</button></div>
-</main>
+</div>
+<nav class="tabbar" id="tabbar" aria-label="Schnellwahl"></nav>
 <div id="toast"></div>
 <datalist id="dl-sensor"></datalist><datalist id="dl-number"></datalist><datalist id="dl-select"></datalist>
 <datalist id="dl-script"></datalist><datalist id="dl-fb0"></datalist><datalist id="dl-fb1"></datalist><datalist id="dl-sens0"></datalist><datalist id="dl-sens1"></datalist><datalist id="dl-notify"></datalist><datalist id="dl-switchy"></datalist><datalist id="dl-all"></datalist>
@@ -271,7 +385,7 @@ function unitFields(i,u){
     h+=field(p+"power","Leistung (Sensor mit Vorzeichen, optional)","text",{list:L,hint:"Für Failsafe, Hausverbrauch, Statistik und Lernen."})+
        field(p+"power_sign","Vorzeichen des Sensors","select",{options:[["discharge_positive","positiv = Entladen"],["charge_positive","positiv = Laden"]]});
   }
-  h+=field(p+"pv","PV-Leistung der Module","text",{list:L,hint:"Die Solarleistung dieses Speichers. Wird gebraucht, damit die PV auch bei leerem Speicher direkt ins Haus gehen kann, und für den Hausverbrauch bei Messart „Batterie“."})+
+  h+="\u0001"+field(p+"pv","PV-Leistung der Module","text",{list:L,hint:"Die Solarleistung dieses Speichers. Wird gebraucht, damit die PV auch bei leerem Speicher direkt ins Haus gehen kann, und für den Hausverbrauch bei Messart „Batterie“."})+
      field(p+"power_basis","Messart der Leistungssensoren","select",{options:[["","Automatisch"],["ac","Leistung am Hausanschluss (AC)"],["battery","Leistung an der Batterie (DC)"]],
        hint:"Anker mit PV-Sensor misst an der Batterie (Laden und Entladen der Batterie, Solar kommt dazu). Prüfe unter System → Selbsttest → Energiebilanz, ob die Werte zur Hersteller-App passen."})+
      `<div class="f"><label>Sensoren dieses Geräts</label><div id="devsens${i}" class="sub">${(u.num||u.dir||u.script)?"lädt …":"Erst Leistung bzw. Modus wählen."}</div></div>`+
@@ -290,9 +404,9 @@ function renderUnits(){
     field("grid.max_age","Ausfall erkennen nach (Sekunden)","num",{min:0,adv:true,hint:"Meldet der Zähler so lange nichts, gehen die Speicher auf 0 W. 0 = nur bei „nicht verfügbar“."}));
   cfg.units.forEach((u,i)=>{
     const conf=isConf(u);
-    h+=fs(`🔋 ${esc(u.name||("Speicher "+(i+1)))}${i?" (optional)":""}`,unitFields(i,u),{closed:!conf&&i>0,sub:conf?(DRV[u.driver||"anker"]||DRV.anker).label:"nicht eingerichtet"});
+    h+=fs(`🔋 ${esc(u.name||("Speicher "+(i+1)))}${i?" (optional)":""}`,unitFields(i,u).replace("\u0001",""),{closed:!conf&&i>0,sub:conf?(DRV[u.driver||"anker"]||DRV.anker).label:"nicht eingerichtet"});
   });
-  $("#p-units").innerHTML=h+advNote();
+  $("#p-units").innerHTML=h.replace(/\u0001/g,"")+advNote();
   cfg.units.forEach((u,i)=>{
     setSensorList(i,[]);                 // sofort: alle Sensoren vorschlagen, auch beim ersten Einrichten
     refreshDevice(i);refreshModeOptions(i);
@@ -528,30 +642,89 @@ async function killOrResume(){
   poll();
 }
 $("#killbtn").addEventListener("click",killOrResume);
-const GROUPS={status:[["status","Übersicht"]],
-  settings:[["units","Anlage"],["control","Regelung"],["surplus","Überschuss"],["extras","Sicherheit & Meldungen"]],
-  eval:[["stats","Statistik"],["replay","Replay"]],
-  system:[["selftest","Selbsttest"],["log","Protokoll"],["card","Dashboard-Karte"]]};
+const IC={
+  status:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  units:'<rect x="2" y="8" width="18" height="9" rx="2"/><path d="M22 11v3M6 11v3M10 11v3"/>',
+  surplus:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  replay:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="m10 9 5 3-5 3z"/>',
+  selftest:'<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+  log:'<path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/>',
+  card:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  mqtt:'<path d="M3 11 12 3l9 8v9H3z"/>',
+  setup:'<path d="m5 12 4 4 10-10"/>',
+  control:'<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-.9c.6.5 1.3.9 2 1.2l.4 2.6h4l.4-2.6c.7-.3 1.4-.7 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
+  more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'};
+const svgi=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]||""}</svg>`;
+const NAVS=[["Betrieb",[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"]]],
+  ["Auswertung",[["stats","Statistik"],["replay","Replay"]]],
+  ["System",[["selftest","Selbsttest"],["log","Protokoll"],["card","Dashboard-Karte"],["mqtt","Entitäten (MQTT)"]]]];
+const NAV_FOOT=[["setup","Einrichtung"],["control","Einstellungen"]];
+const TITLES={status:"Übersicht",units:"Speicher",surplus:"Überschuss",stats:"Statistik",replay:"Replay",selftest:"Selbsttest",log:"Protokoll",
+  card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung"};
+const SET_SUB=[["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]];
 const SETTINGS_PAGES=["units","control","surplus","extras"];
-let curGroup="status";
-function groupOf(p){return Object.keys(GROUPS).find(g=>GROUPS[g].some(x=>x[0]===p))||"status"}
+const SET_GROUP=SET_SUB.map(x=>x[0]);
+const TAB_ITEMS=[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"]];
+let curPage="status";
+function renderNav(){
+  let h="";
+  NAVS.forEach(([sec,items])=>{h+=`<div class="sec">${sec}</div>`+items.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")});
+  h+=`<div class="sep"></div>`+NAV_FOOT.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("");
+  $("#nav").innerHTML=h;
+  $("#tabbar").innerHTML=TAB_ITEMS.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")+`<button type="button" id="moreBtn">${svgi("more")}Mehr</button>`;
+}
+function navActive(p){return SET_GROUP.includes(p)?"control":p}
 function showPage(p){
-  const g=groupOf(p);curGroup=g;
-  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("act",x.dataset.g===g));
-  $("#subnav").innerHTML=GROUPS[g].length>1?GROUPS[g].map(([id,l])=>`<button data-p="${id}" class="${id===p?"act":""}">${l}</button>`).join(""):"";
+  if(!document.getElementById("p-"+p))p="status";
+  curPage=p;
+  const na=navActive(p);
+  document.querySelectorAll("#nav button,#tabbar button[data-p]").forEach(x=>{if(x.dataset.p===na)x.setAttribute("aria-current","page");else x.removeAttribute("aria-current")});
+  const isSet=SET_GROUP.includes(p);
+  $("#main").classList.toggle("hasset",isSet);
+  $("#subnav").innerHTML=isSet?SET_SUB.map(([id,l])=>`<button type="button" data-p="${id}" class="${id===p?"act":""}">${l}</button>`).join(""):"";
   document.querySelectorAll(".page").forEach(x=>x.classList.toggle("act",x.id==="p-"+p));
+  $("#pagetools").classList.toggle("on",p==="surplus");
   $("#savebar").style.display=SETTINGS_PAGES.includes(p)?"flex":"none";
+  $("#title").textContent=TITLES[p]||"SOLASI";
+  document.body.classList.toggle("first",!!(firstRun&&p==="setup"));
+  closeSheet();window.scrollTo(0,0);
   if(p==="card")loadCard();
+  if(p==="mqtt")loadMqtt();
   if(p==="selftest")loadSelfcheck();
   if(p==="stats")loadStats();
   if(p==="replay")renderReplayForm();
+  if(p==="setup")renderSetup();
+  if(p==="look")renderLook();
 }
-$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b)showPage(GROUPS[b.dataset.g][0][0])});
-$("#subnav").addEventListener("click",e=>{const b=e.target.closest("button");if(b)showPage(b.dataset.p)});
+function closeSheet(){$("#side").classList.remove("open");$("#scrim").classList.remove("on")}
+document.addEventListener("click",e=>{
+  if(e.target.closest("#moreBtn")){$("#side").classList.add("open");$("#scrim").classList.add("on");return}
+  const b=e.target.closest("#nav button[data-p],#tabbar button[data-p],#subnav button[data-p]");
+  if(b)showPage(b.dataset.p);
+});
+$("#scrim").addEventListener("click",closeSheet);
 $("#savebar").style.display="none";
 $("#q_expert").checked=expert;
 $("#q_expert").addEventListener("change",e=>{expert=e.target.checked;try{localStorage.setItem("solasi_expert",expert?"1":"0")}catch(x){}
   if(cfg)renderForms();toast(expert?"Experten-Modus an":"Experten-Modus aus");});
+renderNav();
+
+// ---------- Darstellung (gilt nur für dieses Gerät) ----------
+const LOOK_START=[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"],["selftest","Selbsttest"]];
+function lookGet(k,d){try{return localStorage.getItem("solasi_"+k)||d}catch(e){return d}}
+function lookSet(k,v){try{localStorage.setItem("solasi_"+k,v)}catch(e){}}
+function applyDensity(){const d=lookGet("density","normal");document.body.classList.toggle("dens-compact",d==="compact");document.body.classList.toggle("dens-large",d==="large")}
+function renderLook(){
+  const st=lookGet("start","status"),d=lookGet("density","normal");
+  $("#p-look").innerHTML=`<details class="fsec" open><summary>Start und Aussehen <span class="sub">gilt nur für dieses Gerät</span></summary><div class="fbody">
+    <div class="f"><label for="look_start">Startseite</label><div><select id="look_start">${LOOK_START.map(([k,l])=>`<option value="${k}" ${k===st?"selected":""}>${l}</option>`).join("")}</select></div><div class="hint">Diese Seite öffnet SOLASI beim Aufrufen.</div></div>
+    <div class="f"><label>Dichte</label><div class="seg" id="look_dens" role="group" aria-label="Dichte">${[["compact","Kompakt"],["normal","Normal"],["large","Groß"]].map(([k,l])=>`<button type="button" data-d="${k}" aria-pressed="${k===d}">${l}</button>`).join("")}</div><div class="hint">Schriftgröße und Abstände.</div></div>
+  </div></details>`;
+  $("#look_start").addEventListener("change",e=>{lookSet("start",e.target.value);toast("Startseite gespeichert")});
+  $("#look_dens").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;lookSet("density",b.dataset.d);applyDensity();renderLook()});
+}
+applyDensity();
 
 // ---------- Diagramme ----------
 function niceStep(range,ticks=4){const raw=Math.max(range,1e-9)/ticks,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return(f<=1?1:f<=2?2:f<=5?5:10)*p}
@@ -685,6 +858,47 @@ function renderReplay(j){
     <div class="card" style="margin-top:14px"><h3>Ladestand</h3>${lineChart([{name:"Gemessen",color:"#94a3b8",data:a.series.soc},{name:"Simulation jetzt",color:"#f59e0b",data:c.series.soc},...(x?[{name:"Simulation neu",color:"#8b5cf6",data:x.series.soc}]:[])],{title:"mittlerer SOC in %"})}</div>`;
 }
 
+// ---------- Entitäten (MQTT) ----------
+const MQTT_ENTITIES=[
+  ["Sensoren (W)","Solarleistung, Hausverbrauch, Speicherleistung, Netzleistung, Sollwert, Überschuss, Grundlast"],
+  ["Ladestand Ø","Durchschnitt aller Speicher in %"],
+  ["Energiezähler (kWh)","Solarertrag, Hausverbrauch, Netzbezug, Einspeisung, Speicher geladen/entladen – für das Energie-Dashboard"],
+  ["Schalter","Regelung, Testmodus, Not-Aus – auch für Automationen und Sprachassistenten"],
+  ["Zustand & Hinweise","Zustand von SOLASI, Zählerproblem, Eco-Modus aktiv"]];
+async function loadMqtt(){
+  let m;
+  try{m=await (await fetch("api/mqtt")).json();}catch(e){$("#p-mqtt").innerHTML=`<div class="card">Konnte MQTT-Status nicht laden.</div>`;return;}
+  const mc=(cfg&&cfg.mqtt)||{};
+  const tag={verbunden:["ok","verbunden"],verbinde:["warn","verbindet …"],fehler:["warn","nicht verbunden"],aus:["warn","ausgeschaltet"]}[m.state]||["warn",esc(m.state)];
+  $("#p-mqtt").innerHTML=`
+    <div class="hero"><div class="headline">Echte Entitäten in Home Assistant</div>
+      <div class="sub">Über MQTT legt SOLASI feste Sensoren, Energiezähler und Schalter an. Sie bleiben nach einem Neustart erhalten und lassen sich im Energie-Dashboard verwenden.</div></div>
+    <div class="grid">
+      <div class="card"><h3>Verbindung</h3>
+        <div class="row"><span>Status</span><span class="tag ${tag[0]}" id="mqtt_state">${tag[1]}</span></div>
+        ${m.host?`<div class="row"><span>Broker</span><span class="sub">${esc(m.host)}</span></div>`:""}
+        ${m.detail?`<div class="banner off" style="margin-top:10px">${esc(m.detail)}</div>`:""}
+        <div class="row" style="margin-top:10px"><span>MQTT verwenden</span><label class="tg"><input type="checkbox" id="mqtt_enabled" ${mc.enabled!==false?"checked":""}><i></i>an</label></div>
+        <div class="sub" style="margin-top:8px">Ist das Mosquitto-Add-on installiert, findet SOLASI den Broker von selbst. Ohne MQTT arbeitet SOLASI weiter mit einfachen Sensoren, die nach einem Neustart von Home Assistant kurz fehlen.</div>
+      </div>
+      <div class="card"><h3>Eigener Broker (optional)</h3>
+        <div class="sub" style="margin-bottom:8px">Nur nötig, wenn du keinen Broker über Home Assistant betreibst.</div>
+        <div class="f"><label for="mqtt_host">Adresse</label><div><input id="mqtt_host" value="${esc(mc.host||"")}" placeholder="automatisch"></div></div>
+        <div class="f"><label for="mqtt_port">Port</label><div><input id="mqtt_port" type="number" value="${esc(mc.port||1883)}"></div></div>
+        <div class="f"><label for="mqtt_user">Benutzer</label><div><input id="mqtt_user" value="${esc(mc.user||"")}"></div></div>
+        <div class="f"><label for="mqtt_password">Passwort</label><div><input id="mqtt_password" type="password" value="${esc(mc.password||"")}"></div></div>
+        <button class="primary" id="mqtt_save" style="margin-top:8px">Speichern</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Diese Entitäten legt SOLASI an</h3>
+      ${MQTT_ENTITIES.map(([a,b])=>`<div class="row"><span>${esc(a)}</span><span class="sub">${esc(b)}</span></div>`).join("")}
+      <div class="sub" style="margin-top:8px">Alle gehören zum Gerät „SOLASI“ unter <i>Einstellungen → Geräte & Dienste → MQTT</i>.</div></div>`;
+  $("#mqtt_save").addEventListener("click",async()=>{
+    cfg.mqtt={...cfg.mqtt,enabled:$("#mqtt_enabled").checked,host:$("#mqtt_host").value.trim(),
+      port:parseInt($("#mqtt_port").value)||1883,user:$("#mqtt_user").value,password:$("#mqtt_password").value};
+    await save();setTimeout(loadMqtt,1500);});
+}
+
 // ---------- Dashboard-Karte ----------
 async function loadCard(){
   let c;
@@ -722,6 +936,112 @@ async function loadCard(){
 }
 
 // ---------- Anzeige ----------
+// ---------- Einrichtungsassistent ----------
+const WSTEPS=["Willkommen","Zähler","Speicher","Solar und Haus","Prüfen","Testlauf"];
+let wz={step:0,second:false,check:null,busy:false};
+const GRID_HINT=/netz|grid|zähler|zaehler|bezug|meter|bitshake|shelly|tibber|power|leistung|haupt|total|gesamt/i;
+function gridCandidates(){
+  const l=(allSensors||[]).filter(e=>(e.unit||"").toLowerCase()==="w"||(e.unit||"").toLowerCase()==="kw");
+  const sc=e=>(GRID_HINT.test(e.id+" "+(e.name||""))?2:0)+(/pv|solar|batter|akku|speicher|ladeleist|entlade/i.test(e.id+" "+(e.name||""))?-3:0);
+  return l.map(e=>[sc(e),e]).sort((a,b)=>b[0]-a[0]).slice(0,5).map(x=>x[1]);
+}
+function wizBody(){
+  const st=wz.step,u0=cfg.units[0];
+  if(st===0)return `<p class="headline">Willkommen bei SOLASI</p>
+    <div class="sub">SOLASI regelt deinen Heimspeicher so, dass möglichst nichts ins Netz geht und der Solarstrom im Haus bleibt.</div>
+    <div class="wsteps">
+      <div class="step"><b>1</b><div><strong>Zähler wählen</strong><div class="sub">Der Sensor an deinem Hausanschluss.</div></div></div>
+      <div class="step"><b>2</b><div><strong>Speicher einrichten</strong><div class="sub">Leistung, Richtung, Modus und Ladestand.</div></div></div>
+      <div class="step"><b>3</b><div><strong>Prüfen und testen</strong><div class="sub">SOLASI startet im Testmodus und sendet nichts.</div></div></div></div>
+    <div class="sub">Das dauert etwa fünf Minuten. Du kannst jederzeit zurück und später alles unter „Speicher“ und „Einstellungen“ ändern.</div>`;
+  if(st===1){
+    const c=gridCandidates(),cur=cfg.grid.entity,ent=(allSensors||[]).find(e=>e.id===cur);
+    let h=`<p class="headline">Welcher Sensor misst deinen Netzbezug?</p>
+      <div class="sub">Das ist der Zähler am Hausanschluss. Positiv bedeutet Bezug, negativ Einspeisung. SOLASI schlägt passende Sensoren vor.</div>`;
+    if(c.length)h+=`<div class="choice" id="wz_grid" role="group" aria-label="Zähler wählen">${c.map(e=>`<button type="button" data-id="${esc(e.id)}" aria-pressed="${e.id===cur}"><b>${esc(e.name||e.id)}</b><span>${esc(e.id)} · ${esc(e.state)} ${esc(e.unit||"")}</span></button>`).join("")}</div>`;
+    h+=field("grid.entity","Anderer Sensor","text",{list:"sensor",ph:"sensor.netzleistung"});
+    if(cur){
+      const val=ent?Number(String(ent.state).replace(",",".")):NaN,unit=(ent&&ent.unit||"").toLowerCase();
+      h+=`<div class="livebox"><div><span>Aktueller Wert</span><br><b>${ent&&isFinite(val)?esc(ent.state)+" "+esc(ent.unit||""):"–"}</b></div>
+        <span>${ent?"Sensor gefunden":"Dieser Sensor ist in Home Assistant nicht bekannt"}</span></div>`;
+      const chk=(ok,t)=>`<div class="check"><span class="ic ${ok?"ok":"warn"}">${ok?"✓":"!"}</span><span>${t}</span></div>`;
+      h+=chk(!!ent&&isFinite(val),"Der Sensor liefert eine Zahl")+
+         chk(unit==="w","Einheit ist Watt"+(unit==="kw"?" (der Sensor meldet kW, bitte einen Watt-Sensor wählen)":""));
+    }
+    h+=field("grid.invert","Vorzeichen umkehren","bool",{hint:"Nur nötig, wenn dein Zähler Einspeisung positiv meldet."});
+    return h;
+  }
+  if(st===2){
+    let h=`<p class="headline">Wie wird dein Speicher gesteuert?</p><div class="sub">Wähle den Typ, dann die Entitäten. Die Vorschläge kommen aus deinem Home Assistant.</div>`;
+    h+=unitFields(0,u0).split("\u0001")[0];
+    if(wz.second||isConf(cfg.units[1]))h+=`<h2 style="margin:18px 0 6px">Zweiter Speicher</h2>`+unitFields(1,cfg.units[1]).split("\u0001")[0];
+    else h+=`<p><button type="button" class="sec2" id="wz_second">Zweiten Speicher hinzufügen</button></p>`;
+    return h;
+  }
+  if(st===3){
+    let h=`<p class="headline">Solar und Leistungsgrenzen</p><div class="sub">Damit auch bei leerem Speicher Solarstrom ins Haus geht und die Anzeige stimmt. Leere Felder sind in Ordnung.</div>`;
+    cfg.units.forEach((u,i)=>{ if(i===0||wz.second||isConf(u))h+=`<h2 style="margin:14px 0 4px">${esc(u.name||"Speicher "+(i+1))}</h2>`+(unitFields(i,u).split("\u0001")[1]||""); });
+    return h;
+  }
+  if(st===4){
+    if(!wz.check)return `<p class="headline">Prüfe deine Einstellungen …</p><div class="sub">SOLASI speichert und testet die Verbindung zu deinen Entitäten.</div>`;
+    const it=wz.check.items||[],bad=it.filter(x=>x.status==="error"||x.status==="warn");
+    let h=`<p class="headline">${bad.length?`${bad.length} Hinweis${bad.length>1?"e":""} gefunden`:"Alles in Ordnung"}</p>
+      <div class="sub">${bad.length?"Du kannst zurückgehen und es ändern oder trotzdem weitermachen. Im Testmodus wird nichts gesendet.":"Zähler und Speicher sind erreichbar."}</div>`;
+    h+=(bad.length?bad:it.slice(0,6)).map(x=>`<div class="check"><span class="ic ${x.status}">${x.status==="ok"?"✓":x.status==="error"?"✕":"!"}</span><span><b>${esc(x.area)} · ${esc(x.item)}</b><br>${esc(x.text)}${x.hint?`<div class="sub">${esc(x.hint)}</div>`:""}</span></div>`).join("");
+    return h;
+  }
+  const ev=(lastStatus&&lastStatus.events||[]).slice(0,6);
+  return `<p class="headline">Testlauf läuft</p>
+    <div class="sub">SOLASI rechnet jetzt mit deinen echten Werten, sendet aber nichts. Im Protokoll siehst du, was passieren würde. Wenn es passt, schaltest du in der Kopfzeile den Testmodus aus.</div>
+    <div class="log" style="margin-top:12px">${ev.map(e=>`<div class="${e.level}"><span class="t">${e.ts}</span><span>${esc(e.msg)}</span></div>`).join("")||"<div>Noch keine Einträge.</div>"}</div>
+    <div class="sub" style="margin-top:12px">Später kannst du noch den Überschuss für Wallbox oder Heizstab einrichten und Meldungen auf dein Handy aktivieren.</div>`;
+}
+async function wizSave(){
+  const r=await fetch("api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+  const j=await r.json();if(!j.ok)throw new Error(j.error);dirty=false;
+}
+function renderSetup(keepScroll){
+  if(!cfg)return;
+  advHidden=0;
+  const st=wz.step,last=st===WSTEPS.length-1;
+  const steps=WSTEPS.map((l,i)=>`<div class="${i<st?"done":i===st?"cur":""}"><i>${i<st?"✓":i+1}</i>${l}</div>`).join("")+
+    `<div class="skip"><i>+</i>Überschuss (optional)</div><div class="skip"><i>+</i>Meldungen (optional)</div>`;
+  const needs=(st===1&&!cfg.grid.entity)||(st===2&&!isConf(cfg.units[0]));
+  $("#p-setup").innerHTML=`<div class="wz"><div class="vsteps" aria-label="Schritte">${steps}</div>
+    <div class="card"><h2>Schritt ${st+1} von ${WSTEPS.length}</h2><div id="wzbody">${wizBody()}</div>
+    <div class="wfoot"><span>${needs?"Bitte zuerst oben auswählen.":"Du kannst jederzeit zurückgehen."}</span>
+      ${st>0?'<button type="button" class="sec2" id="wz_back">Zurück</button>':""}
+      <button type="button" class="primary" id="wz_next" ${needs||wz.busy?"disabled":""}>${last?"Fertig":st===0?"Los geht’s":"Weiter"}</button></div></div></div>`;
+  if(st===2||st===3)cfg.units.forEach((u,i)=>{setSensorList(i,[]);refreshDevice(i);refreshModeOptions(i);
+    for(const k of ["num","dir","script"]){const e=document.getElementById(`f_units_${i}_${k}`);if(e)e.addEventListener("input",()=>later("dev"+i,()=>refreshDevice(i)));}
+    const m=document.getElementById(`f_units_${i}_mode`);if(m)m.addEventListener("input",()=>later("mode"+i,()=>refreshModeOptions(i)));
+    for(const k of ["num","dir","script"]){const e=document.getElementById(`f_units_${i}_${k}`);if(e)e.addEventListener("input",()=>{const nb=document.getElementById("wz_next");if(nb&&st===2)nb.disabled=!isConf(cfg.units[0]);});}});
+}
+document.addEventListener("change",e=>{if(e.target.id==="f_grid_entity"&&curPage==="setup")renderSetup();});
+document.addEventListener("click",async e=>{
+  const g=e.target.closest("#wz_grid button");
+  if(g){set("grid.entity",g.dataset.id);renderSetup();return;}
+  if(e.target.id==="wz_second"){wz.second=true;renderSetup();return;}
+  if(e.target.id==="wz_back"){wz.step=Math.max(0,wz.step-1);wz.check=null;renderSetup();window.scrollTo(0,0);return;}
+  if(e.target.id==="wz_next"){
+    const last=wz.step===WSTEPS.length-1;
+    if(last){
+      firstRun=false;wizDismissed=true;wz={step:0,second:false,check:null,busy:false};
+      document.body.classList.remove("first");showPage("status");toast("Einrichtung abgeschlossen");return;}
+    wz.step++;wz.check=null;
+    if(wz.step===4){
+      renderSetup();
+      try{await wizSave();wz.check=await (await fetch("api/selfcheck")).json();}catch(err){wz.check={items:[{area:"Speichern",item:"Einstellungen",status:"error",text:String(err.message||err),hint:""}]};}
+      if(wz.step===4)renderSetup();return;}
+    if(wz.step===5){
+      cfg.enabled=true;cfg.dry_run=true;
+      try{await wizSave();syncQuick();}catch(err){toast("Speichern fehlgeschlagen");}
+    }
+    renderSetup();window.scrollTo(0,0);
+  }
+});
+
 const W=v=>v==null?"–":`${Math.round(v)} W`;
 function battery(soc){
   const c=soc==null?"var(--muted)":soc>=50?"var(--ok)":soc>=20?"var(--warn)":"var(--bad)";
@@ -777,64 +1097,78 @@ function renderBadges(s){
   else if(s.dry_run){mp.className="pill test";$("#modetext").textContent="Testmodus"}
   else{mp.className="pill live";$("#modetext").textContent="Live"}
 }
+let today=null,todayAt=0;
+async function loadToday(){
+  if(Date.now()-todayAt<60000)return;
+  todayAt=Date.now();
+  try{const j=await (await fetch("api/stats?days=1")).json();today=(j.days&&j.days.at(-1))||null;if(lastStatus&&curPage==="status")renderStatus(lastStatus);}catch(e){}
+}
+const kwh=v=>v==null?"–":(Math.round(v*10)/10).toLocaleString("de-DE")+" kWh";
+function kpiHtml(s){
+  const t=today,g=s.grid_w,b=s.bat_w;
+  const aut=t&&t.autarky!=null?Math.round(t.autarky*100):null;
+  return `<div class="kpis">
+    <div class="kpi k-sun"><span>Solar</span><b>${s.pv_w==null?"–":s.pv_w}<em>W</em></b><small>${t?"heute "+kwh(t.pv):"&nbsp;"}</small></div>
+    <div class="kpi k-home"><span>Haus</span><b>${s.house_w==null?"–":s.house_w}<em>W</em></b><small>${t?"heute "+kwh(t.house):"&nbsp;"}</small></div>
+    <div class="kpi k-bat"><span>Speicher</span><b>${b==null?"–":Math.abs(b)}<em>W</em></b><small>${b==null?"":b>=5?"entlädt":b<=-5?"lädt":"ruht"}${s.avg_soc!=null?" · Ø "+s.avg_soc+" %":""}</small></div>
+    <div class="kpi k-grid"><span>Netz</span><b>${Math.abs(g)}<em>W</em></b><small>${g>=5?"Bezug":g<=-5?"Einspeisung":"ausgeglichen"}${t?" · heute "+kwh(t.imp):""}</small></div>
+    <div class="kpi"><span>Autarkie heute</span><b>${aut==null?"–":aut}<em>%</em></b><small>${t&&t.selfcons!=null?"Eigenverbrauch "+Math.round(t.selfcons*100)+" %":"&nbsp;"}</small></div></div>`;
+}
+let firstRun=false,wizDismissed=false;
 function renderStatus(s){
-  lastStatus=s;renderBadges(s);
+  lastStatus=s;renderBadges(s);loadToday();
   const needSetup=cfg&&!cfg.grid.entity;
+  if(needSetup&&!wizDismissed&&!firstRun){firstRun=true;showPage("setup");}
   if(needSetup){
-    $("#p-status").innerHTML=`<div class="card welcome"><div style="font-size:46px">☀️</div><h2>Willkommen bei SOLASI</h2>
-      <div class="sub">In drei Schritten ist alles startklar.</div>
-      <div class="steps"><div class="step"><b>1</b><div><strong>Zähler wählen</strong><div class="sub">Dein Stromzähler (z. B. Bitshake) unter „Einstellungen → Anlage“.</div></div></div>
-      <div class="step"><b>2</b><div><strong>Speicher einrichten</strong><div class="sub">Leistung, Richtung, Modus und Ladestand je Speicher auswählen.</div></div></div>
-      <div class="step"><b>3</b><div><strong>Erst testen</strong><div class="sub">Mit Testmodus starten. Im Protokoll siehst du, was SOLASI tun würde.</div></div></div></div>
-      <button class="primary" onclick="showPage('units')">Jetzt einrichten</button></div>`;
+    $("#p-status").innerHTML=`<div class="card"><p class="headline">SOLASI ist noch nicht eingerichtet</p><div class="sub">Der Einrichtungsassistent führt dich in wenigen Schritten durch Zähler und Speicher.</div>
+      <p><button class="primary" onclick="firstRun=false;showPage('setup')">Einrichtung starten</button></p></div>`;
     return;}
   let banners="";
   if(s.safety&&s.safety.state==="stopped")banners+=`<div class="banner bad">⛔ <span><b>SOLASI ist gestoppt</b> (${esc(s.safety.reason)}${s.safety.since?`, seit ${esc(s.safety.since)}`:""}). Die Speicher wurden an ihren eigenen Modus zurückgegeben und werden nicht mehr gesteuert.
-    <button class="primary" style="margin-left:10px;padding:4px 14px" onclick="killOrResume()">Fortsetzen</button></span></div>`;
+    <button class="primary" style="margin-left:10px" onclick="killOrResume()">Fortsetzen</button></span></div>`;
   if(!s.connected)banners+=`<div class="banner bad">🔌 Keine Verbindung zu Home Assistant.</div>`;
   if(!s.enabled)banners+=`<div class="banner off">⏸️ Die Regelung ist <b>aus</b>. SOLASI beobachtet nur und sendet nichts.</div>`;
   else if(s.dry_run)banners+=`<div class="banner test">🧪 <span><b>Testmodus:</b> SOLASI rechnet nur, gesendet wird nichts. Das Protokoll zeigt, was passieren würde.</span></div>`;
-  if(s.enabled&&s.meter_ok===false)banners+=`<div class="banner bad">⚠️ <span><b>Zähler-Ausfall:</b> Failsafe aktiv, die Speicher werden auf 0 W gesetzt.</span></div>`;
+  if(s.enabled&&s.meter_ok===false)banners+=`<div class="banner bad">⚠️ <span><b>Der Zähler liefert keinen Wert.</b> Zur Sicherheit stehen die Speicher auf 0 W, bis er zurück ist. Prüfe in Home Assistant, ob der Zähler-Sensor verfügbar ist.
+    <button class="primary" style="margin-left:10px" onclick="showPage('selftest')">Selbsttest öffnen</button></span></div>`;
   if(!s.units){$("#p-status").innerHTML=banners+`<div class="card">Noch keine Daten. Bitte Zähler und Speicher einrichten und speichern.</div>`;return;}
   const [hl,sub]=headline(s);
-  let h=banners+`<div class="hero"><div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>
+  let left=`<div class="hero" style="margin:0"><div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>
     <div class="flow">${flowSVG(s)}</div>
     <div>${s.eco_active?'<span class="tag warn">🌙 Eco-Modus aktiv</span>':''}${s.blocked_w?`<span class="tag">Entladung gesperrt für ${s.blocked_w} W</span>`:''}<span class="tag ${s.meter_ok?"ok":"bad"}">Zähler ${s.meter_ok?"in Ordnung":"Ausfall"}</span>
     <span class="tag">Gesamtsollwert ${s.t_target} W</span>
     ${s.curtail&&s.curtail.state==="ok"?'<span class="tag ok">Abregelung bestätigt</span>':''}
     ${s.curtail&&s.curtail.state==="fehlgeschlagen"?'<span class="tag bad">Abregelung greift nicht</span>':''}
     ${s.eco_active&&s.learned_base_load?`<span class="tag">Grundlast gelernt: ${s.learned_base_load} W</span>`:''}</div></div>`;
-  h+=`<div class="grid">`;
+  let right=`<div class="card"><h2>Speicher <a onclick="showPage('units')">Verwalten</a></h2>`;
   s.units.forEach(u=>{
     const soc=u.soc<0?null:u.soc;
-    h+=`<div class="card"><h3>${esc(u.name)}</h3>
-      <div class="bat">${battery(soc)}<div class="big">${soc==null?"–":soc+" %"}</div></div>
-      ${u.pv!=null?`<div class="row"><span>Solar dieses Speichers</span><b>${u.pv} W</b></div>`:""}
-      <div class="row"><span>Aktuell eingestellt</span><b>${u.set} W</b></div>
-      <div class="row"><span>Echte Leistung</span><b>${u.real} W</b></div>
-      <div class="row"><span>Neuer Sollwert</span><b>${u.plan} W</b></div>
-      <div style="margin-top:8px">
-        <span class="tag">${esc(u.dir||"–")}</span><span class="tag">${esc(u.mode||"–")}</span>
-        ${u.available?"":'<span class="tag warn">Leistung nicht verfügbar</span>'}
-        ${u.force?'<span class="tag test">Abregelung (voll)</span>':''}</div></div>`;});
+    right+=`<div class="urow"><div class="bat">${battery(soc)}</div><b>${esc(u.name)} · ${soc==null?"–":soc+" %"}</b><span class="w">${u.real} W</span>
+      <span class="sub">${u.pv!=null?`Solar ${u.pv} W · `:""}eingestellt ${u.set} W · neu ${u.plan} W · ${esc(u.dir||"–")} · ${esc(u.mode||"–")}
+      ${u.available?"":'<span class="tag warn">Leistung nicht verfügbar</span>'}${u.force?'<span class="tag test">Abregelung (voll)</span>':''}</span></div>`;});
+  right+=`</div>`;
   if(s.surplus_enabled){
-    h+=`<div class="card"><h3>Überschuss${s.surplus_dry_run?" · Test":""}</h3>
-      <div class="big">${W(s.surplus_w)}</div><div class="sub" style="margin-bottom:6px">steht für Verbraucher zur Verfügung</div>`;
+    right+=`<div class="card"><h2>Überschuss${s.surplus_dry_run?" · Test":""} <a onclick="showPage('surplus')">Verwalten</a></h2>
+      <div class="sub" style="margin-bottom:4px">${W(s.surplus_w)} frei für Verbraucher</div>`;
     (s.slots||[]).forEach(sl=>{
-      h+=`<div class="row"><span>${esc(sl.name)}</span>
-        <span>${sl.state?`<span class="tag ${sl.state==="on"?"ok":""}">${esc(sl.state)}</span>`:""}${sl.num_v!=null?`<span class="tag">Vorgabe ${sl.num_v}</span>`:""}<b>${sl.own_w} W</b></span></div>`;});
-    h+=`</div>`;}
-  h+=`</div>`;
-  $("#p-status").innerHTML=h;
+      right+=`<div class="cons"><b>${esc(sl.name)}</b>${sl.state?`<span class="tag ${sl.state==="on"?"ok":""}">${esc(sl.state)}</span>`:""}<span class="sub">${sl.num_v!=null?`Vorgabe ${sl.num_v} · `:""}${sl.own_w} W</span></div>`;});
+    right+=`</div>`;}
+  right+=`<div class="card"><h2>Protokoll <a onclick="showPage('log')">Alle</a></h2><div class="log" id="minilog"></div></div>`;
+  $("#p-status").innerHTML=banners+kpiHtml(s)+`<div class="cols"><div class="stack">${left}</div><div class="stack">${right}</div></div>`;
+  renderLog(s.events);
 }
 function renderLog(ev){
-  $("#log").innerHTML=(ev||[]).map(e=>`<div class="${e.level}"><span class="t">${e.ts}</span><span>${esc(e.msg)}</span></div>`).join("")||"<div>Noch keine Einträge.</div>";
+  const row=e=>`<div class="${e.level}"><span class="t">${e.ts}</span><span>${esc(e.msg)}</span></div>`;
+  $("#log").innerHTML=(ev||[]).map(row).join("")||"<div>Noch keine Einträge.</div>";
+  const m=document.getElementById("minilog");if(m)m.innerHTML=(ev||[]).slice(0,6).map(row).join("")||"<div>Noch keine Einträge.</div>";
 }
 async function poll(){
   try{const s=await (await fetch("api/status")).json();renderStatus(s);renderLog(s.events);}
   catch(e){$("#connpill").className="pill";$("#conntext").textContent="Getrennt";}
 }
-loadAll().then(()=>{poll();setInterval(poll,2000);});
+loadAll().then(()=>{
+  const sp=lookGet("start","status");if(sp!=="status"&&cfg&&cfg.grid.entity)showPage(sp);
+  poll();setInterval(poll,2000);});
 </script>
 </body>
 </html>

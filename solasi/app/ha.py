@@ -102,6 +102,8 @@ class HA:
                 "id": eid,
                 "name": (s.get("attributes") or {}).get("friendly_name", ""),
                 "domain": eid.split(".", 1)[0],
+                "state": s.get("state"),
+                "unit": (s.get("attributes") or {}).get("unit_of_measurement", ""),
             })
         return sorted(out, key=lambda e: e["id"])
 

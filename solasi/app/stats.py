@@ -11,7 +11,11 @@ class Stats:
     def __init__(self, path, clock=now_local):
         self.path = path
         self.clock = clock
-        self.days = load_json(path, {}).get("days", {})
+        raw = load_json(path, {})
+        self.days = raw.get("days", {})
+        # Laufende Gesamtzähler (Wh) für das Energie-Dashboard: wachsen nur, auch wenn alte Tage gekürzt werden
+        self.totals = {k: float(raw.get("totals", {}).get(k, sum(r.get(k, 0.0) for r in self.days.values())))
+                       for k in KEYS}
         self._last = None
         self._last_save = time.monotonic()
 
@@ -26,15 +30,17 @@ class Stats:
             return
         rec = self.days.setdefault(self.clock().strftime("%Y-%m-%d"), {**{k: 0.0 for k in KEYS}, "secs": 0.0})
         h = dt / 3600.0
+        add = {"imp": max(grid_w, 0) * h, "exp": max(-grid_w, 0) * h}
         if pv_w is not None:
-            rec["pv"] += max(pv_w, 0) * h
+            add["pv"] = max(pv_w, 0) * h
         if house_w is not None:
-            rec["house"] += max(house_w, 0) * h
-        rec["imp"] += max(grid_w, 0) * h
-        rec["exp"] += max(-grid_w, 0) * h
+            add["house"] = max(house_w, 0) * h
         if bat_w is not None:
-            rec["bat_dis"] += max(bat_w, 0) * h
-            rec["bat_chg"] += max(-bat_w, 0) * h
+            add["bat_dis"] = max(bat_w, 0) * h
+            add["bat_chg"] = max(-bat_w, 0) * h
+        for k, v in add.items():
+            rec[k] += v
+            self.totals[k] += v
         rec["secs"] += dt
         if now_mono - self._last_save > 60:
             self.save()
@@ -42,7 +48,7 @@ class Stats:
     def save(self):
         keep = sorted(self.days)[-KEEP_DAYS:]
         self.days = {d: self.days[d] for d in keep}
-        save_json(self.path, {"days": self.days})
+        save_json(self.path, {"days": self.days, "totals": self.totals})
         self._last_save = time.monotonic()
 
     @staticmethod

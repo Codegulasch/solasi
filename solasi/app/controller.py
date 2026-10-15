@@ -18,6 +18,7 @@ import energy
 import watchdog
 from ha import is_num, num
 from learn import BaseLoadLearner, is_night
+from mqtt import MqttBridge
 from notify import Notifier
 from stats import Stats
 from util import data_path, load_json, save_json
@@ -70,6 +71,7 @@ DEFAULT_CONFIG = {
     "notify": {"service": "", "delay_min": 2, "cooldown_min": 60, "recovery": True,
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
+    "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
     "safety": {"kill_entity": "", "release_on_stop": True, "release_on_disable": True,
                "auto_meter_min": 5, "auto_errors": True, "resume_auto": False,
                "watchdog": True, "watchdog_min": 3},
@@ -326,6 +328,10 @@ class Controller:
         self.card = {"installed": False, "target": "", "resource": "unbekannt",
                      "url": "", "base_url": "", "restart_needed": False}
         self.last_snap = None
+        self.mqtt = MqttBridge(self, os.environ.get("SOLASI_VERSION", "dev"))
+        self._trend_path = data_path("trend.json")
+        self.trend = load_json(self._trend_path, {}).get("p", [])     # [Zeit, Solar, Haus] alle 5 Minuten, 24 Stunden
+        self.addon_slug = ""             # für „Antippen öffnet SOLASI“ in der Dashboard-Karte
 
     @property
     def cfg(self):
@@ -605,6 +611,30 @@ class Controller:
                             f"Überschuss {d['surplus_w']:.0f} W, eigene Leistung {own:.0f} W)",
                        "number", "set_value", {"entity_id": s["num"], "value": new_v})
 
+    async def apply_settings(self, changes, source="Oberfläche"):
+        """Ändert Einstellungen (z. B. Regelung ein/aus) und führt die Folgen aus – für Oberfläche und MQTT."""
+        cfg = self.cfg
+        new = copy.deepcopy(cfg)
+        new.update(changes)
+        await self.save_config(new)
+        self.event("info", f"{source}: " + ", ".join(f"{k} = {v}" for k, v in changes.items()))
+
+    async def save_config(self, data):
+        was_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
+        self.store.save(data)
+        now_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
+        if now_live and not was_live:
+            self._mode_try.clear()           # Live-Steuerung eingeschaltet: Modus sofort setzen
+        if was_live and not now_live and self.cfg["safety"]["release_on_disable"] and not self.stopped:
+            self.event("info", "Live-Steuerung beendet: Speicher werden freigegeben")
+            asyncio.create_task(self.release_all("Steuerung ausgeschaltet", force=True))
+        self.wake.set()
+        if self.ha.connected:
+            asyncio.create_task(self.sync_watchdog())
+        if self.status:
+            self.status["enabled"], self.status["dry_run"] = self.cfg["enabled"], self.cfg["dry_run"]
+        await self.publish_entities()
+
     # ---------- Kill-Switch / Sicherheit ----------
     @property
     def stopped(self):
@@ -776,6 +806,27 @@ class Controller:
         night = is_night(pv if snap["has_pv"] else None, snap["sun"], datetime.now(timezone.utc).hour)
         self.learner.observe(time.time(), house, night)
         self._curtail_update(snap, d, now_m)
+        self._trend_add(pv, house)
+
+    trend_every = 300
+    trend_keep = 288
+
+    def _trend_add(self, pv, house):
+        """Kurzer Tagesverlauf für die Dashboard-Karte (Mittel je 5 Minuten, letzte 24 Stunden)."""
+        acc = getattr(self, "_trend_acc", None)
+        if acc is None:
+            acc = self._trend_acc = {"t0": time.time(), "pv": [], "h": []}
+        if pv is not None:
+            acc["pv"].append(pv)
+        if house is not None:
+            acc["h"].append(house)
+        if time.time() - acc["t0"] < self.trend_every:
+            return
+        avg = lambda v: round(sum(v) / len(v)) if v else None  # noqa: E731
+        self.trend.append([int(time.time()), avg(acc["pv"]), avg(acc["h"])])
+        self.trend = self.trend[-self.trend_keep:]
+        self._trend_acc = None
+        save_json(self._trend_path, {"p": self.trend})
 
     def _curtail_update(self, snap, d, now, hold_s=180):
         """Beobachtet, ob die Abregelung bei vollem Speicher wirkt (Einspeisung trotz vollem Speicher)."""
@@ -868,8 +919,13 @@ class Controller:
             "blocked_w": st.get("blocked_w"), "want": st.get("want"),
             "units": st.get("units", []), "slots": st.get("slots", []),
             "stop_reason": st.get("safety", {}).get("reason", "") if stopped else "",
+            "addon_slug": self.addon_slug,
+            "trend": {"pv": [p[1] for p in self.trend], "house": [p[2] for p in self.trend]},
+            "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
         }
         out = {"sensor.solasi": (state, main)}
+        if self.mqtt.active:
+            return out                 # die Einzelwerte kommen dann als echte MQTT-Entitäten
         for key, eid, name, icon, val in (
             ("pv", "sensor.solasi_pv_power", "SOLASI Solarleistung", "mdi:solar-power", st.get("pv_w")),
             ("house", "sensor.solasi_house_power", "SOLASI Hausverbrauch", "mdi:home-lightning-bolt", st.get("house_w")),
@@ -885,6 +941,7 @@ class Controller:
         return out
 
     async def publish_entities(self):
+        await self.mqtt.publish_state()
         if not self.ha.api_url:
             return
         for eid, (state, attrs) in self._entity_payloads().items():

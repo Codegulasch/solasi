@@ -1,8 +1,8 @@
 name: "SOLASI"
-version: "1.0.7"
+version: "1.2.0"
 slug: solasi
 description: "SOLASI – Nulleinspeisung und Energieregelung für Heimspeicher (Anker SOLIX, Marstek u. a.) mit Eco-Modus, Überschusssteuerung, Not-Aus und Live-Übersicht"
-url: "https://github.com/Codegulasch/solasi"
+url: "https://github.com/DEIN-NAME/solasi"
 arch:
   - amd64
   - aarch64
@@ -14,6 +14,8 @@ ingress_port: 8099
 panel_icon: mdi:solar-power
 panel_title: "SOLASI"
 homeassistant_api: true
+services:
+  - mqtt:want
 map:
   - type: homeassistant_config
     read_only: false

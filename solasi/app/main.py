@@ -107,20 +107,10 @@ def build_app(ctrl, store, ha):
     async def set_config(request):
         try:
             data = await request.json()
-            was_live = bool(store.cfg["enabled"]) and not store.cfg["dry_run"]
-            store.save(data)
+            await ctrl.save_config(data)
         except Exception as e:  # noqa: BLE001
             return web.json_response({"ok": False, "error": str(e)}, status=400)
         ctrl.event("info", "Einstellungen gespeichert")
-        now_live = bool(store.cfg["enabled"]) and not store.cfg["dry_run"]
-        if now_live and not was_live:
-            ctrl._mode_try.clear()           # Live-Steuerung eingeschaltet: Modus sofort setzen
-        if was_live and not now_live and store.cfg["safety"]["release_on_disable"] and not ctrl.stopped:
-            ctrl.event("info", "Live-Steuerung beendet: Speicher werden freigegeben")
-            asyncio.create_task(ctrl.release_all("Steuerung ausgeschaltet", force=True))
-        ctrl.wake.set()
-        if ha.connected:
-            asyncio.create_task(ctrl.sync_watchdog())
         return web.json_response({"ok": True})
 
     @routes.post("/api/kill")
@@ -150,6 +140,10 @@ def build_app(ctrl, store, ha):
         eid = request.query.get("entity", "")
         opts = ha.attr(eid, "options", []) if eid else []
         return web.json_response({"entity": eid, "state": ha.state(eid) if eid else None, "options": opts or []})
+
+    @routes.get("/api/mqtt")
+    async def mqtt_api(_):
+        return web.json_response({**ctrl.mqtt.status, "enabled": store.cfg["mqtt"]["enabled"]})
 
     @routes.get("/api/card")
     async def card(_):
@@ -236,12 +230,29 @@ def build_app(ctrl, store, ha):
     return app
 
 
+async def fetch_slug():
+    """Eigener Add-on-Name beim Supervisor, damit die Karte die Oberfläche öffnen kann."""
+    import aiohttp
+    if not TOKEN:
+        return ""
+    try:
+        async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as s:
+            async with s.get(os.environ.get("SUPERVISOR_URL", "http://supervisor") + "/addons/self/info",
+                             timeout=aiohttp.ClientTimeout(total=8)) as r:
+                if r.status == 200:
+                    return ((await r.json()).get("data") or {}).get("slug", "")
+    except Exception as e:  # noqa: BLE001
+        log.info("Add-on-Name nicht abrufbar: %s", e)
+    return ""
+
+
 async def main():
     store = ConfigStore(CONFIG_PATH)
     ctrl = Controller(None, store)
     ha = HA(HA_URL, TOKEN, on_entity_event=lambda eid: ctrl.on_entity_event(eid),
             api_url=HA_API_URL, on_connected=lambda: ctrl.post_connect())
     ctrl.ha = ha
+    ctrl.addon_slug = await fetch_slug()
     target, created = install_card()
     full_url = f"{CARD_BASE_URL}?v={VERSION}"
     ctrl.card.update(installed=bool(target), target=target or "", url=full_url, base_url=CARD_BASE_URL,
@@ -263,6 +274,8 @@ async def main():
             loop.add_signal_handler(sig, stop.set)
         except NotImplementedError:  # pragma: no cover
             pass
+    ctrl.mqtt.version = VERSION
+    ctrl.mqtt.start()
     tasks = [asyncio.create_task(ha.run()), asyncio.create_task(ctrl.run())]
     try:
         await stop.wait()
@@ -274,6 +287,7 @@ async def main():
         await asyncio.gather(*tasks, return_exceptions=True)
         ctrl.stats.save()
         ctrl.learner.save()
+        await ctrl.mqtt.stop()
         await ha.close()
         await runner.cleanup()
 

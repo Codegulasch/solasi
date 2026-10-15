@@ -228,6 +228,15 @@ def run(cfg, ha, ctrl=None):
     n = cfg["notify"]
     add("Benachrichtigungen", "Ziel", "ok" if n["service"] else "info",
         n["service"] or "nicht eingerichtet", "" if n["service"] else "Unter „Einstellungen → Sicherheit & Meldungen“ auswählen.")
+    if ctrl is not None and getattr(ctrl, "mqtt", None) is not None:
+        ms = ctrl.mqtt.status
+        if ms["state"] == "verbunden":
+            add("Verbindung", "MQTT-Entitäten", "ok", f"verbunden ({ms['host']})")
+        elif ms["state"] == "aus":
+            add("Verbindung", "MQTT-Entitäten", "info", "ausgeschaltet", "Einfache Sensoren werden verwendet.")
+        else:
+            add("Verbindung", "MQTT-Entitäten", "warn", ms.get("detail") or "noch nicht verbunden",
+                "Optional: Mosquitto-Add-on installieren, dann legt SOLASI feste Entitäten an. Siehe System → Entitäten (MQTT).")
     if ctrl is not None:
         house_known = ctrl.last_snap is not None and ctrl.last_snap.get("house_gross") is not None
         add("Lernen & Statistik", "Hausverbrauch", "ok" if house_known else "warn",

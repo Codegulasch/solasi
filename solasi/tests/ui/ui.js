@@ -1,7 +1,7 @@
 const {JSDOM}=require("jsdom");const fs=require("fs");const path=require("path");const APP=path.join(__dirname,"..","..","app");
 const html=fs.readFileSync(path.join(APP,"static","index.html"),"utf8");
 const cfg=JSON.parse(require("child_process").execSync(`python3 -c "import json,controller;print(json.dumps(controller.DEFAULT_CONFIG))"`,{cwd:APP,env:{...process.env,SOLASI_DATA:require("os").tmpdir()}}).toString());
-cfg.grid.entity="sensor.grid";const saved=[];let replayBody=null;const calls=[];let failDevice=false;
+cfg.grid.entity="sensor.grid";const saved=[];let replayBody=null;const calls=[];let failDevice=false;let mqttState="verbunden";
 const status={flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},safety:{state:"active",reason:"",since:null},pv_w:780,bat_w:-260,house_w:529,connected:true,enabled:true,dry_run:true,surplus_enabled:true,surplus_dry_run:true,meter_ok:true,grid_w:400,net_balance:400,net_dis:400,t_target:390,eco_active:false,avg_soc:60,blocked_w:0,want:"Entladen",surplus_w:1620,
  units:[{name:"Speicher A",pv:540,soc:80,set:0,real:0,plan:280,force:false,available:false,mode:"self_consumption",dir:"discharge"},{name:"Speicher B",soc:40,set:0,real:0,plan:110,force:true,available:true,mode:"third_party_control",dir:"discharge"}],
  slots:[{name:"Wallbox",ent:"switch.wb",num:"number.wb",state:"on",own_w:1380,num_v:6}],
@@ -15,6 +15,7 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
     const routes={
       "api/config":()=>post?(saved.push(JSON.parse(o.body)),{ok:true}):cfg,
       "api/status":()=>status,
+      "api/mqtt":()=>({state:mqttState,detail:mqttState==="fehler"?"Kein MQTT-Broker gefunden":"",host:"core-mosquitto",enabled:true}),
       "api/card":()=>({installed:true,target:"/homeassistant/www/solasi/solasi-card.js",resource:"registriert",url:"/local/solasi/solasi-card.js?v=1.3.0",restart_needed:false,yaml:"x"}),
       "api/selfcheck":()=>({summary:{ok:5,warn:1,error:1,info:1},curtail:{state:"fehlgeschlagen",note:"Speicher voll, trotzdem 300 W Einspeisung.",since:"04.10. 12:00",export_w:300},
         items:[{area:"Zähler",item:"Netzleistung",status:"warn",text:"sensor.g liefert kW statt W",hint:"Einheit umrechnen"},{area:"Speicher A",item:"Modus-Option",status:"error",text:"nicht vorhanden",hint:""},{area:"Verbindung",item:"Home Assistant",status:"ok",text:"verbunden",hint:""}]}),
@@ -33,7 +34,7 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
         alt:{imp:6.9,exp:0.1,end_soc:50,min_soc:15,bat_dis:6.9,bat_chg:3.1,curtailed:0,writes:240,eco_h:0,series:{grid:[8,15,5,0],soc:[80,70,60,50]}}}}};
     const key=Object.keys(routes).find(k=>u.startsWith(k));
     const j=key?routes[key]():ents;return{json:async()=>j};};
-  w.confirm=()=>true;
+  w.confirm=()=>true;w.scrollTo=()=>{};
   w.addEventListener("error",e=>errors.push(e.message));
  }});
 const w=dom.window,d=w.document;
@@ -83,6 +84,15 @@ const w=dom.window,d=w.document;
  ok(d.querySelector("#p-card a[href='card.js']")===null,"Kein manueller Download nötig, wenn automatisch installiert");
 
  const go=async p=>{w.showPage(p);await new Promise(r=>setTimeout(r,150));};
+ // Entitäten (MQTT)
+ await go("mqtt");let tm=d.getElementById("p-mqtt").textContent;
+ ok(tm.includes("verbunden")&&tm.includes("core-mosquitto")&&tm.includes("Energiezähler")&&tm.includes("Not-Aus"),"MQTT-Seite zeigt Status, Broker und angelegte Entitäten");
+ d.getElementById("mqtt_host").value="192.168.1.5";d.getElementById("mqtt_port").value="1884";d.getElementById("mqtt_enabled").checked=false;
+ d.getElementById("mqtt_save").click();await new Promise(r=>setTimeout(r,100));
+ ok(saved.at(-1).mqtt.host==="192.168.1.5"&&saved.at(-1).mqtt.port===1884&&saved.at(-1).mqtt.enabled===false,"MQTT-Einstellungen werden gespeichert");
+ mqttState="fehler";await go("mqtt");tm=d.getElementById("p-mqtt").textContent;
+ ok(tm.includes("nicht verbunden")&&tm.includes("Kein MQTT-Broker gefunden"),"MQTT-Fehler wird verständlich angezeigt");
+ mqttState="verbunden";
  // Selbsttest
  await go("selftest");let t=d.getElementById("p-selftest").textContent;
  ok(t.includes("1 Problem gefunden")&&t.includes("liefert kW statt W")&&t.includes("Einheit umrechnen")&&t.includes("Greift nicht")&&t.includes("300 W Einspeisung"),"Selbsttest zeigt Befunde, Hinweise und Abregelungs-Ergebnis");
@@ -127,14 +137,23 @@ const w=dom.window,d=w.document;
 
  // --- Aufgeräumte Navigation ---
  w.showPage("status");
- ok(d.querySelectorAll("#nav button").length===4,"vier Hauptbereiche statt neun Reiter");
+ const navItems=[...d.querySelectorAll("#nav button")].map(b=>b.textContent.trim());
+ ok(["Übersicht","Speicher","Überschuss","Statistik","Replay","Selbsttest","Protokoll","Dashboard-Karte","Entitäten (MQTT)","Einrichtung","Einstellungen"].every(x=>navItems.includes(x)),"Seitenleiste mit allen Bereichen");
+ ok([...d.querySelectorAll("#nav .sec")].map(x=>x.textContent).join()==="Betrieb,Auswertung,System","Seitenleiste in drei Abschnitte gegliedert");
  ok(d.getElementById("subnav").children.length===0,"Übersicht hat keine Unternavigation");
- w.showPage("units");ok(d.querySelectorAll("#subnav button").length===4&&d.querySelector("#nav button.act").dataset.g==="settings","Einstellungen: vier Unterseiten");
+ w.showPage("units");ok(d.getElementById("p-units").classList.contains("act")&&d.getElementById("savebar").style.display==="flex"&&d.querySelector("#nav button[aria-current=page]").textContent.includes("Speicher"),"Speicher: Seite aktiv, Speichern-Leiste sichtbar");
+ w.showPage("control");ok(d.querySelectorAll("#subnav button").length===3&&d.querySelector("#nav button[aria-current=page]").textContent.includes("Einstellungen"),"Einstellungen: Regelung, Sicherheit & Meldungen, Darstellung");
  ok([...d.querySelectorAll("#subnav button")].some(b=>b.textContent==="Sicherheit & Meldungen"),"Unterseite heißt Sicherheit & Meldungen");
- d.querySelector('#subnav [data-p="surplus"]').click();ok(d.getElementById("p-surplus").classList.contains("act")&&d.getElementById("savebar").style.display==="flex","Unterseite wechselt, Speichern-Leiste sichtbar");
- w.showPage("stats");ok(d.querySelectorAll("#subnav button").length===2&&d.getElementById("savebar").style.display==="none","Auswertung: Statistik und Replay");
- w.showPage("log");ok(d.querySelectorAll("#subnav button").length===3&&d.querySelector("#nav button.act").dataset.g==="system","System: Selbsttest, Protokoll, Dashboard-Karte");
- d.querySelector('#nav [data-g="eval"]').click();ok(d.getElementById("p-stats").classList.contains("act"),"Hauptbereich öffnet die erste Unterseite");
+ d.querySelector('#subnav [data-p="extras"]').click();ok(d.getElementById("p-extras").classList.contains("act")&&d.getElementById("title").textContent==="Sicherheit & Meldungen","Unterseite wechselt, Titel folgt");
+ w.showPage("surplus");ok(d.getElementById("pagetools").classList.contains("on")&&d.getElementById("savebar").style.display==="flex","Überschuss: Schalter und Speichern-Leiste sichtbar");
+ w.showPage("stats");ok(d.getElementById("savebar").style.display==="none"&&!d.getElementById("pagetools").classList.contains("on"),"Statistik: keine Speichern-Leiste");
+ ok(d.querySelectorAll("#tabbar button").length===4&&d.querySelector("#tabbar #moreBtn")!==null,"Untere Leiste am Handy: drei Punkte und Mehr");
+ d.getElementById("moreBtn").click();ok(d.getElementById("side").classList.contains("open"),"Mehr öffnet das Menü von unten");
+ d.querySelector('#nav button[data-p="log"]').click();ok(!d.getElementById("side").classList.contains("open")&&d.getElementById("p-log").classList.contains("act"),"Auswahl schließt das Menü");
+ w.showPage("look");ok(d.getElementById("look_start")!==null,"Darstellung: Startseite wählbar");
+ d.querySelector('#look_dens [data-d="large"]').click();ok(d.body.classList.contains("dens-large"),"Dichte Groß wirkt sofort");
+ d.querySelector('#look_dens [data-d="normal"]').click();
+ d.querySelector('#nav button[data-p="stats"]').click();ok(d.getElementById("p-stats").classList.contains("act"),"Menüpunkt öffnet die Seite");
 
  // --- Energiefluss in weiteren Lagen ---
  const draw=async(o)=>{Object.assign(status,o);await new Promise(r=>setTimeout(r,2300));return [...d.querySelectorAll(".flow svg path.line")].map(l=>l.getAttribute("class"));};
@@ -172,7 +191,7 @@ const w=dom.window,d=w.document;
  const sec=[...d.querySelectorAll("#p-units details.fsec")];
  ok(sec.length===3&&sec[0].open&&sec[1].open===true,"Zähler und Speicher A sind offen");
  // --- Energiefluss-Korrektur: Messart, Gerätesensoren, PV-Durchleitung ---
- ok(d.querySelector("#p-status").textContent.includes("Solar dieses Speichers")&&d.querySelector("#p-status").textContent.includes("540 W"),"Speicher-Karte zeigt die Solarleistung des Speichers");
+ ok(d.querySelector("#p-status").textContent.includes("Solar 540 W")&&d.querySelector("#p-status").textContent.includes("540 W"),"Speicher-Karte zeigt die Solarleistung des Speichers");
  cfg.units[0].num="number.dev_geraet_1_leistung";w.renderUnits();await new Promise(r=>setTimeout(r,300));
  const pb=d.getElementById("f_units_0_power_basis");
  ok(pb&&[...pb.options].map(o=>o.value).join()===",ac,battery","Messart-Auswahl: Automatisch, AC, Batterie");

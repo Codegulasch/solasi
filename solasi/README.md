@@ -12,6 +12,7 @@ Es läuft lokal auf deinem Home Assistant, ohne Cloud und ohne Konto.
 - Überschuss für Heizstab, Wallbox (stufenlos) und Schalter
 - Anker SOLIX, Marstek und weitere Speichertypen, dazu ein eigenes Skript für alles Weitere
 - Live-Übersicht mit Energiefluss, Dashboard-Karte, Statistik und „Was wäre wenn“-Replay
+- Feste Entitäten per MQTT: Sensoren, Energiezähler für das Energie-Dashboard und Schalter (Regelung, Testmodus, Not-Aus)
 - Sicherheit: Testmodus, Not-Aus, Rückfall auf den Modus des Herstellers, Wächter und Benachrichtigungen
 
 **Erste Schritte**

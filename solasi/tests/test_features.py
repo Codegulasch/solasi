@@ -248,3 +248,14 @@ def test_anforderungen():
     cfg["grid"]["entity"] = "sensor.g"; u = cfg["units"][0]; u.update(num="number.a", dir="select.d", soc="sensor.s")
     miss = replay.check_requirements(cfg)
     assert any("echte Entladeleistung" in m for m in miss) and any("PV-Leistung" in m for m in miss)
+
+
+# ---------------- Tagesverlauf für die Karte ----------------
+def test_trend_mittelt_je_fuenf_minuten_und_begrenzt(tmp_path):
+    ctrl = mk_ctrl(tmp_path); ctrl.trend_every = 0; ctrl.trend_keep = 3
+    for i in range(5):
+        ctrl._trend_add(100 * i, 300)
+    assert len(ctrl.trend) == 3 and ctrl.trend[-1][1:] == [400, 300]
+    ctrl.trend_every = 300
+    ctrl._trend_add(None, None)                       # fehlende Werte brechen nichts
+    assert len(ctrl.trend) == 3

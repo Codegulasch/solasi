@@ -1,5 +1,20 @@
 # Änderungen
 
+## 1.2.0
+- **Neues Layout:** Seitenleiste mit den Bereichen *Betrieb*, *Auswertung* und *System*, dazu eine Kopfleiste mit Status, **Regelung**, **Testmodus** und **Not-Aus** (mit Rückfrage). Das Design bleibt gleich.
+- **Neue Übersicht:** Kennzahlen, Energiefluss, Speicher, Überschuss und Protokoll auf einen Blick, plus ein Hinweisband, wenn etwas Aufmerksamkeit braucht.
+- **Am Handy:** Leiste unten mit den wichtigsten Seiten und einem „Mehr“-Menü für den Rest.
+- **Einstellungen** mit eigener Navigation: *Regelung*, *Sicherheit & Meldungen* und *Darstellung* (Startseite und Dichte, je Gerät gemerkt).
+- **Einrichtungsassistent** im neuen Layout; beim ersten Start ist die Seitenleiste ausgeblendet. Die Schritte *Solar* und *Haus* sind zu **Solar und Haus** zusammengefasst.
+- **Dashboard-Karte:** Größen *Groß* und *Kompakt*, Tagesverlauf der letzten 24 Stunden, Not-Aus-Knopf mit Rückfrage (benötigt MQTT), Antippen öffnet SOLASI, Akzentfarbe und ein visueller Editor.
+
+## 1.1.0
+- **Echte Entitäten über MQTT:** Mit einem MQTT-Broker (z. B. dem Mosquitto-Add-on) legt SOLASI ein Gerät „SOLASI“ mit festen Entitäten an: Leistungen, Ladestand, Zustand, **Energiezähler für das Energie-Dashboard** und die Schalter **Regelung**, **Testmodus** und **Not-Aus**.
+  Die Entitäten bleiben nach einem Neustart erhalten und haben einen Verlauf. Ohne Broker läuft alles wie bisher. Neue Seite *System → Entitäten (MQTT)* und ein Eintrag im Selbsttest.
+- Dauerhafte Gesamtzähler (kWh) für Solarertrag, Verbrauch, Netzbezug, Einspeisung und Speicher.
+- Hinweis: Die Regelgenauigkeit wurde im Simulator mit verschiedenen Reglern verglichen. Die bisherige Regelung liegt bereits nahe am Optimum, deshalb bleibt sie unverändert.
+  Eine größere *Schrittweite* (z. B. 30 W) spart rund ein Viertel der Schreibzugriffe auf den Speicher bei nur etwa 3 % mehr Abweichung.
+
 ## 1.0.7
 - **Not-Aus und Freigabe sind zuverlässiger:** Beim Stoppen sendet SOLASI jetzt immer 0 W und den Rückfall-Modus an den Speicher, auch wenn der zuletzt bekannte Zustand schon zu passen scheint.
   Direkt nach einem Befehl meldet das Gerät seinen neuen Zustand oft verzögert. Dann hätte SOLASI die Leistung stehen lassen können, obwohl der Speicher noch lief. Gilt für alle Speichertypen.

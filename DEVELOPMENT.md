@@ -8,7 +8,7 @@ Dieses Dokument richtet sich an alle, die an SOLASI mitarbeiten oder es selbst v
 | Pfad | Inhalt |
 |---|---|
 | `solasi/config.yaml` | Add-on-Beschreibung und **Version** |
-| `solasi/app/` | Regelung in Python (`controller.py`, `drivers.py`, `energy.py`, `watchdog.py`, `replay.py` …), Weboberfläche in `static/`, Dashboard-Karte in `card/` |
+| `solasi/app/` | Regelung in Python (`controller.py`, `drivers.py`, `energy.py`, `watchdog.py`, `replay.py`, `mqtt.py` für die MQTT-Entitäten …), Weboberfläche in `static/`, Dashboard-Karte in `card/` |
 | `solasi/tests/` | Python-Tests gegen einen simulierten Home Assistant, Oberflächen-Tests in `tests/ui` (jsdom) |
 | `solasi/CHANGELOG.md` | Änderungen für Nutzer (wird in Home Assistant und im GitHub-Release angezeigt) |
 | `solasi/DOCS.md`, `solasi/README.md` | Anleitung und Kurzbeschreibung für Nutzer |
