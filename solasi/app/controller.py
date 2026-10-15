@@ -72,7 +72,7 @@ DEFAULT_CONFIG = {
     "notify": {"service": "", "delay_min": 2, "cooldown_min": 60, "recovery": True,
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
-    "meters": {"show_day": True, "extra": False, "items": []},
+    "meters": {"show_day": True, "extra": False, "items": [], "order": []},
     # Anordnung der Blöcke in Übersicht und Statistik (leer = Standardreihenfolge, gilt für alle Geräte)
     "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
     "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
@@ -93,6 +93,15 @@ UI_BLOCKS = {
     "status": ["kpis", "meters", "hero", "trend", "units", "surplus", "log"],
     "stats": ["period", "tiles", "chart"],
 }
+
+
+def clean_order(raw):
+    """Reihenfolge der Zählerkacheln: Schlüssel "day", "pv", "imp" oder "m:<entity>"; ohne Doppelte."""
+    out = []
+    for x in raw if isinstance(raw, list) else []:
+        if isinstance(x, str) and 0 < len(x) <= 120 and x not in out:
+            out.append(x)
+    return out[:40]
 
 
 def clean_ui(ui):
@@ -651,6 +660,8 @@ class Controller:
         was_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
         if isinstance(data, dict) and "ui" in data:
             data = {**data, "ui": clean_ui(data["ui"])}
+        if isinstance(data, dict) and isinstance(data.get("meters"), dict):
+            data = {**data, "meters": {**data["meters"], "order": clean_order(data["meters"].get("order"))}}
         self.store.save(data)
         self._meters_view = None             # geänderte Zähler sofort neu lesen
         now_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
@@ -865,6 +876,7 @@ class Controller:
             "items": self.meters.compute(mc.get("items"), lookup, now_local().strftime("%Y-%m-%d")),
             "today": None if k is None else {"house": k["house"], "pv": k["pv"], "imp": k["imp"], "autarky": k["autarky"]},
             "show_day": bool(mc.get("show_day", True)), "extra": bool(mc.get("extra", False)),
+            "order": clean_order(mc.get("order")),
         }
         self._meters_at = now
         return self._meters_view
@@ -985,7 +997,7 @@ class Controller:
             "trend": self.trend_series(),
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
-            "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"]},
+            "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"], "order": self.meter_view()["order"]},
         }
         out = {"sensor.solasi": (state, main)}
         if self.mqtt.active:

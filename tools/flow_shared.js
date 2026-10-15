@@ -221,17 +221,24 @@ const SF = (() => {
 
   /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
   function meters(d) {
-    const tiles = [];
+    const all = [];
     const t = d.today;
-    const hero = d.show_day !== false && t && t.house != null
-      ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
-    (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
+    if (d.show_day !== false && t && t.house != null)
+      all.push({ k: "day", n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute", hero: true });
+    (d.items || []).forEach(m => all.push({ k: "m:" + (m.entity || ""), n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
       sub: m.day != null && m.value != null ? dayText(m) : "" }));
     if (d.extra && t) {
-      if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
-      if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
+      if (t.pv != null) all.push({ k: "pv", n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
+      if (t.imp != null) all.push({ k: "imp", n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
     }
-    if (!hero && !tiles.length) return "";
+    // eigene Reihenfolge: genannte Kacheln zuerst, der Rest in Standardreihenfolge
+    const ord = Array.isArray(d.order) ? d.order : [];
+    const rank = x => { const i = ord.indexOf(x.k); return i < 0 ? ord.length + all.indexOf(x) : i; };
+    const seq = all.slice().sort((x, y) => rank(x) - rank(y));
+    if (!seq.length) return "";
+    const first = seq[0];
+    const hero = first.hero ? first : null;
+    const tiles = hero ? seq.slice(1) : seq;
     const tile = x => `<div class="sfm-t" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
       <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
     if (hero && tiles.length && d.layout !== "even")

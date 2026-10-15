@@ -212,6 +212,7 @@ Unter *Betrieb → Zähler* zeigst du weitere Zähler aus Home Assistant in SOLA
 - **Zähler hinzufügen:** wähle den Sensor, gib Name, Symbol und Farbe an. Es sind bis zu acht Zähler möglich. Geeignet sind Sensoren, die nur hochzählen. Einheit und Nachkommastellen übernimmt SOLASI vom Sensor.
 - **Verbrauch heute:** bei jedem Zähler lässt sich die Differenz zum Tagesbeginn anzeigen, zum Beispiel „+0,18 kWh heute“. **Wasserzähler** (Einheit m³, Symbol Wassertropfen oder „Wasser“ im Namen) zeigen den Verbrauch heute in **Litern** („+180 l heute“); der Zählerstand bleibt in m³. SOLASI merkt sich dafür den ersten Wert des Tages. Beim ersten Start mitten am Tag zählt der Verbrauch ab diesem Zeitpunkt. Wird ein Zähler getauscht oder zurückgesetzt, beginnt die Zählung neu.
 - **Solarertrag und Netzbezug heute** lassen sich als weitere Kacheln dazuschalten.
+- **Reihenfolge:** auf derselben Seite ordnest du alle Kacheln mit Pfeilen an. Die Karte übernimmt sie; mit `meters_order` (z. B. `[day, "m:sensor.wasser", pv, imp]`) bekommt eine Karte eine eigene Reihenfolge, im Editor mit Pfeilen. Steht der Tagesverbrauch an erster Stelle, wird er groß dargestellt, sonst sind alle Kacheln gleich groß.
 
 ## Blöcke anordnen
 
@@ -236,6 +237,7 @@ show_tags: true              # Eco, Zähler, Sollwert
 size: large                  # large oder compact (vier Kacheln, ohne Diagramm)
 show_meters: true            # Reihe mit Tagesverbrauch und Zählern ganz oben
 meters_layout: big           # big (große Kachel links) oder even (alle gleich groß)
+meters_order: []              # Reihenfolge der Zählerkacheln, leer = wie im Add-on
 order: [meters, headline, flow, trend, batteries, surplus, tags]   # Reihenfolge der Blöcke (Standard wie hier)
 show_trend: true             # Verlauf der letzten 24 Stunden
 show_kill: true              # Not-Aus-Knopf mit Rückfrage (benötigt MQTT)

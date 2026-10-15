@@ -1,6 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
-from controller import clean_ui, deep_merge, DEFAULT_CONFIG
+from controller import clean_order, clean_ui, deep_merge, DEFAULT_CONFIG
 
 
 def test_default_leer():
@@ -24,3 +24,9 @@ def test_merge_behaelt_gespeicherte_reihenfolge_und_alte_configs():
     m = deep_merge(DEFAULT_CONFIG, {"ui": {"status_order": ["log", "hero"]}})
     assert m["ui"]["status_order"] == ["log", "hero"] and m["ui"]["stats_order"] == []
     assert deep_merge(DEFAULT_CONFIG, {})["ui"]["status_hidden"] == []
+
+
+def test_clean_order_kacheln():
+    assert clean_order(["day", "m:sensor.x", "day", 3, "", None]) == ["day", "m:sensor.x"]
+    assert clean_order("x") == [] and clean_order(None) == []
+    assert DEFAULT_CONFIG["meters"]["order"] == []

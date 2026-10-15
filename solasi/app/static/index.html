@@ -617,7 +617,7 @@ const MCOLS=[["zaehl","Rosa"],["water","Blau"],["water2","Grün"],["sun","Gelb"]
 function renderMeters(){
   advHidden=0;
   const m=cfg.meters,mv=lastStatus&&lastStatus.meter_view;
-  const prev=mv?SF.meters({items:mv.items,today:mv.today,show_day:m.show_day,extra:m.extra}):"";
+  const prev=mv?SF.meters({items:mv.items,today:mv.today,show_day:m.show_day,extra:m.extra,order:m.order}):"";
   let h=prev?`<div class="card" style="margin-bottom:14px"><h2>So sieht es aus</h2>${prev}</div>`:"";
   h+=fs("📊 Anzeige",field("meters.show_day","Kachel „Tagesverbrauch“ zeigen (Haus heute)","bool")+
     field("meters.extra","Solarertrag und Netzbezug heute dazu","bool"));
@@ -631,8 +631,20 @@ function renderMeters(){
       field(p+"daily","Verbrauch heute anzeigen","bool",{hint:"SOLASI merkt sich den Stand zu Beginn des Tages und zeigt die Differenz."})+
       `<div class="f"><span></span><div><button type="button" data-delmeter="${i}">Zähler entfernen</button></div></div>`,
       {closed:!!it.entity});});
+  const tl=[];
+  if(m.show_day)tl.push(["day","Tagesverbrauch"]);
+  m.items.forEach(it=>{if(it.entity)tl.push(["m:"+it.entity,it.name||it.entity]);});
+  if(m.extra){tl.push(["pv","Solarertrag heute"]);tl.push(["imp","Netzbezug heute"]);}
+  const rk=k=>{const i=(m.order||[]).indexOf(k);return i<0?1e3+tl.findIndex(x=>x[0]===k):i};
+  tl.sort((a,b)=>rk(a[0])-rk(b[0]));
+  if(tl.length>1)h+=fs("↕️ Reihenfolge der Kacheln",`<div class="ordlist" id="mord">${tl.map(([k,n],i)=>`<div class="ordrow"><span>${esc(n)}</span><span><button type="button" data-mv="-1" data-k="${esc(k)}" aria-label="nach oben" ${i===0?"disabled":""}>↑</button><button type="button" data-mv="1" data-k="${esc(k)}" aria-label="nach unten" ${i===tl.length-1?"disabled":""}>↓</button></span></div>`).join("")}</div>
+    <div class="sub" style="margin-top:8px">Steht „Tagesverbrauch“ ganz oben, wird es als große Kachel gezeigt. Die Karte übernimmt diese Reihenfolge, sofern dort keine eigene eingestellt ist.</div>`);
   h+=`<p><button type="button" id="addmeter" ${m.items.length>=8?"disabled":""}>+ Zähler hinzufügen</button></p>`;
   $("#p-meters").innerHTML=h;
+  const mo=$("#mord");
+  if(mo)mo.addEventListener("click",e=>{const b=e.target.closest("[data-mv]");if(!b)return;
+    const o=tl.map(x=>x[0]),i=o.indexOf(b.dataset.k),j=i+ +b.dataset.mv;if(j<0||j>=o.length)return;
+    [o[i],o[j]]=[o[j],o[i]];m.order=o;markDirty();renderMeters();});
   const add=$("#addmeter");
   if(add)add.onclick=()=>{m.items.push({entity:"",name:"",icon:"zaehler",color:"zaehl",daily:true});markDirty();renderMeters();};
   document.querySelectorAll("[data-delmeter]").forEach(b=>b.onclick=()=>{m.items.splice(+b.dataset.delmeter,1);markDirty();renderMeters();});
@@ -1339,17 +1351,24 @@ const SF = (() => {
 
   /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
   function meters(d) {
-    const tiles = [];
+    const all = [];
     const t = d.today;
-    const hero = d.show_day !== false && t && t.house != null
-      ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
-    (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
+    if (d.show_day !== false && t && t.house != null)
+      all.push({ k: "day", n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute", hero: true });
+    (d.items || []).forEach(m => all.push({ k: "m:" + (m.entity || ""), n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
       sub: m.day != null && m.value != null ? dayText(m) : "" }));
     if (d.extra && t) {
-      if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
-      if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
+      if (t.pv != null) all.push({ k: "pv", n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
+      if (t.imp != null) all.push({ k: "imp", n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
     }
-    if (!hero && !tiles.length) return "";
+    // eigene Reihenfolge: genannte Kacheln zuerst, der Rest in Standardreihenfolge
+    const ord = Array.isArray(d.order) ? d.order : [];
+    const rank = x => { const i = ord.indexOf(x.k); return i < 0 ? ord.length + all.indexOf(x) : i; };
+    const seq = all.slice().sort((x, y) => rank(x) - rank(y));
+    if (!seq.length) return "";
+    const first = seq[0];
+    const hero = first.hero ? first : null;
+    const tiles = hero ? seq.slice(1) : seq;
     const tile = x => `<div class="sfm-t" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
       <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
     if (hero && tiles.length && d.layout !== "even")

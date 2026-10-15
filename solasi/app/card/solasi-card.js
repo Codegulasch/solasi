@@ -12,6 +12,7 @@
  *   show_trend: true                # Tagesverlauf von Solar und Haus
  *   show_meters: true               # Reihe mit Tagesverbrauch und Zählern ganz oben
  *   meters_layout: big              # big (große Kachel links) oder even (alle gleich groß)
+ *   meters_order: [day, "m:sensor.wasser", pv, imp]   # Reihenfolge der Zählerkacheln (leer = wie im Add-on)
  *   order: [meters, headline, flow, trend, batteries, surplus, tags]   # Reihenfolge der Blöcke (Standard wie hier)
  *   show_kill: true                 # Not-Aus-Knopf (braucht MQTT, siehe Anleitung)
  *   tap_open: true                  # Antippen öffnet SOLASI
@@ -318,17 +319,24 @@ const SF = (() => {
 
   /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
   function meters(d) {
-    const tiles = [];
+    const all = [];
     const t = d.today;
-    const hero = d.show_day !== false && t && t.house != null
-      ? { n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute" } : null;
-    (d.items || []).forEach(m => tiles.push({ n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
+    if (d.show_day !== false && t && t.house != null)
+      all.push({ k: "day", n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute", hero: true });
+    (d.items || []).forEach(m => all.push({ k: "m:" + (m.entity || ""), n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
       sub: m.day != null && m.value != null ? dayText(m) : "" }));
     if (d.extra && t) {
-      if (t.pv != null) tiles.push({ n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
-      if (t.imp != null) tiles.push({ n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
+      if (t.pv != null) all.push({ k: "pv", n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
+      if (t.imp != null) all.push({ k: "imp", n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
     }
-    if (!hero && !tiles.length) return "";
+    // eigene Reihenfolge: genannte Kacheln zuerst, der Rest in Standardreihenfolge
+    const ord = Array.isArray(d.order) ? d.order : [];
+    const rank = x => { const i = ord.indexOf(x.k); return i < 0 ? ord.length + all.indexOf(x) : i; };
+    const seq = all.slice().sort((x, y) => rank(x) - rank(y));
+    if (!seq.length) return "";
+    const first = seq[0];
+    const hero = first.hero ? first : null;
+    const tiles = hero ? seq.slice(1) : seq;
     const tile = x => `<div class="sfm-t" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
       <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
     if (hero && tiles.length && d.layout !== "even")
@@ -418,7 +426,7 @@ const SF = (() => {
           <div class="tile bat"><div class="n">Speicher</div><div class="v">${b == null ? "–" : W(Math.abs(b))}</div></div>
           <div class="tile grid"><div class="n">Netz</div><div class="v">${W(Math.abs(g))}</div></div></div>`;
         const mc = a.meters_cfg || {};
-        const mhtml = c.show_meters ? SF.meters({ items: a.meters || [], today: a.today, show_day: mc.show_day, extra: mc.extra, layout: c.meters_layout }) : "";
+        const mhtml = c.show_meters ? SF.meters({ items: a.meters || [], today: a.today, show_day: mc.show_day, extra: mc.extra, layout: c.meters_layout, order: Array.isArray(c.meters_order) && c.meters_order.length ? c.meters_order : mc.order }) : "";
         const parts = {
           meters: mhtml ? `<div class="mwrap">${mhtml}</div>` : "",
           headline: c.show_headline ? `<div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>` : "",
@@ -463,7 +471,7 @@ const SF = (() => {
        die Karte wird nie kleiner als zuvor (gleiche Breite), und beim Laden gilt die zuletzt bekannte Höhe. */
     _paint(html, ready) {
       const root = this.shadowRoot;
-      const key = `sc-h:${this._cfg.entity}:${this._cfg.size}:${(this._cfg.order || []).join(",")}`;
+      const key = `sc-h:${this._cfg.entity}:${this._cfg.size}:${(this._cfg.order || []).join(",")}:${(this._cfg.meters_order || []).join(",")}`;
       const w = this.offsetWidth || 0;
       if (this._hk !== key || (this._hw && w && Math.abs(this._hw - w) > 2)) { this._hk = key; this._minH = 0; }
       if (!this._minH && !ready) {
@@ -511,15 +519,32 @@ const SF = (() => {
   // ---- Visueller Editor ----
   class SOLASICardEditor extends HTMLElement {
     setConfig(config) { this._cfg = config || {}; this._build(); }
-    set hass(h) { this._hass = h; if (this._form) this._form.hass = h; }
+    set hass(h) { const first = !this._hass; this._hass = h; if (this._form) this._form.hass = h; if (first && this._ord) this._drawOrder(); }
+    _tiles() {
+      const st = this._hass && this._hass.states ? this._hass.states[this._cfg.entity || "sensor.solasi"] : null;
+      const a = (st && st.attributes) || {}, mc = a.meters_cfg || {}, out = [];
+      if (mc.show_day !== false && a.today) out.push(["day", "Tagesverbrauch"]);
+      (a.meters || []).forEach(m => out.push(["m:" + (m.entity || ""), m.name || m.entity]));
+      if (mc.extra && a.today) { out.push(["pv", "Solarertrag heute"]); out.push(["imp", "Netzbezug heute"]); }
+      const ord = Array.isArray(this._cfg.meters_order) && this._cfg.meters_order.length ? this._cfg.meters_order : (mc.order || []);
+      const rk = k => { const i = ord.indexOf(k); return i < 0 ? 1e3 + out.findIndex(x => x[0] === k) : i; };
+      return out.sort((x, y) => rk(x[0]) - rk(y[0]));
+    }
     _drawOrder() {
       const names = Object.fromEntries(BLOCKS), o = blockOrder(this._cfg.order);
+      const tl = this._tiles();
+      const row = (n, key, i, len, attr) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--divider-color,#ddd)">
+          <span>${esc(n)}</span><span>
+          <button type="button" ${attr}="${esc(key)}" data-mv="-1" ${i === 0 ? "disabled" : ""} aria-label="nach oben">↑</button>
+          <button type="button" ${attr}="${esc(key)}" data-mv="1" ${i === len - 1 ? "disabled" : ""} aria-label="nach unten">↓</button></span></div>`;
+      this._tileList = tl.map(x => x[0]);
       this._ord.innerHTML = `<div style="margin:14px 0 6px;font-weight:600">Reihenfolge der Blöcke</div>` + o.map((id, i) =>
         `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--divider-color,#ddd)">
           <span>${esc(names[id])}</span><span>
           <button type="button" data-mv="-1" data-id="${id}" ${i === 0 ? "disabled" : ""} aria-label="nach oben">↑</button>
           <button type="button" data-mv="1" data-id="${id}" ${i === o.length - 1 ? "disabled" : ""} aria-label="nach unten">↓</button></span></div>`).join("") +
-        `<div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px">Ein- und Ausblenden über die Schalter oben.</div>`;
+        `<div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px">Ein- und Ausblenden über die Schalter oben.</div>` +
+        (tl.length > 1 ? `<div style="margin:14px 0 6px;font-weight:600">Reihenfolge der Zählerkacheln</div>` + tl.map(([k, n], i) => row(n, k, i, tl.length, "data-tk")).join("") : "");
     }
     _build() {
       if (!this._form) {
@@ -551,6 +576,15 @@ const SF = (() => {
         this._ord.addEventListener("click", ev => {
           const b = ev.target.closest && ev.target.closest("button[data-mv]");
           if (!b) return;
+          if (b.dataset.tk !== undefined) {
+            const t = [...(this._tileList || [])], i = t.indexOf(b.dataset.tk), j = i + Number(b.dataset.mv);
+            if (i < 0 || j < 0 || j >= t.length) return;
+            [t[i], t[j]] = [t[j], t[i]];
+            this._cfg = { ...this._cfg, meters_order: t };
+            this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._cfg }, bubbles: true, composed: true }));
+            this._drawOrder();
+            return;
+          }
           const o = blockOrder(this._cfg.order), i = o.indexOf(b.dataset.id), j = i + Number(b.dataset.mv);
           if (i < 0 || j < 0 || j >= o.length) return;
           [o[i], o[j]] = [o[j], o[i]];

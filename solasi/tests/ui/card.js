@@ -114,4 +114,19 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
 {const e3=mk({},st("Entladen",attrs));const h1=e3.shadowRoot.querySelector("ha-card");
  e3.hass={states:st("Entladen",attrs)};   // gleicher Inhalt, nur neue last_updated
  ok(e3.shadowRoot.querySelector("ha-card")===h1,"Gleicher Inhalt: kein Neuaufbau der Karte");}
+// ---- Reihenfolge der Zählerkacheln ----
+{const a3=JSON.parse(JSON.stringify(attrs));a3.meters=[{entity:"sensor.w1",name:"Wasser Haus",value:5,dec:1,unit:"m³",icon:"wasser",color:"water",day:0.1},{entity:"sensor.w2",name:"Wasser Garten",value:7,dec:1,unit:"m³",icon:"wasser",color:"water",day:0.2}];
+ a3.meters_cfg={show_day:true,extra:true};
+ const names=el=>[...el.shadowRoot.querySelectorAll(".sfm-n")].map(n=>n.textContent);
+ ok(names(mk({},st("Entladen",a3))).join()==="Tagesverbrauch,Wasser Haus,Wasser Garten,Solarertrag heute,Netzbezug heute","Kacheln: Standardreihenfolge");
+ ok(names(mk({meters_order:["m:sensor.w2","day"]},st("Entladen",a3))).join()==="Wasser Garten,Tagesverbrauch,Wasser Haus,Solarertrag heute,Netzbezug heute","meters_order setzt die Reihenfolge");
+ const e4=mk({meters_order:["m:sensor.w2","day"]},st("Entladen",a3));
+ ok(q(e4,".sfm.even").length===1&&q(e4,".sfm.big").length===0,"Ohne Tagesverbrauch an erster Stelle: gleich große Kacheln");
+ a3.meters_cfg.order=["pv","m:sensor.w1"];
+ ok(names(mk({},st("Entladen",a3)))[0]==="Solarertrag heute","Ohne meters_order gilt die Reihenfolge aus dem Add-on");
+ ok(names(mk({meters_order:["imp"]},st("Entladen",a3)))[0]==="Netzbezug heute","meters_order hat Vorrang vor dem Add-on");
+ const e5=w.customElements.get("solasi-card").getConfigElement();w.document.body.appendChild(e5);e5.hass={states:st("Entladen",a3)};e5.setConfig({});
+ let g5=null;e5.addEventListener("config-changed",e=>g5=e.detail.config);
+ e5.querySelector('button[data-tk="pv"][data-mv="1"]').click();
+ ok(g5&&g5.meters_order&&g5.meters_order.join()==="m:sensor.w1,pv,day,m:sensor.w2,imp","Editor: Zählerkachel verschieben");}
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

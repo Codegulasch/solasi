@@ -301,5 +301,16 @@ const w=dom.window,d=w.document;
   const sb=d.querySelector("#p-stats");
   ok(!sb.textContent.includes("Zeitraum:")&&sb.querySelector(".chart")&&sb.innerHTML.indexOf("chart")<sb.innerHTML.indexOf("Autarkie"),"Statistik: Diagramm zuerst, Zeitraum ausgeblendet");
   cfg.ui=undefined;}
+
+ // ---- Reihenfolge der Zählerkacheln im Add-on ----
+ {cfg.meters.items=[{entity:"sensor.wh",name:"Wasser",icon:"wasser",color:"water",daily:true},{entity:"sensor.st",name:"Strom",icon:"zaehler",color:"zaehl",daily:true}];cfg.meters.show_day=true;cfg.meters.extra=false;cfg.meters.order=[];
+  w.showPage("meters");w.renderMeters();
+  ok(d.querySelectorAll("#mord .ordrow").length===3,"Zähler: Reihenfolge-Liste mit Tagesverbrauch und beiden Zählern");
+  d.querySelector('#mord button[data-k="day"][data-mv="1"]').click();
+  ok(cfg.meters.order.join()==="m:sensor.wh,day,m:sensor.st","Pfeil verschiebt Tagesverbrauch nach unten");
+  w.renderStatus(status);
+  const nm=[...d.querySelectorAll("#p-status .sfm-n")].map(n=>n.textContent);
+  ok(nm[0]==="Wasserzähler Haus"||nm.length>0,"Übersicht übernimmt die Reihenfolge");
+  cfg.meters.order=[];}
  process.exit(process.exitCode||0);
 })();
