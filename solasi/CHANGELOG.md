@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.3.5
+- **Zwei Speicher mit unterschiedlichen Grenzen:** SOLASI beachtet jetzt das Maximum der Leistungs-Entität (z. B. 800 W bei der Anker Solix 4). Früher forderte es bei höherer eingestellter Entladeleistung (z. B. 1250 W) vom ersten Speicher mehr, als er annimmt, und verteilte den Rest nicht auf den zweiten.
+## 1.3.4
+- **Springen, dritte Runde:** Die Karte behält jetzt ihr `ha-card`-Element dauerhaft und tauscht nur den Inhalt, sodass die Karte nie für ein Bild leer steht. Zusätzlich hält der Kartenrahmen seine Mindesthöhe.
+- **Versionshinweis:** Ist die Kartendatei im Browser oder in der App älter als das Add-on (zwischengespeichert), zeigt die Karte einen Hinweis „Karte veraltet – Seite neu laden“.
+- **Sprung-Diagnose** der Karte (Option `debug: true`) zeigt Version und letzte Ereignisse.
 ## 1.3.3
 - **Springen behoben (Dashboard):** Aus einer Bildschirmaufnahme ließ sich die Ursache eingrenzen: Die Seite wurde für einen Moment kürzer, der Browser kappte die Scrollposition und die Ansicht sprang in einem Bild nach oben. Jetzt gibt es zwei Absicherungen. Die Karte merkt sich ihre Höhe je Fensterbreite schon vor dem ersten Zeichnen und fällt nicht mehr zusammen, auch nicht, wenn Home Assistant sie neu erzeugt oder der Sensor kurz „nicht verfügbar“ meldet (dann bleibt der letzte Stand abgeblendet stehen). Ein **Scroll-Wächter** holt die alte Position zurück, falls die Seite ohne Eingabe nach oben springt und dabei am unteren Ende landet.
 ## 1.3.2

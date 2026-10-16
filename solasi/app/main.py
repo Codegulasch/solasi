@@ -310,6 +310,7 @@ async def main():
         except NotImplementedError:  # pragma: no cover
             pass
     ctrl.mqtt.version = VERSION
+    ctrl.card_version = VERSION
     ctrl.mqtt.start()
     tasks = [asyncio.create_task(ha.run()), asyncio.create_task(ctrl.run())]
     try:

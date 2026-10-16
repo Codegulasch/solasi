@@ -132,3 +132,11 @@ def test_ueberschuss_rueckfall_auf_netz():
 def test_ueberschuss_eigener_sensor():
     cfg = mk_cfg(); cfg["surplus"]["source"] = "custom"
     assert surplus_value(cfg, mk_snap(cfg, 0, [], custom_w=450.0)) == 450.0
+
+def test_entitaetsmaximum_begrenzt_und_rest_geht_ans_andere_geraet():
+    # Speicher A darf laut Entität nur 800 W, obwohl max_dis 1250 eingestellt ist: der Rest muss von B kommen
+    cfg = mk_cfg(); cfg["units"][0]["max_dis"] = 1250; cfg["units"][1]["max_dis"] = 800
+    units = [mk_unit(cfg, 0, 80), mk_unit(cfg, 1, 80)]
+    units[0]["nmax_dis"] = 800
+    d = decide(cfg, mk_snap(cfg, 2000, units))
+    assert units[0]["p"] == 800 and units[1]["p"] == 800

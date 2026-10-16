@@ -16,6 +16,7 @@
  *   meters_order: [day, "m:sensor.wasser", pv, imp]   # Reihenfolge der Zählerkacheln (leer = wie im Add-on)
  *   order: [meters, headline, flow, trend, batteries, surplus, tags]   # Reihenfolge der Blöcke (Standard wie hier)
  *   show_kill: true                 # Not-Aus-Knopf (braucht MQTT, siehe Anleitung)
+ *   debug: false                    # Sprung-Diagnose einblenden (auch über das Add-on einschaltbar)
  *   tap_open: true                  # Antippen öffnet SOLASI
  *   accent: ""                      # Akzentfarbe, z. B. "#3F5BD8" (leer = Standard)
  */
@@ -44,7 +45,7 @@
       const el = scrollerOf(ev.target);
       if (!el) return;
       const y = el.scrollTop, prev = last.get(el) || 0, max = el.scrollHeight - el.clientHeight;
-      if (Date.now() - input > 400 && prev - y > 120 && y >= max - 3) restore(el, prev);
+      if (Date.now() - input > 400 && prev - y > 120 && y >= max - 3) { if (window.__kwDbg) window.__kwDbg(`Wächter: Sprung ${Math.round(prev)}→${Math.round(y)} px, hole zurück`); restore(el, prev); }
       else last.set(el, y);
     };
     const hook = el => { if (el && !hooked.has(el)) { hooked.add(el); el.addEventListener("scroll", onScroll, { passive: true }); last.set(el, el.scrollTop); } };
@@ -72,6 +73,40 @@
     const ord = (Array.isArray(o) ? o : []).filter((x, i, a) => all.includes(x) && a.indexOf(x) === i);
     return [...ord, ...all.filter(x => !ord.includes(x))];
   };
+
+  /* Zeichnet in das Shadow-DOM, ohne <ha-card> neu zu erzeugen. Ein neues ha-card rendert seinen Inhalt erst in einem
+     Microtask; erzwingt vorher irgendeine Karte ein Layout (Höhe messen), ist die Karte für einen Moment leer, die Seite
+     wird kürzer, der Browser kappt die Scrollposition und die Ansicht springt nach oben. Hier bleibt ha-card bestehen,
+     nur Stil und Inhalt werden ersetzt (in einem Schritt, ohne Zwischen-Layout). */
+  function paintShadow(root, html) {
+    const t = document.createElement("template");
+    t.innerHTML = html;
+    const kids = [...t.content.children], nc = kids[kids.length - 1];
+    const cur = [...root.children].find(e => e.localName === "ha-card");
+    const ok = cur && nc && nc.localName === "ha-card" && root.lastElementChild === cur && root.children.length === kids.length &&
+      kids.slice(0, -1).every((k, i) => k.localName === "style" && root.children[i].localName === "style");
+    if (!ok) { root.innerHTML = html; return; }
+    kids.slice(0, -1).forEach((k, i) => { const s = root.children[i]; if (s.textContent !== k.textContent) s.textContent = k.textContent; });
+    for (const a of [...cur.attributes]) if (a.name !== "style" && !nc.hasAttribute(a.name)) cur.removeAttribute(a.name);
+    for (const a of [...nc.attributes]) if (a.name !== "style" && cur.getAttribute(a.name) !== a.value) cur.setAttribute(a.name, a.value);
+    cur.replaceChildren(...nc.childNodes);
+  }
+
+  /* Diagnose (Add-on: Einstellungen → Darstellung → Sprung-Diagnose, oder Karten-Option debug: true) */
+  const DBG = { box: null, lines: [] };
+  const dbgOn = () => { try { return localStorage.getItem("solasi_debug") === "1"; } catch (e) { return false; } };
+  const dbgNote = t => {
+    if (!dbgOn() && !(window.__solasiDebugCard)) return;
+    DBG.lines.unshift(new Date().toLocaleTimeString("de-DE") + " " + t);
+    DBG.lines.length = Math.min(DBG.lines.length, 10);
+    if (!DBG.box) {
+      DBG.box = document.createElement("pre");
+      DBG.box.style.cssText = "position:fixed;left:6px;bottom:70px;max-width:92vw;z-index:99999;margin:0;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.82);color:#fff;font:11px/1.35 monospace;white-space:pre-wrap;pointer-events:none";
+      document.body.appendChild(DBG.box);
+    }
+    DBG.box.textContent = `SOLASI-Karte v${VERSION}\n` + DBG.lines.join("\n");
+  };
+  window.__kwDbg = window.__kwDbg || dbgNote;
   const num = v => (v === null || v === undefined || v === "" || isNaN(Number(v))) ? null : Number(v);
 
   const STYLE = `
@@ -86,6 +121,7 @@
       --sf-line:var(--divider-color,#ddd);--sf-sun:var(--sc-sun);--sf-bat:var(--sc-bat);--sf-grid:var(--sc-grid);--sf-home:var(--sc-home);
       --sf-ok:var(--sc-ok);--sf-warn:var(--sc-warn);--sf-bad:var(--sc-bad)}
     .stale{opacity:.55}
+    .oldv{font-size:11.5px;margin:0 0 6px;padding:6px 10px;border-radius:10px;background:color-mix(in srgb,var(--sc-warn) 18%,transparent);color:var(--primary-text-color)}
     .head{display:flex;align-items:center;gap:8px;margin-bottom:2px}
     .head .t{font-size:16px;font-weight:600;color:var(--primary-text-color)}
     .pill{margin-left:auto;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;
@@ -425,6 +461,7 @@ const SF = (() => {
       this._cfg = { entity: "sensor.solasi", title: "SOLASI", show_headline: true, show_batteries: true,
                     show_surplus: true, show_tags: true, size: "large", show_trend: true, show_meters: true, meters_layout: "big", show_kill: true,
                     tap_open: true, accent: "", ...(config || {}) };
+      if (this._cfg.debug) window.__solasiDebugCard = true;
       this._key = null;
       this._render();
     }
@@ -504,9 +541,13 @@ const SF = (() => {
       const killBtn = ks ? `<button type="button" class="kill ${stopped ? "go" : this._armed ? "arm" : ""}" data-kill="1">${stopped ? "Fortsetzen" : this._armed ? "Wirklich stoppen?" : "Not-Aus"}</button>` : "";
       const when = st && st.last_updated ? `<span class="when">${ago(st.last_updated)}</span>` : "";
       const canOpen = c.tap_open && a2.addon_slug;
-      const head = c.title || killBtn ? `<div class="head"><span class="t">${esc(c.title)}</span>${pill}${when}${killBtn}</div>` : "";
+      const stale = a2.card_version && !VERSION.startsWith("__") && a2.card_version !== VERSION
+        ? `<div class="oldv">Karte v${esc(VERSION)} ist veraltet (Add-on v${esc(a2.card_version)}). Bitte Seite neu laden bzw. in der App den Frontend-Cache leeren.</div>` : "";
+      const head0 = c.title || killBtn ? `<div class="head"><span class="t">${esc(c.title)}</span>${pill}${when}${killBtn}</div>` : "";
+      const head = stale + head0;
       const html = `<style>${STYLE}${c.accent ? `ha-card{--sc-sun:${esc(c.accent)}}` : ""}</style><ha-card class="${canOpen ? "tap" : ""}">
         ${head}${body}</ha-card>`;
+      if (!ready) dbgNote(`Zustand ohne Inhalt: ${!this._hass ? "kein hass" : !st ? "Entität fehlt" : st.state}`);
       this._paint(html, ready);
       this._slug = canOpen ? a2.addon_slug : "";
       this._kill = ks ? a2.kill_switch : "";
@@ -529,8 +570,9 @@ const SF = (() => {
       if (full === this._last) return;
       this._last = full;
       const old = this.getBoundingClientRect();
-      root.innerHTML = html;
+      paintShadow(root, html);
       const card = root.querySelector("ha-card");
+      this.style.minHeight = this._minH ? this._minH + "px" : "";
       if (card && this._minH) card.style.minHeight = this._minH + "px";
       const h = card ? Math.ceil(card.getBoundingClientRect().height) : 0;
       if (ready && h > (this._minH || 0)) {
@@ -544,7 +586,19 @@ const SF = (() => {
       if (dh && old.bottom <= 0 && old.height) window.scrollBy(0, dh);
     }
 
+    disconnectedCallback() { dbgNote("Karte entfernt"); if (this._ro) { this._ro.disconnect(); this._ro = null; } }
+
     connectedCallback() {
+      dbgNote("Karte eingefügt" + (this._minH ? ` (Mindesthöhe ${this._minH} px)` : ""));
+      if (!this._ro && window.ResizeObserver) {
+        this._h0 = 0;
+        this._ro = new ResizeObserver(() => {
+          const h = Math.round(this.getBoundingClientRect().height);
+          if (this._h0 && Math.abs(h - this._h0) > 40) dbgNote(`Höhe ${this._h0}→${h} px`);
+          this._h0 = h;
+        });
+        this._ro.observe(this);
+      }
       this.shadowRoot.addEventListener("click", ev => {
         const k = ev.target.closest && ev.target.closest("[data-kill]");
         if (k) {
@@ -601,7 +655,8 @@ const SF = (() => {
           <button type="button" data-mv="-1" data-id="${id}" ${i === 0 ? "disabled" : ""} aria-label="nach oben">↑</button>
           <button type="button" data-mv="1" data-id="${id}" ${i === o.length - 1 ? "disabled" : ""} aria-label="nach unten">↓</button></span></div>`).join("") +
         `<div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px">Ein- und Ausblenden über die Schalter oben.</div>` +
-        (tl.length > 1 ? `<div style="margin:14px 0 6px;font-weight:600">Reihenfolge der Zählerkacheln</div>` + tl.map(([k, n], i) => row(n, k, i, tl.length, "data-tk")).join("") : "");
+        (tl.length > 1 ? `<div style="margin:14px 0 6px;font-weight:600">Reihenfolge der Zählerkacheln</div>` + tl.map(([k, n], i) => row(n, k, i, tl.length, "data-tk")).join("") : "") +
+        `<div style="font-size:11px;color:var(--secondary-text-color);margin-top:12px">Kartenversion ${esc(VERSION)}</div>`;
     }
     _build() {
       if (!this._form) {

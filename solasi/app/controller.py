@@ -176,6 +176,14 @@ def _round_step(x, step):
     return int(math.floor(x / step + 0.5) * step)
 
 
+def _ent_max(ha, eid):
+    """Maximalwert einer number-Entität (Attribut „max“) oder None."""
+    if not eid:
+        return None
+    m = ha.attr(eid, "max")
+    return float(m) if isinstance(m, (int, float)) and not isinstance(m, bool) and m > 0 else None
+
+
 def _split(total, caps, weights):
     """Verteilt total (>0) auf höchstens zwei Geräte unter Beachtung der Limits."""
     if len(caps) == 1:
@@ -253,6 +261,12 @@ def decide(cfg, snap):
         u["pvcap"] = min(u["cfg"]["max_dis"], max(pv_u - 10.0, 0.0)) if pass_ok else 0.0
         u["dcap"] = u["cfg"]["max_dis"] if u["elig_dis"] else u["pvcap"]
         u["ccap"] = u["cfg"]["max_chg"] if u["elig_chg"] else 0
+        # Die Leistungs-Entität selbst begrenzt, was der Speicher annimmt (z. B. 800 W). Mehr zu verlangen bringt nichts,
+        # der Rest muss vom anderen Speicher kommen.
+        if u.get("nmax_dis"):
+            u["dcap"] = min(u["dcap"], u["nmax_dis"])
+        if u.get("nmax_chg"):
+            u["ccap"] = min(u["ccap"], u["nmax_chg"])
 
     want_dis = any(u["dcap"] > 0 for u in units) and net_dis >= (eff_off if dis_now else eff_on)
     want_chg = any(u["elig_chg"] for u in units) and net_balance <= -(eff_off if chg_now else eff_on)
@@ -368,6 +382,7 @@ class Controller:
         self._meters_view = None
         self._trend_path = data_path("trend.json")
         self.trend = load_json(self._trend_path, {}).get("p", [])     # [Zeit, Solar, Haus] alle 5 Minuten, 24 Stunden
+        self.card_version = ""           # Version des Add-ons, die Karte vergleicht sie mit ihrer eigenen
         self.addon_slug = ""             # für „Antippen öffnet SOLASI“ in der Dashboard-Karte
 
     @property
@@ -443,6 +458,7 @@ class Controller:
                 "set": r["set"], "real": abs(fl["ac"]) if fl["ac"] is not None else 0.0,
                 "pv": fl["pv"], "ac": fl["ac"], "bat": fl["bat"],
                 "dir": r["dir"], "num_state": r["num_state"], "mode": r["mode"],
+                "nmax_dis": _ent_max(ha, u["num"]), "nmax_chg": _ent_max(ha, u.get("num_chg") or u["num"]),
             })
         has_pv = pv_cfg and pv_known
         has_out = out_cfg and out_known
@@ -994,6 +1010,7 @@ class Controller:
             "units": st.get("units", []), "slots": st.get("slots", []),
             "stop_reason": st.get("safety", {}).get("reason", "") if stopped else "",
             "addon_slug": self.addon_slug,
+            "card_version": self.card_version,
             "trend": self.trend_series(),
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
