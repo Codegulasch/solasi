@@ -71,14 +71,19 @@ def run(cfg, ha, ctrl=None):
             add(area, label, "ok", ", ".join(opts))
 
     for u in cfg["units"]:
+        obs = bool(u.get("observe"))
+        if obs:      # beobachtet: keine Steuer-Felder prüfen
+            u = dict(u, num="", dir="", mode="", enable="", num_chg="", fallback_mode="", script="")
         area = u["name"] if u["name"].lower().startswith("speicher") else f"Speicher {u['name']}"
         d = drivers.driver(u)
-        if not (drivers.entities(u) or u["soc"]):
+        if not (drivers.entities(u) or u["soc"] or u["pv"]):
             continue
         configured += 1
         o = drivers.opts(u, names)
         add(area, "Speichertyp", "info", labels[d])
-        if not drivers.configured(u):
+        if obs:
+            add(area, "Steuerung", "info", "Nur beobachten: SOLASI liest die Werte und schreibt nichts auf diesen Speicher")
+        if not drivers.configured(u) and not obs:
             add(area, "Konfiguration", "error", "Für diesen Speichertyp fehlen Pflichtfelder",
                 {"anker": "Leistung (number) und Richtung (select) wählen.", "signed": "Leistung (number) wählen.",
                  "limit": "Limit (number) wählen.", "modal": "Modus (select) und Entladeleistung (number) wählen.",
@@ -99,13 +104,13 @@ def run(cfg, ha, ctrl=None):
             check_entity(area, "Ladeleistung (number)", u["num_chg"], "number", numeric=True)
         if d == "modal" and not u["num_chg"]:
             add(area, "Ladeleistung (number)", "info", "nicht gewählt: dieser Speicher wird nicht aus dem Netz geladen")
-        if d in ("anker", "modal"):
+        if d in ("anker", "modal") and not obs:
             lbl = "Richtung (select)" if d == "anker" else "Modus Stop/Laden/Entladen (select)"
             if check_entity(area, lbl, u["dir"], "select"):
                 check_options(area, "Richtungs-Optionen" if d == "anker" else "Modus-Optionen", u["dir"],
                               [o["dis"], o["chg"]] + ([o["stop"]] if d == "modal" else []),
                               "Namen im Speicher (Experten-Modus) oder global unter „Sicherheit & Meldungen → Namen der Optionen“ anpassen.")
-        if d == "script":
+        if d == "script" and not obs:
             check_entity(area, "Skript", u["script"], "script")
             add(area, "Aufruf", "info", "Das Skript erhält die Felder power_w (+ Entladen, − Laden), mode und unit.")
         if u["enable"]:
@@ -115,7 +120,7 @@ def run(cfg, ha, ctrl=None):
                 if o["mode"]:
                     check_options(area, "Modus-Option", u["mode"], [o["mode"]],
                                   "Option im Speicher oder global unter „Sicherheit & Meldungen → Namen der Optionen“ anpassen.")
-        elif d == "anker":
+        elif d == "anker" and not obs:
             add(area, "Betriebsmodus (select)", "warn", "nicht gewählt",
                 "Ohne Modus-Wächter muss der Speicher von Hand im externen Modus bleiben.")
         # Rückfall für den Kill-Switch
@@ -130,7 +135,7 @@ def run(cfg, ha, ctrl=None):
         elif d in ("anker", "signed", "modal") and u["mode"]:
             add(area, "Rückfall-Modus", "warn", "nicht gewählt",
                 "Beim Stoppen bleibt der Speicher im externen Modus (mit 0 W). Wähle den Modus, den er danach haben soll, z. B. Eigenverbrauch.")
-        elif d == "anker":
+        elif d == "anker" and not obs:
             add(area, "Rückfall-Modus", "warn", "kein Betriebsmodus gewählt",
                 "Ohne Betriebsmodus kann SOLASI den Speicher beim Stoppen nicht auf Eigenverbrauch zurückstellen.")
         if check_entity(area, "Ladestand (SOC)", u["soc"], "sensor", numeric=True):
@@ -176,7 +181,7 @@ def run(cfg, ha, ctrl=None):
 
     # ---- Energiebilanz ----
     if configured:
-        fls = [(u, drivers.flows(ha, u)) for u in cfg["units"] if drivers.configured(u)]
+        fls = [(u, drivers.flows(ha, u)) for u in cfg["units"] if (drivers.configured(u) or u.get("observe"))]
         gv = drivers.sensor_num(ha, cfg["grid"]["entity"]) if cfg["grid"]["entity"] else None
         pv_known = [f_["pv"] for _, f_ in fls if f_["pv"] is not None]
         ac_known = [f_["ac"] for _, f_ in fls if f_["has"]]

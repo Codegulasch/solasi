@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.4.0
+- **Gesamt-Ladestand nach Kapazität:** Der „mittlere Ladestand“ ist jetzt nach der nutzbaren Kapazität der Speicher gewichtet (bisher einfacher Durchschnitt) und steht zusätzlich in kWh („6,2 von 15 kWh“). Die Kapazität trägst du je Speicher unter *Einrichtung* ein (zum Beispiel 5 und 10). Vorher stand sie nur im Experten-Modus.
+- **Energiefluss mit zwei Anlagen:** Bei zwei Speichern zeigt der Energiefluss jede Solaranlage und jeden Speicher als eigene Kachel, mit Leistung, Ladestand und kWh. Das Design bleibt unverändert. Mit nur einem Speicher sieht alles aus wie bisher.
+- **Verlauf:** Eine zusätzliche Fläche „aus Speichern“ zeigt, wann die Akkus ans Haus abgegeben haben (gilt für Add-on und Karte; der Verlauf füllt sich ab jetzt, ältere Punkte haben keinen Speicherwert).
+- **Speicherliste und Karte:** Ladestand je Speicher auch in kWh.
+- **Nur beobachten:** Neue Option je Speicher. SOLASI liest Ladestand und Leistung und zeigt sie an, schreibt aber nichts auf den Speicher und rechnet ihn nicht in den eigenen Sollwert ein. Gedacht für Speicher, die ihre Hersteller-App selbst regelt (zum Beispiel Anker mit Smart Meter und Nullexport).
 ## 1.3.5
 - **Zwei Speicher mit unterschiedlichen Grenzen:** SOLASI beachtet jetzt das Maximum der Leistungs-Entität (z. B. 800 W bei der Anker Solix 4). Früher forderte es bei höherer eingestellter Entladeleistung (z. B. 1250 W) vom ersten Speicher mehr, als er annimmt, und verteilte den Rest nicht auf den zweiten.
 ## 1.3.4

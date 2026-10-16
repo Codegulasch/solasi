@@ -139,5 +139,18 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  el6.shadowRoot.querySelector('[data-tile="day"]').click();
  ok(navd===1,"Tipp auf Tagesverbrauch öffnet das Add-on");
  ok(el6.getCardSize()>=3,"getCardSize liefert eine Zahl");}
+
+{ // zwei Anlagen: je Solar und Speicher eine Kachel, kWh, Speicher-Fläche im Verlauf
+ const now=Math.floor(Date.now()/1000),n=30;
+ const a2={meters:[],today:{},flows:{solar_house:30,solar_battery:0,battery_house:1570,grid_house:1093},pv_w:30,house_w:2693,battery_w:1570,grid_w:1093,avg_soc:41,kwh:6.2,cap_kwh:15,target_w:1600,
+  units:[{name:"Anker Solix 4 HÜTTE",pv:10,soc:14,kwh:0.7,cap:5,set:800,bat:800,available:true},{name:"Anker Solix 4 DACH",pv:20,soc:55,kwh:5.5,cap:10,set:800,bat:770,available:true}],
+  trend:{t:Array.from({length:n},(_,i)=>now-(n-1-i)*300),pv:Array(n).fill(400),house:Array(n).fill(900),bat:Array.from({length:n},(_,i)=>i>10?500:0)}};
+ const e2=mk({},st("Entladen",a2)),sv=e2.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent;
+ ok(sv.includes("HÜTTE")&&sv.includes("DACH")&&!sv.includes("ANKER")&&sv.includes("14 % · 0,7 kWh")&&sv.includes("55 % · 5,5 kWh"),"Zwei Speicher: Kurznamen, Ladestand und kWh je Speicher");
+ ok(sv.includes("Solar HÜTTE")&&sv.includes("Solar DACH"),"Zwei Solarkacheln");
+ const hl=e2.shadowRoot.querySelector(".headline");ok(e2.shadowRoot.textContent.includes("6,2 von 15 kWh"),"Gesamt-Ladestand mit kWh");
+ ok(e2.shadowRoot.querySelector('svg[aria-label^="Verlauf"]').textContent.includes("aus Speichern"),"Verlauf zeigt die Abgabe der Speicher");
+ ok(e2.shadowRoot.textContent.includes("5,5 von 10 kWh"),"Speicherliste mit kWh");
+}
 ok(w.__kwScrollGuard===true,"Scroll-Wächter ist aktiv");
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

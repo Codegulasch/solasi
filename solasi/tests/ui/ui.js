@@ -3,7 +3,7 @@ const html=fs.readFileSync(path.join(APP,"static","index.html"),"utf8");
 const cfg=JSON.parse(require("child_process").execSync(`python3 -c "import json,controller;print(json.dumps(controller.DEFAULT_CONFIG))"`,{cwd:APP,env:{...process.env,SOLASI_DATA:require("os").tmpdir()}}).toString());
 cfg.grid.entity="sensor.grid";const saved=[];let replayBody=null;const calls=[];let failDevice=false;let mqttState="verbunden";
 const status={flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},safety:{state:"active",reason:"",since:null},pv_w:780,bat_w:-260,house_w:529,connected:true,enabled:true,dry_run:true,surplus_enabled:true,surplus_dry_run:true,meter_ok:true,grid_w:400,net_balance:400,net_dis:400,t_target:390,eco_active:false,avg_soc:60,blocked_w:0,want:"Entladen",surplus_w:1620,
- units:[{name:"Speicher A",pv:540,soc:80,set:0,real:0,plan:280,force:false,available:false,mode:"self_consumption",dir:"discharge"},{name:"Speicher B",soc:40,set:0,real:0,plan:110,force:true,available:true,mode:"third_party_control",dir:"discharge"}],
+ units:[{name:"Speicher A",pv:540,soc:80,set:0,real:0,plan:280,force:false,available:false,mode:"self_consumption",dir:"discharge"},{name:"Speicher B",soc:-1,set:0,real:0,plan:110,force:true,available:true,mode:"third_party_control",dir:"discharge"}],
  slots:[{name:"Wallbox",ent:"switch.wb",num:"number.wb",state:"on",own_w:1380,num_v:6}],
  events:[{ts:"12:00:01",level:"test",msg:"Test: Speicher A: 0 W → 280 W"},{ts:"12:00:00",level:"error",msg:"<b>x</b>"}]};
 {const now=Math.floor(Date.now()/1000),n=120,t=[],pv=[],house=[];for(let i=0;i<n;i++){t.push(now-(n-1-i)*300);pv.push(Math.round(Math.max(0,Math.sin(i/n*Math.PI)*1600)));house.push(300+(i%7)*20)}status.trend={t,pv,house}

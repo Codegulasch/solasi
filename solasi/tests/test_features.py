@@ -255,7 +255,7 @@ def test_trend_mittelt_je_fuenf_minuten_und_begrenzt(tmp_path):
     ctrl = mk_ctrl(tmp_path); ctrl.trend_every = 0; ctrl.trend_keep = 3
     for i in range(5):
         ctrl._trend_add(100 * i, 300)
-    assert len(ctrl.trend) == 3 and ctrl.trend[-1][1:] == [400, 300]
+    assert len(ctrl.trend) == 3 and ctrl.trend[-1][1:3] == [400, 300] and ctrl.trend[-1][3] is None
     ctrl.trend_every = 300
     ctrl._trend_add(None, None)                       # fehlende Werte brechen nichts
     assert len(ctrl.trend) == 3

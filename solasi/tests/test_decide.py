@@ -140,3 +140,22 @@ def test_entitaetsmaximum_begrenzt_und_rest_geht_ans_andere_geraet():
     units[0]["nmax_dis"] = 800
     d = decide(cfg, mk_snap(cfg, 2000, units))
     assert units[0]["p"] == 800 and units[1]["p"] == 800
+
+
+def test_soc_nach_kapazitaet_gewichtet():
+    cfg = mk_cfg()
+    units = [mk_unit(cfg, 0, 14), mk_unit(cfg, 1, 55)]
+    units[0]["cap"], units[1]["cap"] = 5.0, 10.0
+    d = decide(cfg, mk_snap(cfg, 0, units))
+    assert abs(d["avg_soc"] - (0.14 * 5 + 0.55 * 10) / 15 * 100) < 0.01
+    assert abs(d["kwh"] - 6.2) < 0.01 and d["cap_kwh"] == 15
+
+
+def test_beobachteter_speicher_wird_nicht_gesteuert_und_nicht_gezaehlt():
+    cfg = mk_cfg()
+    units = [mk_unit(cfg, 0, 80, setv=0), mk_unit(cfg, 1, 100, setv=800)]
+    units[1]["obs"] = True
+    d = decide(cfg, mk_snap(cfg, 300, units))
+    assert units[1]["p"] == 0 and units[1]["dcap"] == 0      # nichts für den beobachteten Speicher
+    assert d["net_balance"] == 300                             # seine 800 W zählen nicht als eigener Sollwert
+    assert units[0]["p"] > 0

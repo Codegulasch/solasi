@@ -39,6 +39,7 @@ def default_unit(name):
         "driver": "anker", "num_chg": "", "dir_dis": "", "dir_chg": "", "dir_stop": "", "mode_option": "",
         "enable": "", "script": "", "sign": "discharge_positive", "power": "", "power_sign": "discharge_positive",
         "can_charge": True, "curtail": True,
+        "observe": False,    # nur beobachten: Werte lesen und anzeigen, aber nichts schreiben (z. B. wenn die Hersteller-App regelt)
         "power_basis": "",   # "" = automatisch, "ac" oder "battery" (siehe drivers.basis)
         # Rückfall beim Stoppen (Kill-Switch): Modus, den der Speicher dann bekommt (z. B. Eigenverbrauch)
         "fallback_mode": "", "fallback_value": "",
@@ -176,6 +177,15 @@ def _round_step(x, step):
     return int(math.floor(x / step + 0.5) * step)
 
 
+def cap_kwh(u):
+    """Nutzbare Kapazität in kWh (Standard 5)."""
+    try:
+        v = float(u.get("capacity_kwh"))
+    except (TypeError, ValueError):
+        return 5.0
+    return v if v > 0 else 5.0
+
+
 def _ent_max(ha, eid):
     """Maximalwert einer number-Entität (Attribut „max“) oder None."""
     if not eid:
@@ -239,7 +249,7 @@ def decide(cfg, snap):
     slot_own = [slot_own_power(s, snap["slots"][i]) for i, s in enumerate(slots)]
     blocked_w = sum(slot_own[i] for i, s in enumerate(slots) if s["block"]) if sp_on else 0.0
 
-    set_total = sum(u["set"] for u in units)
+    set_total = sum(u["set"] for u in units if not u.get("obs"))   # beobachtete Speicher regelt jemand anders
     net_balance = grid_w + set_total
     net_dis = net_balance - blocked_w
     dis_now = set_total > 5
@@ -261,6 +271,8 @@ def decide(cfg, snap):
         u["pvcap"] = min(u["cfg"]["max_dis"], max(pv_u - 10.0, 0.0)) if pass_ok else 0.0
         u["dcap"] = u["cfg"]["max_dis"] if u["elig_dis"] else u["pvcap"]
         u["ccap"] = u["cfg"]["max_chg"] if u["elig_chg"] else 0
+        if u.get("obs"):
+            u["dcap"] = u["ccap"] = u["pvcap"] = 0
         # Die Leistungs-Entität selbst begrenzt, was der Speicher annimmt (z. B. 800 W). Mehr zu verlangen bringt nichts,
         # der Rest muss vom anderen Speicher kommen.
         if u.get("nmax_dis"):
@@ -272,7 +284,10 @@ def decide(cfg, snap):
     want_chg = any(u["elig_chg"] for u in units) and net_balance <= -(eff_off if chg_now else eff_on)
 
     socs = [u["soc"] for u in units if u["soc"] >= 0]
-    avg_soc = sum(socs) / len(socs) if socs else 100.0
+    known = [u for u in units if u["soc"] >= 0]
+    cap_all = sum(u.get("cap") or 5.0 for u in known)
+    avg_soc = (sum(u["soc"] * (u.get("cap") or 5.0) for u in known) / cap_all) if known else 100.0   # nach Kapazität gewichtet
+    kwh_now = sum(max(0.0, min(100.0, u["soc"])) / 100.0 * (u.get("cap") or 5.0) for u in known)
     eco_active = bool(f["eco"]) and avg_soc <= so["eco_threshold"]
 
     # ---- Gesamtsollwert (positiv = Entladen) ----
@@ -329,7 +344,7 @@ def decide(cfg, snap):
     return {
         "meter_ok": meter_ok, "grid_w": grid_w, "net_balance": net_balance, "net_dis": net_dis,
         "want_dis": want_dis, "want_chg": want_chg, "eco_active": eco_active,
-        "avg_soc": avg_soc, "t_target": t, "blocked_w": blocked_w,
+        "avg_soc": avg_soc, "kwh": kwh_now, "cap_kwh": cap_all, "t_target": t, "blocked_w": blocked_w,
         "slot_own": slot_own, "surplus_w": surplus_w,
     }
 
@@ -381,7 +396,7 @@ class Controller:
         self._meters_at = 0.0
         self._meters_view = None
         self._trend_path = data_path("trend.json")
-        self.trend = load_json(self._trend_path, {}).get("p", [])     # [Zeit, Solar, Haus] alle 5 Minuten, 24 Stunden
+        self.trend = load_json(self._trend_path, {}).get("p", [])     # [Zeit, Solar, Haus, Speicher-Abgabe] alle 5 Minuten, 24 Stunden
         self.card_version = ""           # Version des Add-ons, die Karte vergleicht sie mit ihrer eigenen
         self.addon_slug = ""             # für „Antippen öffnet SOLASI“ in der Dashboard-Karte
 
@@ -431,16 +446,20 @@ class Controller:
         pv_w, pv_cfg, pv_known = 0.0, False, True
         out_cfg, out_known, bat_known = False, True, True
         for u in cfg["units"]:
-            fl = drivers.flows(ha, u) if (drivers.configured(u) or u.get("pv")) else None
+            obs = bool(u.get("observe"))
+            fl = drivers.flows(ha, u) if (drivers.configured(u) or u.get("pv") or obs) else None
             if u["pv"]:
                 pv_cfg = True
                 if fl["pv"] is None:
                     pv_known = False          # Sensor fehlt oder ist nicht verfügbar: unbekannt, nicht 0 W
                 else:
                     pv_w += fl["pv"]
-            if not drivers.configured(u):
+            if not drivers.configured(u) and not (obs and (u.get("soc") or u.get("pv"))):
                 continue
-            r = drivers.read(ha, u, names, self._script_mem)
+            if obs:
+                r = {"has": False, "set": 0.0, "dir": None, "num_state": None, "mode": None}
+            else:
+                r = drivers.read(ha, u, names, self._script_mem)
             if fl["has"]:
                 out_cfg = True
                 if fl["ac"] is None:
@@ -453,7 +472,8 @@ class Controller:
                     bat_w += fl["bat"]
             soc_s = ha.state(u["soc"]) if u["soc"] else None
             units.append({
-                "cfg": u, "k": u["name"], "has": r["has"],
+                "cfg": u, "k": u["name"], "has": r["has"], "obs": obs,
+                "cap": cap_kwh(u),
                 "soc": num(soc_s, -1) if is_num(soc_s) else -1,
                 "set": r["set"], "real": abs(fl["ac"]) if fl["ac"] is not None else 0.0,
                 "pv": fl["pv"], "ac": fl["ac"], "bat": fl["bat"],
@@ -554,6 +574,8 @@ class Controller:
         names, f, c = cfg["names"], cfg["features"], cfg["control"]
         uc = u["cfg"]
         p = u["p"]
+        if u.get("obs"):
+            return                                   # beobachtet: nichts schreiben
 
         # 1) Voraussetzungen schaffen (Fernsteuerung einschalten, Arbeitsmodus auf externe Steuerung setzen).
         #    Mit „Modus automatisch setzen“ passiert das sofort beim Start, nach „Fortsetzen“ und wenn der Modus von außen
@@ -749,7 +771,7 @@ class Controller:
         try:
             checks = []
             for uc in cfg["units"]:
-                if not drivers.configured(uc):
+                if not drivers.configured(uc) or uc.get("observe"):
                     continue
                 s = drivers.read(ha, uc, cfg["names"], self._script_mem)
                 cmds = drivers.release_commands(uc, s, cfg["names"], ha)
@@ -864,7 +886,7 @@ class Controller:
         night = is_night(pv if snap["has_pv"] else None, snap["sun"], datetime.now(timezone.utc).hour)
         self.learner.observe(time.time(), house, night)
         self._curtail_update(snap, d, now_m)
-        self._trend_add(pv, house)
+        self._trend_add(pv, house, bat)
 
     trend_every = 300
     trend_keep = 288
@@ -899,21 +921,24 @@ class Controller:
 
     def trend_series(self):
         """Verlauf für Oberfläche und Karte: Zeit (Sekunden), Solar, Haus."""
-        return {"t": [p[0] for p in self.trend], "pv": [p[1] for p in self.trend], "house": [p[2] for p in self.trend]}
+        return {"t": [p[0] for p in self.trend], "pv": [p[1] for p in self.trend], "house": [p[2] for p in self.trend],
+                "bat": [p[3] if len(p) > 3 else None for p in self.trend]}
 
-    def _trend_add(self, pv, house):
+    def _trend_add(self, pv, house, bat=None):
         """Kurzer Tagesverlauf für die Dashboard-Karte (Mittel je 5 Minuten, letzte 24 Stunden)."""
         acc = getattr(self, "_trend_acc", None)
         if acc is None:
-            acc = self._trend_acc = {"t0": time.time(), "pv": [], "h": []}
+            acc = self._trend_acc = {"t0": time.time(), "pv": [], "h": [], "b": []}
         if pv is not None:
             acc["pv"].append(pv)
         if house is not None:
             acc["h"].append(house)
+        if bat is not None:
+            acc["b"].append(max(0.0, bat))        # nur die Abgabe der Speicher
         if time.time() - acc["t0"] < self.trend_every:
             return
         avg = lambda v: round(sum(v) / len(v)) if v else None  # noqa: E731
-        self.trend.append([int(time.time()), avg(acc["pv"]), avg(acc["h"])])
+        self.trend.append([int(time.time()), avg(acc["pv"]), avg(acc["h"]), avg(acc["b"])])
         self.trend = self.trend[-self.trend_keep:]
         self._trend_acc = None
         save_json(self._trend_path, {"p": self.trend})
@@ -1005,6 +1030,7 @@ class Controller:
             "pv_w": st.get("pv_w"), "house_w": st.get("house_w"), "grid_w": st.get("grid_w"),
             "battery_w": st.get("bat_w"), "target_w": st.get("t_target"),
             "surplus_w": st.get("surplus_w"), "avg_soc": st.get("avg_soc"),
+            "kwh": st.get("kwh"), "cap_kwh": st.get("cap_kwh"),
             "eco_active": st.get("eco_active"), "meter_ok": st.get("meter_ok"),
             "blocked_w": st.get("blocked_w"), "want": st.get("want"),
             "units": st.get("units", []), "slots": st.get("slots", []),
@@ -1079,8 +1105,11 @@ class Controller:
             "units": [{
                 "name": u["k"], "soc": u["soc"], "set": round(u["set"]), "real": round(u["real"]),
                 "plan": u["p"], "force": u["force"], "available": u["has"], "pv": None if u.get("pv") is None else round(u["pv"]),
-                "mode": u["mode"], "dir": u["dir"],
+                "mode": u["mode"], "dir": u["dir"], "obs": u["obs"],
+                "cap": u["cap"], "kwh": None if u["soc"] < 0 else round(max(0.0, min(100.0, u["soc"])) / 100 * u["cap"], 2),
+                "ac": None if u.get("ac") is None else round(u["ac"]), "bat": None if u.get("bat") is None else round(u["bat"]),
             } for u in snap["units"]],
+            "kwh": round(d["kwh"], 2), "cap_kwh": round(d["cap_kwh"], 2),
             "slots": [{
                 "name": s["name"], "ent": s["ent"], "num": s["num"],
                 "state": snap["slots"][i]["ent_state"], "own_w": round(d["slot_own"][i]),

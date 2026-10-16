@@ -87,6 +87,10 @@ SOLASI ist nicht auf einen Hersteller festgelegt. Je Speicher wählst du unter *
 
 Speichertypen ohne Netzladen (Ausgangslimit, Modus ohne Ladezahl) werden bei Überschuss nie zum Laden eingeplant.
 
+**Kapazität und Gesamt-Ladestand:** Trage je Speicher die nutzbare Kapazität in kWh ein (*Einrichtung*, zum Beispiel 5 oder 10). Der Gesamt-Ladestand im Energiefluss ist danach nach Kapazität gewichtet und steht auch in kWh da. Mit Standardwert 5 kWh bei jedem Speicher wäre er sonst ein einfacher Durchschnitt.
+
+**Nur beobachten:** Regelt die Hersteller-App einen Speicher selbst (zum Beispiel Anker Solix mit Smart Meter und Nullexport), schalte bei diesem Speicher „Nur beobachten“ ein. SOLASI liest dann Ladestand und die echten Leistungssensoren, schreibt aber nichts auf den Speicher, setzt keinen Modus und gibt ihn beim Stoppen nicht zurück. Leistung und Richtung müssen nicht eingetragen sein. Den Rest regelt SOLASI mit den anderen Speichern. Sein Beitrag steht trotzdem in Energiefluss, Verlauf und Gesamt-Ladestand.
+
 > **Stand:** Die Anker SOLIX ist im Praxiseinsatz entwickelt und getestet. Die anderen Typen sind nach den Beschreibungen der jeweiligen Integrationen umgesetzt und bisher nur in Simulationen geprüft.
 > Beobachte sie bitte zuerst im Testmodus und gib gern Rückmeldung.
 

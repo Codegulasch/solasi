@@ -356,7 +356,7 @@ const DRV={
   limit:{label:"Ausgangslimit (nur Entladen)",desc:"Eine Zahl begrenzt die Abgabe ins Haus, geladen wird nur über PV. Passt z. B. zu Wechselrichter-Limits (OpenDTU) und Speichern mit Ausgangslimit.",charge:false,curtail:false},
   script:{label:"Eigenes Skript (für alles andere)",desc:"SOLASI ruft ein Home-Assistant-Skript auf und übergibt power_w (+ Entladen, − Laden), mode (discharge, charge oder idle) und unit. Damit lässt sich jedes System anbinden.",charge:true,curtail:false}
 };
-const isConf=u=>{const d=u.driver||"anker";return d==="anker"?!!(u.num&&u.dir):d==="modal"?!!(u.dir&&u.num):d==="script"?!!u.script:!!u.num};
+const isConf=u=>{const d=u.driver||"anker";if(u.observe)return !!(u.soc||u.pv);return d==="anker"?!!(u.num&&u.dir):d==="modal"?!!(u.dir&&u.num):d==="script"?!!u.script:!!u.num};
 
 function unitFields(i,u){
   const p=`units.${i}.`,d=u.driver||"anker",D=DRV[d]||DRV.anker;
@@ -364,6 +364,7 @@ function unitFields(i,u){
   h+=field(p+"driver","Speichertyp","select",{options:Object.entries(DRV).map(([k,v])=>[k,v.label]),
     after:dd=>{set(p+"curtail",!!DRV[dd].curtail);set(p+"can_charge",DRV[dd].charge);renderUnits();}});
   h+=`<div class="drvdesc">${esc(D.desc)}</div>`;
+  h+=field(p+"observe","Nur beobachten (nicht steuern)","bool",{hint:"SOLASI liest Ladestand und Leistung und zeigt sie an, schreibt aber nichts auf diesen Speicher. Für Speicher, die ihre Hersteller-App selbst regelt (z. B. Anker mit Smart Meter). Leistung und Richtung können dann leer bleiben, wichtig sind Ladestand und die echten Leistungssensoren."});
   if(d==="anker"){
     h+=field(p+"num","Leistung (number)","text",{list:"number",hint:"Die Entität „Leistungssteuerung“ des Speichers."})+
        field(p+"dir","Leistungsfluss / Richtung (select)","text",{list:"select"})+
@@ -414,7 +415,7 @@ function unitFields(i,u){
      (D.charge?field(p+"max_chg","Max. Ladeleistung (W)","num",{min:0,step:10}):"")+
      (D.charge?field(p+"can_charge","Aus dem Netz laden erlauben","bool",{adv:true}):"")+
      (D.curtail?field(p+"curtail","Abregelung bei vollem Speicher erzwingen","bool",{adv:true,hint:"Stellt den vollen Speicher auf „Entladen“ mit 0 W bzw. Hausbedarf."}):"")+
-     field(p+"capacity_kwh","Nutzbare Kapazität (kWh)","num",{min:0.5,step:0.1,adv:true,hint:"Nur für den Replay."});
+     field(p+"capacity_kwh","Nutzbare Kapazität (kWh)","num",{min:0.5,step:0.1,hint:"Wird für den Gesamt-Ladestand (nach Kapazität gewichtet), die kWh-Anzeige und den Replay gebraucht. Beispiel: 5 oder 10 bei zwei gekoppelten Akkus."});
   return h;
 }
 function renderUnits(){
@@ -1244,22 +1245,21 @@ const SF = (() => {
     }
   };
 
-  function tile(k, label, val, sub, col, icon) {
-    const t = T[k];
-    return `<g><rect x="${t.x}" y="${t.y}" width="${TW}" height="${TH}" rx="18" style="fill:var(--sf-card)"/>
-      <rect x="${t.x}" y="${t.y}" width="${TW}" height="${TH}" rx="18" style="fill:var(${col});fill-opacity:.13;stroke:var(${col});stroke-width:1.6"/>
+  function tile(k, label, val, sub, col, icon, pos) {
+    const t = pos || T[k], w = t.w || TW;
+    return `<g><rect x="${t.x}" y="${t.y}" width="${w}" height="${TH}" rx="18" style="fill:var(--sf-card)"/>
+      <rect x="${t.x}" y="${t.y}" width="${w}" height="${TH}" rx="18" style="fill:var(${col});fill-opacity:.13;stroke:var(${col});stroke-width:1.6"/>
       <g transform="translate(${t.x + 14} ${t.y + 14})">${icon}</g>
       <text x="${t.x + 54}" y="${t.y + 27}" class="sf-l">${label}</text>
       <text x="${t.x + 54}" y="${t.y + 50}" class="sf-v">${val}</text>
       ${sub ? `<text x="${t.x + 54}" y="${t.y + 66}" class="sf-s">${sub}</text>` : ""}</g>`;
   }
 
-  /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}} */
-  function flow(d) {
-    const f = d.f || {}, v = { sh: f.sh, sb: f.sb, bh: f.bh, gh: f.gh };
+  /* Linien zeichnen: lines = [{pts, col, val}] */
+  function drawLines(lines) {
     let idle = "", live = "", dots = "", chips = "";
-    for (const k in L) {
-      const x = L[k], val = v[k] == null ? 0 : v[k];
+    for (const x of lines) {
+      const val = x.val == null ? 0 : x.val;
       idle += `<path d="${pd(x.pts)}" class="sf-i"/>`;
       if (Math.abs(val) < 5) continue;
       const pts = val >= 0 ? x.pts : [...x.pts].reverse();
@@ -1278,12 +1278,80 @@ const SF = (() => {
       chips += `<rect x="${(mx - cw / 2).toFixed(1)}" y="${(my - 11).toFixed(1)}" width="${cw.toFixed(1)}" height="22" rx="11" style="fill:var(--sf-card);stroke:var(${x.col});stroke-opacity:.55"/>
         <text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" class="sf-c">${txt}</text>`;
     }
+    return idle + live + dots + chips;
+  }
+
+  const nf1 = v => Number(v).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const kwhTxt = v => v == null || isNaN(v) ? "" : nf1(v) + " kWh";
+  /* Kurznamen: gemeinsamen Anfang abschneiden („Anker Solix 4 HÜTTE“ und „… DACH“ -> „HÜTTE“, „DACH“) */
+  function shortNames(names) {
+    if (names.length < 2) return names.slice();
+    let p = names[0];
+    for (const n of names) { while (p && !n.startsWith(p)) p = p.slice(0, -1); }
+    p = p.replace(/\S*$/, "");                       // nur an Wortgrenzen kürzen
+    const cut = names.map(n => n.slice(p.length).trim());
+    return cut.every(c => c.length >= 3) ? cut : names.slice();
+  }
+  const clip = (t, n) => { t = String(t); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+
+  /* Mehrere Speicher: je Solaranlage und je Speicher eine Kachel */
+  function flowMulti(d, U) {
+    const f = d.f || {}, nb = U.length, th = TH;
+    const ps = U.filter(u => u.pv != null), names = shortNames(U.map(u => u.name));
+    const bx = 10, bw = 180, by0 = 112, step = 92;
+    const bottom = by0 + (nb - 1) * step + th, H = bottom + 34;
+    const hx = 275, hy = by0 + (nb - 1) * step, hm = hy + th / 2;
+    const gx = 470, gy = by0;
+    const two = ps.length >= 2, sw = 170;
+    const sunX = two ? [165, 365] : [hx - 10];           // Mitte bei 350
+    const sunN = two ? ps : [null];
+    const pvSum = ps.reduce((a, u) => a + Math.max(u.pv, 0), 0);
+    const disS = U.reduce((a, u) => a + Math.max(u.bat || 0, 0), 0);
+    const lines = [], tiles = [];
+    // Solar -> Haus je Solaranlage
+    sunN.forEach((u, i) => {
+      const x0 = sunX[i], cx = x0 + (two ? sw : 170) / 2, share = u ? (pvSum > 0 ? Math.max(u.pv, 0) / pvSum : 1 / ps.length) : 1;
+      lines.push({ pts: [[cx, 88], [cx, 88 + (hy - 88) * .45], [350, hy - (hy - 88) * .45], [350, hy]], col: "--sf-sun", val: f.sh == null ? null : f.sh * share });
+    });
+    // Solar -> Speicher (gesamt) zur Speicherspalte
+    lines.push({ pts: [[sunX[0], 50], [bx + bw / 2, 50], [bx + bw / 2, 80], [bx + bw / 2, by0]], col: "--sf-sun", val: f.sb });
+    // Speicher -> Haus je Speicher
+    U.forEach((u, i) => {
+      const ym = by0 + i * step + th / 2, share = disS > 0 ? Math.max(u.bat || 0, 0) / disS : 1 / nb;
+      lines.push({ pts: [[bx + bw, ym], [bx + bw + 42, ym], [hx - 42, hm], [hx, hm]], col: "--sf-bat", val: f.bh == null ? null : f.bh * share });
+    });
+    lines.push({ pts: [[gx + 75, gy + th], [gx + 75, hm], [gx - 10, hm], [hx + 150, hm]], col: "--sf-grid", val: f.gh });
+    sunN.forEach((u, i) => {
+      tiles.push(tile("sun", u ? "Solar " + esc(clip(names[U.indexOf(u)], 9)) : "Solar", wl(u ? u.pv : d.pv),
+        (u ? u.pv : d.pv) != null && (u ? u.pv : d.pv) < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), { x: sunX[i], y: 12, w: sw }));
+    });
+    U.forEach((u, i) => {
+      const soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null;
+      const sub = [soc != null ? soc + " %" : "", kwhTxt(u.kwh)].filter(Boolean).join(" · ");
+      tiles.push(tile("bat", esc(clip(names[i], 12)), u.bat == null ? "–" : wl(Math.abs(u.bat)), sub, "--sf-bat", ICON.bat("var(--sf-bat)", soc),
+        { x: bx, y: by0 + i * step, w: bw }));
+    });
+    const grid = d.grid == null ? 0 : d.grid;
+    tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), { x: gx, y: gy, w: TW }));
+    tiles.push(tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), { x: hx, y: hy, w: TW }));
+    // Linien zuerst, dann Kacheln (Chips liegen über den Linien, Kacheln darüber)
+    return `<svg viewBox="0 0 640 ${H}" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}${tiles.join("")}</svg>`;
+  }
+
+  /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}]} */
+  function flow(d) {
+    const U = (d.units || []).filter(u => u && u.name && u.soc != null && u.soc >= 0);
+    if (U.length > 1) return flowMulti(d, U);
+    const f = d.f || {};
+    const lines = Object.keys(L).map(k => ({ pts: L[k].pts, col: L[k].col, val: f[k] }));
     const bat = d.bat, grid = d.grid == null ? 0 : d.grid, soc = d.soc != null && d.soc >= 0 ? Math.round(d.soc) : null;
     const batSub = bat == null ? "" : bat >= 5 ? "gibt ab" : bat <= -5 ? "lädt" : "ruht";
     const gridSub = grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen";
-    return `<svg viewBox="0 0 640 340" role="img" aria-label="Energiefluss">${CSS}${idle}${live}${dots}${chips}
+    const kw = kwhTxt(d.kwh);
+    const socPart = soc != null ? soc + " %" + (kw ? " · " + kw : "") : kw;
+    return `<svg viewBox="0 0 640 340" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}
       ${tile("sun", "Solar", wl(d.pv), d.pv != null && d.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"))}
-      ${tile("bat", "Speicher", bat == null ? "–" : wl(Math.abs(bat)), batSub ? batSub + (soc != null ? " · " + soc + " %" : "") : (soc != null ? soc + " %" : ""), "--sf-bat", ICON.bat("var(--sf-bat)", soc))}
+      ${tile("bat", "Speicher", bat == null ? "–" : wl(Math.abs(bat)), batSub ? batSub + (socPart ? " · " + socPart : "") : socPart, "--sf-bat", ICON.bat("var(--sf-bat)", soc))}
       ${tile("grid", "Netz", wl(Math.abs(grid)), gridSub, "--sf-grid", ICON.grid("var(--sf-grid)"))}
       ${tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"))}
     </svg>`;
@@ -1291,7 +1359,7 @@ const SF = (() => {
 
   /* Überschrift aus den Flüssen; ohne Flüsse aus dem Sollwert. d: {f, grid, soc, target} */
   function headline(d) {
-    const f = d.f, s = d.soc != null && d.soc >= 0 ? ` · mittlerer Ladestand ${Math.round(d.soc)} %` : "";
+    const f = d.f, s = d.soc != null && d.soc >= 0 ? ` · mittlerer Ladestand ${Math.round(d.soc)} %` + (d.cap ? ` (${nf1(d.kwh)} von ${Number(d.cap).toLocaleString("de-DE", { maximumFractionDigits: 1 })} kWh)` : "") : "";
     const g = d.grid == null ? 0 : d.grid;
     const gs = Math.abs(g) < 30 ? "Netzbezug nahe null" : g > 0 ? `Netzbezug ${fmt(g)} W` : `Einspeisung ${fmt(-g)} W`;
     if (f) {
@@ -1324,19 +1392,21 @@ const SF = (() => {
 
   /* d: {t:[Sekunden]|null, pv:[W], house:[W]}; Werte im Abstand von 5 Minuten, das letzte ist „jetzt“ */
   function trend(d) {
-    const pv = d.pv || [], hs = d.house || [], n = Math.max(pv.length, hs.length);
+    const pv = d.pv || [], hs = d.house || [], bt = d.bat || [], n = Math.max(pv.length, hs.length);
     if (n < 3) return "";
     const end = Date.now() / 1000;
     const ts = d.t && d.t.length === n ? d.t : Array.from({ length: n }, (_, i) => end - (n - 1 - i) * 300);
     const t1 = Math.max(ts[n - 1], ts[0] + 600), t0 = Math.max(ts[0], t1 - 86400);
     const X0 = 44, X1 = 626, Y0 = 18, Y1 = 150;
-    const all = [...pv, ...hs].filter(v => v != null);
+    const hasBat = bt.some(v => v != null && v > 5);
+    const comb = pv.map((v, i) => (v || 0) + (bt[i] || 0));
+    const all = [...pv, ...hs, ...(hasBat ? comb : [])].filter(v => v != null);
     const mx = Math.max(...all, 100);
     const step = [250, 500, 1000, 2000, 2500, 5000, 10000].find(s => mx / s <= 3.2) || 10000;
     const top = Math.ceil(mx / step) * step;
     const X = t => X0 + (t - t0) / (t1 - t0) * (X1 - X0), Y = v => Y1 - Math.min(v, top) / top * (Y1 - Y0);
     const pts = arr => { const o = []; let last = 0; for (let i = 0; i < n; i++) { if (ts[i] < t0) continue; if (arr[i] != null) last = arr[i]; o.push([X(ts[i]), Y(last)]); } return o; };
-    const P = pts(pv), H = pts(hs);
+    const P = pts(pv), H = pts(hs), BT = hasBat ? pts(comb) : null;
     let grid = "";
     for (let v = 0; v <= top; v += step) {
       const y = Y(v).toFixed(1), lab = v === 0 ? "0" : v >= 1000 ? (v / 1000).toLocaleString("de-DE") + "k" : String(v);
@@ -1353,13 +1423,16 @@ const SF = (() => {
     }
     const area = P.length > 1 ? `${smooth(P, Y1)}L${P[P.length - 1][0].toFixed(1)} ${Y1}L${P[0][0].toFixed(1)} ${Y1}Z` : "";
     const nowP = P[P.length - 1];
-    return `<svg viewBox="0 0 640 196" role="img" aria-label="Verlauf der letzten Stunden: Solar und Haus">${CSS}${grid}${ticks}
+    const batArea = BT && BT.length > 1 ? `${smooth(BT, Y1)}${smooth([...P].reverse(), Y1).replace(/^M/, "L")}Z` : "";
+    return `<svg viewBox="0 0 640 196" role="img" aria-label="Verlauf der letzten Stunden: Solar, Speicher und Haus">${CSS}${grid}${ticks}
+      ${batArea ? `<path d="${batArea}" style="fill:var(--sf-bat);fill-opacity:.28;stroke:var(--sf-bat);stroke-opacity:.7;stroke-width:1.2"/>` : ""}
       <path d="${area}" style="fill:var(--sf-sun);fill-opacity:.2;stroke:none"/>
       <path d="${smooth(P, Y1)}" class="sf-o" style="stroke:var(--sf-sun);stroke-width:2.4;stroke-linejoin:round"/>
       <path d="${smooth(H, Y1)}" class="sf-o" style="stroke:var(--sf-home);stroke-width:2.4;stroke-linejoin:round"/>
       <circle cx="${nowP[0].toFixed(1)}" cy="${nowP[1].toFixed(1)}" r="4.5" style="fill:var(--sf-sun);stroke:var(--sf-card);stroke-width:2"/>
       <g transform="translate(${X0} 186)"><circle cx="5" cy="-4" r="5" style="fill:var(--sf-sun)"/><text x="16" y="0" class="sf-c">Solar</text>
-      <circle cx="78" cy="-4" r="5" style="fill:var(--sf-home)"/><text x="89" y="0" class="sf-c">Haus</text></g></svg>`;
+      <circle cx="78" cy="-4" r="5" style="fill:var(--sf-home)"/><text x="89" y="0" class="sf-c">Haus</text>
+      ${batArea ? `<circle cx="140" cy="-4" r="5" style="fill:var(--sf-bat)"/><text x="151" y="0" class="sf-c">aus Speichern</text>` : ""}</g></svg>`;
   }
 
 
@@ -1454,7 +1527,8 @@ const SF = (() => {
 /*FLOW-END*/
 function flowData(s){
   const f=s.flows;
-  return {pv:s.pv_w,house:s.house_w,bat:s.bat_w,grid:s.grid_w,soc:s.avg_soc,target:s.t_target,
+  return {pv:s.pv_w,house:s.house_w,bat:s.bat_w,grid:s.grid_w,soc:s.avg_soc,target:s.t_target,kwh:s.kwh,cap:s.cap_kwh,
+    units:(s.units||[]).map(u=>({name:u.name,soc:u.soc,kwh:u.kwh,pv:u.pv,bat:u.bat})),
     f:f?{sh:f.solar_house,sb:f.solar_battery,bh:f.battery_house,gh:f.grid_house}:null};
 }
 function flowSVG(s){return SF.flow(flowData(s))}
@@ -1586,7 +1660,7 @@ function renderStatus(s){
   s.units.forEach(u=>{
     const soc=u.soc<0?null:u.soc;
     un+=`<div class="urow"><div class="bat">${battery(soc)}</div><b>${esc(u.name)}</b><span class="w">${u.real} W</span>
-      <span class="sub">${soc==null?"":soc+" % geladen · "}${esc(dirTxt(u.dir))} ${u.real} W${u.pv!=null?` · Solar ${u.pv} W`:""}</span>
+      <span class="sub">${soc==null?"":soc+" % geladen"+(u.kwh!=null?` (${u.kwh.toLocaleString("de-DE",{maximumFractionDigits:1})} von ${u.cap.toLocaleString("de-DE",{maximumFractionDigits:1})} kWh)`:"")+" · "}${u.obs?"beobachtet · ":""}${esc(dirTxt(u.dir))} ${u.real} W${u.pv!=null?` · Solar ${u.pv} W`:""}</span>
       <span class="pills2">${u.available?'<span class="tag ok">bereit</span>':'<span class="tag warn">Leistung nicht verfügbar</span>'}${s.dry_run?'<span class="tag test">Test</span>':''}${u.force?'<span class="tag test">Abregelung (voll)</span>':''}<span class="tag">${esc(modeTxt(u.mode))}</span></span>
       <details class="udet"><summary>Technische Details</summary><dl><dt>Eingestellt</dt><dd>${u.set} W</dd><dt>Neu</dt><dd>${u.plan} W</dd><dt>Richtung</dt><dd>${esc(u.dir||"–")}</dd><dt>Modus</dt><dd>${esc(u.mode||"–")}</dd></dl></details></div>`;});
   B.units=un+`</div>`;
