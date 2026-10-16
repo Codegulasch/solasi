@@ -21,6 +21,46 @@
  */
 (() => {
   const VERSION = "__VERSION__";
+
+  /* Scroll-Wächter: Springt die Seite ohne Eingabe weit nach oben und landet dabei am unteren Ende (der Browser
+     begrenzt die Position, weil die Seite kurz niedriger wurde), wird die alte Position zurückgeholt, sobald die
+     Seite wieder wächst. Gemeinsam für alle Karten, läuft nur einmal je Seite. */
+  (() => {
+    if (window.__kwScrollGuard) return;
+    window.__kwScrollGuard = true;
+    let input = 0;
+    const last = new WeakMap(), hooked = new WeakSet();
+    const scrollerOf = t => (t === document || t === window || !t || t === document.documentElement || t === document.body) ? document.scrollingElement : t;
+    const restore = (el, want) => {
+      const t0 = Date.now(), seen = input;
+      const step = () => {
+        if (input !== seen || Date.now() - t0 > 2500) return;       // Nutzer greift ein oder zu lange her
+        if (el.scrollTop < want - 1) { el.scrollTop = want; requestAnimationFrame(step); }
+        else last.set(el, el.scrollTop);
+      };
+      requestAnimationFrame(step);
+    };
+    const onScroll = ev => {
+      const el = scrollerOf(ev.target);
+      if (!el) return;
+      const y = el.scrollTop, prev = last.get(el) || 0, max = el.scrollHeight - el.clientHeight;
+      if (Date.now() - input > 400 && prev - y > 120 && y >= max - 3) restore(el, prev);
+      else last.set(el, y);
+    };
+    const hook = el => { if (el && !hooked.has(el)) { hooked.add(el); el.addEventListener("scroll", onScroll, { passive: true }); last.set(el, el.scrollTop); } };
+    hook(window);
+    addEventListener("scroll", onScroll, { passive: true, capture: true });
+    ["wheel", "touchstart", "touchmove", "touchend", "keydown", "pointerdown", "mousedown"].forEach(n =>
+      addEventListener(n, ev => {
+        input = Date.now();
+        for (const n2 of (ev.composedPath ? ev.composedPath() : [])) {      // Scroll-Container auch in Shadow-DOMs finden
+          if (n2 && n2.nodeType === 1 && n2.scrollHeight > n2.clientHeight + 4) {
+            const o = getComputedStyle(n2).overflowY;
+            if (o === "auto" || o === "scroll") { hook(n2); break; }
+          }
+        }
+      }, { passive: true, capture: true }));
+  })();
   const W = v => (v == null || isNaN(v)) ? "–" : `${Math.round(v)} W`;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   let lastScrollAt = 0;
@@ -45,6 +85,7 @@
       --sf-card:var(--ha-card-background,var(--card-background-color,#fff));--sf-fg:var(--primary-text-color);--sf-muted:var(--secondary-text-color);
       --sf-line:var(--divider-color,#ddd);--sf-sun:var(--sc-sun);--sf-bat:var(--sc-bat);--sf-grid:var(--sc-grid);--sf-home:var(--sc-home);
       --sf-ok:var(--sc-ok);--sf-warn:var(--sc-warn);--sf-bad:var(--sc-bad)}
+    .stale{opacity:.55}
     .head{display:flex;align-items:center;gap:8px;margin-bottom:2px}
     .head .t{font-size:16px;font-weight:600;color:var(--primary-text-color)}
     .pill{margin-left:auto;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;
@@ -415,9 +456,9 @@ const SF = (() => {
       if (!this._hass) {
         body = `<div class="msg">Lade …</div>`;
       } else if (!st) {
-        body = `<div class="msg">Entität <b>${esc(c.entity)}</b> nicht gefunden.<br>Läuft das SOLASI-Add-on?</div>`;
+        body = this._goodBody ? `<div class="stale">${this._goodBody}</div>` : `<div class="msg">Entität <b>${esc(c.entity)}</b> nicht gefunden.<br>Läuft das SOLASI-Add-on?</div>`;
       } else if (st.state === "unavailable" || st.state === "unknown") {
-        body = `<div class="msg">SOLASI ist gerade nicht erreichbar.</div>`;
+        body = this._goodBody ? `<div class="stale">${this._goodBody}</div>` : `<div class="msg">SOLASI ist gerade nicht erreichbar.</div>`;
       } else {
         const a = st.attributes || {};
         const [hl, sub] = headline(a, st.state);
@@ -453,6 +494,7 @@ const SF = (() => {
         body = compact ? `${c.show_headline ? `<div class="sub">${esc(hl)}</div>` : ""}${tiles}`
           : blockOrder(c.order).map(id => parts[id] || "").join("\n");
         ready = true;
+        this._goodBody = body;
         this._pill = pill;
       }
       const pill = st && this._pill && st.state !== "unavailable" ? `<span class="pill ${this._pill[1]}">${esc(this._pill[0])}</span>` : "";
@@ -475,11 +517,13 @@ const SF = (() => {
        die Karte wird nie kleiner als zuvor (gleiche Breite), und beim Laden gilt die zuletzt bekannte Höhe. */
     _paint(html, ready) {
       const root = this.shadowRoot;
-      const key = `sc-h:${this._cfg.entity}:${this._cfg.size}:${(this._cfg.order || []).join(",")}:${(this._cfg.meters_order || []).join(",")}`;
+      const vb = Math.round((window.innerWidth || 0) / 40);          // Breitenklasse des Fensters, auch vor dem ersten Layout bekannt
+      const key = `sc-h:${this._cfg.entity}:${this._cfg.size}:${(this._cfg.order || []).join(",")}:${(this._cfg.meters_order || []).join(",")}:${vb}`;
       const w = this.offsetWidth || 0;
-      if (this._hk !== key || (this._hw && w && Math.abs(this._hw - w) > 2)) { this._hk = key; this._minH = 0; }
-      if (!this._minH && !ready) {
-        try { const v = JSON.parse(localStorage.getItem(key) || "null"); if (v && v.w && Math.abs(v.w - w) <= 2) this._minH = v.h; } catch (e) { /* ohne Speicher */ }
+      if (this._hk !== key) { this._hk = key; this._minH = 0; }
+      if (this._hw && w && Math.abs(this._hw - w) > 2) this._minH = 0;
+      if (!this._minH) {
+        try { const v = JSON.parse(localStorage.getItem(key) || "null"); if (v && v.h > 60 && v.h < 3000) this._minH = v.h; } catch (e) { /* ohne Speicher */ }
       }
       const full = `${html}<!--${this._minH || 0}-->`;
       if (full === this._last) return;

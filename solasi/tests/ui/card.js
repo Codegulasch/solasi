@@ -139,4 +139,5 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  el6.shadowRoot.querySelector('[data-tile="day"]').click();
  ok(navd===1,"Tipp auf Tagesverbrauch öffnet das Add-on");
  ok(el6.getCardSize()>=3,"getCardSize liefert eine Zahl");}
+ok(w.__kwScrollGuard===true,"Scroll-Wächter ist aktiv");
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));
