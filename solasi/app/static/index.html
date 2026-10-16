@@ -1294,6 +1294,37 @@ const SF = (() => {
   }
   const clip = (t, n) => { t = String(t); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 
+  /* Zwei Anlagen: links und rechts je ein Paar aus Solar und Speicher, in der Mitte Netz und Haus.
+     Jede Solaranlage lädt ihren eigenen Speicher und versorgt das Haus. */
+  function flowPairs(d, U) {
+    const names = shortNames(U.map(u => u.name)), th = TH, w = 170;
+    const cx = [10, 460];
+    const nx = 245, ny = 12, hx = 245, hy = 244, H = hy + th + 24;
+    const sy = 12, by = 126;
+    const lines = [], tiles = [];
+    U.forEach((u, i) => {
+      const x = cx[i], c = x + w / 2, left = i === 0;
+      const pv = u.pv == null ? null : Math.max(u.pv, 0), bat = u.bat == null ? 0 : u.bat;
+      const chg = Math.max(-bat, 0), dis = Math.max(bat, 0);
+      const toHouse = pv == null ? null : Math.max(pv - chg, 0);
+      const ex = left ? x + w : x;                       // Seite zur Mitte
+      const mid = left ? ex + 33 : ex - 33, hin = left ? hx : hx + TW;
+      lines.push({ pts: [[c, sy + th], [c, sy + th + 13], [c, by - 13], [c, by]], col: "--sf-sun", val: pv == null ? null : chg });
+      lines.push({ pts: [[ex, sy + 38], [mid, sy + 38], [mid, hy + 24], [hin, hy + 24]], col: "--sf-sun", val: toHouse });
+      lines.push({ pts: [[c, by + th], [c, hy + 52], [left ? ex + 25 : ex - 25, hy + 52], [hin, hy + 52]], col: "--sf-bat", val: dis });
+      const soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null;
+      const sub = [soc != null ? soc + " %" : "", kwhTxt(u.kwh)].filter(Boolean).join(" · ");
+      tiles.push(tile("sun", "Solar " + esc(clip(names[i], 9)), wl(u.pv), u.pv != null && u.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), { x, y: sy, w }));
+      tiles.push(tile("bat", esc(clip(names[i], 12)), u.bat == null ? "–" : wl(Math.abs(u.bat)), sub,
+        "--sf-bat", ICON.bat("var(--sf-bat)", soc), { x, y: by, w }));
+    });
+    const grid = d.grid == null ? 0 : d.grid;
+    lines.push({ pts: [[nx + TW / 2, ny + th], [nx + TW / 2, ny + th + 50], [nx + TW / 2, hy - 50], [nx + TW / 2, hy]], col: "--sf-grid", val: d.f ? d.f.gh : grid });
+    tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), { x: nx, y: ny, w: TW }));
+    tiles.push(tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), { x: hx, y: hy, w: TW }));
+    return `<svg viewBox="0 0 640 ${H}" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}${tiles.join("")}</svg>`;
+  }
+
   /* Mehrere Speicher: je Solaranlage und je Speicher eine Kachel */
   function flowMulti(d, U) {
     const f = d.f || {}, nb = U.length, th = TH;
@@ -1341,7 +1372,8 @@ const SF = (() => {
   /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}]} */
   function flow(d) {
     const U = (d.units || []).filter(u => u && u.name && u.soc != null && u.soc >= 0);
-    if (U.length > 1) return flowMulti(d, U);
+    if (U.length === 2) return flowPairs(d, U);
+    if (U.length > 2) return flowMulti(d, U);
     const f = d.f || {};
     const lines = Object.keys(L).map(k => ({ pts: L[k].pts, col: L[k].col, val: f[k] }));
     const bat = d.bat, grid = d.grid == null ? 0 : d.grid, soc = d.soc != null && d.soc >= 0 ? Math.round(d.soc) : null;

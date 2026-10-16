@@ -1,5 +1,7 @@
 # Änderungen
 
+## 1.4.1
+- **Energiefluss bei zwei Anlagen:** Jede Solaranlage steht jetzt mit ihrem eigenen Speicher als Paar da (HÜTTE links, DACH rechts, Netz und Haus in der Mitte). Je Anlage gibt es drei Linien: Solar → eigener Speicher (Ladeleistung), Solar → Haus und Speicher → Haus. Vorher gab es nur eine Sammellinie „Solar → Speicher“, die immer beim ersten Speicher endete.
 ## 1.4.0
 - **Gesamt-Ladestand nach Kapazität:** Der „mittlere Ladestand“ ist jetzt nach der nutzbaren Kapazität der Speicher gewichtet (bisher einfacher Durchschnitt) und steht zusätzlich in kWh („6,2 von 15 kWh“). Die Kapazität trägst du je Speicher unter *Einrichtung* ein (zum Beispiel 5 und 10). Vorher stand sie nur im Experten-Modus.
 - **Energiefluss mit zwei Anlagen:** Bei zwei Speichern zeigt der Energiefluss jede Solaranlage und jeden Speicher als eigene Kachel, mit Leistung, Ladestand und kWh. Das Design bleibt unverändert. Mit nur einem Speicher sieht alles aus wie bisher.

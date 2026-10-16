@@ -148,6 +148,8 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  const e2=mk({},st("Entladen",a2)),sv=e2.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent;
  ok(sv.includes("HÜTTE")&&sv.includes("DACH")&&!sv.includes("ANKER")&&sv.includes("14 % · 0,7 kWh")&&sv.includes("55 % · 5,5 kWh"),"Zwei Speicher: Kurznamen, Ladestand und kWh je Speicher");
  ok(sv.includes("Solar HÜTTE")&&sv.includes("Solar DACH"),"Zwei Solarkacheln");
+ { const ch=FH.chips(e2.shadowRoot.querySelector('svg[aria-label="Energiefluss"]'));
+   ok(["10 W","20 W","800 W","770 W","1.093 W"].every(c=>ch.includes(c)),"Paar-Ansicht: je Anlage Solar->Haus und Speicher->Haus, Netz->Haus"); }
  const hl=e2.shadowRoot.querySelector(".headline");ok(e2.shadowRoot.textContent.includes("6,2 von 15 kWh"),"Gesamt-Ladestand mit kWh");
  ok(e2.shadowRoot.querySelector('svg[aria-label^="Verlauf"]').textContent.includes("aus Speichern"),"Verlauf zeigt die Abgabe der Speicher");
  ok(e2.shadowRoot.textContent.includes("5,5 von 10 kWh"),"Speicherliste mit kWh");
