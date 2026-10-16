@@ -129,4 +129,14 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  let g5=null;e5.addEventListener("config-changed",e=>g5=e.detail.config);
  e5.querySelector('button[data-tk="pv"][data-mv="1"]').click();
  ok(g5&&g5.meters_order&&g5.meters_order.join()==="m:sensor.w1,pv,day,m:sensor.w2,imp","Editor: Zählerkachel verschieben");}
+// ---- Tipp auf Zählerkachel ----
+{const a6=JSON.parse(JSON.stringify(attrs));a6.meters=[{entity:"sensor.w1",name:"Wasser Haus",value:5,dec:1,unit:"m³",icon:"wasser",color:"water",day:0.1}];
+ const el6=w.document.createElement("solasi-card");w.document.body.appendChild(el6);el6.setConfig({});
+ el6.hass={states:{...st("Entladen",{...a6,addon_slug:"abc_solasi"}),"sensor.w1":{state:"5",attributes:{}}}};
+ let mi=null,navd=0;el6.addEventListener("hass-more-info",e=>mi=e.detail.entityId);w.addEventListener("location-changed",()=>navd++);
+ el6.shadowRoot.querySelector('[data-tile="m:sensor.w1"]').click();
+ ok(mi==="sensor.w1"&&navd===0,"Tipp auf Zählerkachel öffnet den Verlauf des Zählers in HA (nicht das Add-on)");
+ el6.shadowRoot.querySelector('[data-tile="day"]').click();
+ ok(navd===1,"Tipp auf Tagesverbrauch öffnet das Add-on");
+ ok(el6.getCardSize()>=3,"getCardSize liefert eine Zahl");}
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

@@ -179,7 +179,7 @@ const SF = (() => {
     .sfm.even{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
     .sfm.big{grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr)}
     .sfm-r{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
-    .sfm-t{display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-radius:14px;padding:12px 14px;min-width:0;background:var(--sf-tile,rgba(128,128,128,.12))}
+    .sfm-t{cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-radius:14px;padding:12px 14px;min-width:0;background:var(--sf-tile,rgba(128,128,128,.12))}
     .sfm-h{display:grid}
     .sfm-h .sfm-t{justify-content:center;gap:8px;padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--sf-sun) 18%,var(--sf-tile,transparent)),var(--sf-tile,transparent) 85%)}
     .sfm-hd{display:flex;align-items:center;gap:9px;min-width:0;width:100%}
@@ -239,12 +239,12 @@ const SF = (() => {
     const first = seq[0];
     const hero = first.hero ? first : null;
     const tiles = hero ? seq.slice(1) : seq;
-    const tile = x => `<div class="sfm-t" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
+    const tile = x => `<div class="sfm-t" data-tile="${esc(x.k)}" role="button" tabindex="0" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
       <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
     if (hero && tiles.length && d.layout !== "even")
       return `${MCSS}<div class="sfm-w"><div class="sfm big"><div class="sfm-h">${tile(hero)}</div><div class="sfm-r">${tiles.map(tile).join("")}</div></div></div>`;
     return `${MCSS}<div class="sfm-w"><div class="sfm even">${(hero ? [hero, ...tiles] : tiles).map(x => x === hero ? `<div class="sfm-h">${tile(x)}</div>` : tile(x)).join("")}</div></div>`;
   }
 
-  return { flow, trend, headline, wl, meters };
+  return { flow, trend, headline, wl, meters, isWater };
 })();

@@ -91,3 +91,25 @@ def test_version_kommt_aus_config_yaml(monkeypatch):
     assert v and v != "dev" and v[0].isdigit()
     monkeypatch.setenv("SOLASI_VERSION", "9.9.9")
     assert appmain.read_version() == "9.9.9"
+
+
+@pytest.mark.asyncio
+async def test_meter_history(tmp_path):
+    store = ConfigStore(str(tmp_path / "m.json"))
+    store.cfg["meters"]["items"] = [{"entity": "sensor.wasser", "name": "W"}]
+    ctrl = Controller(None, store); ha = HA("ws://x", "t"); ctrl.ha = ha
+    ha.states = {"sensor.wasser": {"entity_id": "sensor.wasser", "state": "5", "attributes": {"friendly_name": "Wasser", "unit_of_measurement": "m³"}}}
+    calls = []
+
+    async def fake_call(payload, timeout=15):
+        calls.append(payload["type"])
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).timestamp() * 1000
+        return {"sensor.wasser": [{"start": now - 3600_000, "change": 0.25}]}
+    ha.call = fake_call
+    async with TestClient(TestServer(appmain.build_app(ctrl, store, ha))) as c:
+        r = await (await c.get("/api/meter_history?entity=sensor.wasser&days=7")).json()
+        assert r["ok"] and r["unit"] == "m³" and len(r["days"]) == 7 and r["source"] == "statistik"
+        assert any(d["value"] for d in r["days"]) and calls == ["recorder/statistics_during_period"]
+        bad = await c.get("/api/meter_history?entity=sensor.fremd")
+        assert bad.status == 400

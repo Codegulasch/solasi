@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 
+import meterhist
 import replay
 import selfcheck
 from controller import Controller, ConfigStore
@@ -156,6 +157,40 @@ def build_app(ctrl, store, ha):
     @routes.get("/api/selfcheck")
     async def selfcheck_api(_):
         return web.json_response({**selfcheck.run(store.cfg, ha, ctrl), "curtail": ctrl.curtail})
+
+    @routes.get("/api/meter_history")
+    async def meter_history(request):
+        eid = request.query.get("entity", "")
+        known = [i.get("entity") for i in (store.cfg.get("meters") or {}).get("items", [])]
+        if eid not in known:
+            return web.json_response({"ok": False, "error": "Unbekannter Zähler"}, status=400)
+        try:
+            days = max(1, min(int(request.query.get("days", 30)), 120))
+        except ValueError:
+            days = 30
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=days + 1)
+        daily, source = {}, ""
+        try:
+            res = await ha.call({"type": "recorder/statistics_during_period", "start_time": start.isoformat(),
+                                 "end_time": end.isoformat(), "statistic_ids": [eid], "period": "hour",
+                                 "types": ["change"]}, timeout=40)
+            daily = meterhist.daily_from_stats((res or {}).get(eid))
+            source = "statistik"
+        except Exception:  # noqa: BLE001
+            daily = {}
+        if not daily:
+            try:
+                raw = await ha.history([eid], start, end)
+                daily = meterhist.daily_from_history(replay.parse_history(raw).get(eid))
+                source = "verlauf"
+            except Exception as e:  # noqa: BLE001
+                return web.json_response({"ok": False, "error": f"Kein Verlauf verfügbar ({e})"}, status=502)
+        st = ha.states.get(eid) or {}
+        at = st.get("attributes") or {}
+        return web.json_response({"ok": True, "entity": eid, "unit": at.get("unit_of_measurement") or "",
+                                  "name": at.get("friendly_name") or eid, "source": source,
+                                  "days": meterhist.fill(daily, days)})
 
     @routes.get("/api/stats")
     async def stats_api(request):

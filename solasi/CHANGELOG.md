@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.3.2
+- **Statistik je Kachel:** Antippen einer Kachel in der Übersicht öffnet eine eigene Seite mit Verlauf (7, 30 oder 90 Tage), Summe, Durchschnitt und höchstem Tag. Zähler holen die Tageswerte aus der Langzeitstatistik von Home Assistant, ersatzweise aus dem Recorder-Verlauf; Wasser steht in Litern. Tagesverbrauch, Solarertrag und Netzbezug nutzen die SOLASI-Statistik.
+- **Karte:** Antippen einer Zählerkachel öffnet Verlauf und Statistik des Zählers in Home Assistant, alle anderen Kacheln öffnen weiter SOLASI.
+- **Gegen das Springen:** jeder Block der Übersicht wird nie niedriger als zuvor (bei gleicher Breite), sodass die Seite nicht schrumpft und der Browser die Scrollposition nicht verschiebt. Die Karte meldet Home Assistant ihre echte Höhe (`getCardSize`), damit das Dashboard-Layout nicht nachträglich nachrückt.
+- **Sprung-Diagnose:** unter *Einstellungen → Darstellung* einschaltbar. Blendet unten links ein, wenn die Seite ohne Eingabe nach oben springt oder sich Elemente verschieben, und nennt die Ursache. Gedacht, um einen hartnäckigen Sprung gezielt zu finden.
 ## 1.3.1
 - **Zählerkacheln anordnen:** unter *Betrieb → Zähler → Reihenfolge der Kacheln* (Tagesverbrauch, jeder Zähler, Solarertrag, Netzbezug). In der Karte gilt dieselbe Reihenfolge, oder eine eigene mit `meters_order` (im Editor mit Pfeilen). Steht der Tagesverbrauch ganz oben, bleibt er die große Kachel.
 ## 1.3.0

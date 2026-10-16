@@ -214,9 +214,15 @@ Unter *Betrieb → Zähler* zeigst du weitere Zähler aus Home Assistant in SOLA
 - **Solarertrag und Netzbezug heute** lassen sich als weitere Kacheln dazuschalten.
 - **Reihenfolge:** auf derselben Seite ordnest du alle Kacheln mit Pfeilen an. Die Karte übernimmt sie; mit `meters_order` (z. B. `[day, "m:sensor.wasser", pv, imp]`) bekommt eine Karte eine eigene Reihenfolge, im Editor mit Pfeilen. Steht der Tagesverbrauch an erster Stelle, wird er groß dargestellt, sonst sind alle Kacheln gleich groß.
 
+## Statistik einer Kachel
+
+Tippe in der Übersicht auf eine Kachel (Tagesverbrauch, Zähler, Solarertrag, Netzbezug), um deren Verlauf zu sehen: Balken je Tag für 7, 30 oder 90 Tage, dazu Summe, Durchschnitt und höchster Tag. Bei Zählern liest SOLASI die Tageswerte aus der Langzeitstatistik von Home Assistant; hat der Sensor keine (er braucht `state_class: total_increasing`), wird der Recorder-Verlauf ausgewertet. Wasserzähler zeigen Liter. In der Dashboard-Karte öffnet das Antippen einer Zählerkachel stattdessen Verlauf und Statistik des Zählers in Home Assistant.
+
 ## Blöcke anordnen
 
-Unter *Einstellungen → Darstellung → Anordnung* legst du die Reihenfolge der Blöcke in **Übersicht** (Kennzahlen, Zähler, Energiefluss, Verlauf, Speicher, Überschuss, Protokoll) und **Statistik** (Zeitraum, Kennzahlen, Diagramm) fest. Mit den Pfeilen verschiebst du einen Block, mit dem Haken blendest du ihn aus. Die Anordnung wird mit *Speichern* abgelegt und gilt auf allen Geräten. *Standard wiederherstellen* setzt sie zurück. Auf breiten Bildschirmen verteilt SOLASI die Blöcke in der gewählten Reihenfolge auf zwei Spalten, am Handy stehen sie untereinander.
+Unter *Einstellungen → Darstellung → Anordnung* legst du die Reihenfolge der Blöcke in **Übersicht** (Kennzahlen, Zähler, Energiefluss, Verlauf, Speicher, Überschuss, Protokoll) und **Statistik** (Zeitraum, Kennzahlen, Diagramm) fest. Mit den Pfeilen verschiebst du einen Block, mit dem Haken blendest du ihn aus. Die Anordnung wird mit *Speichern* abgelegt und gilt auf allen Geräten. *Standard wiederherstellen* setzt sie zurück. Falls die Seite beim Scrollen von allein springt: *Einstellungen → Darstellung → Sprung-Diagnose* einschalten, dann erscheint unten links, was sich verschiebt.
+
+Auf breiten Bildschirmen verteilt SOLASI die Blöcke in der gewählten Reihenfolge auf zwei Spalten, am Handy stehen sie untereinander.
 
 ## Dashboard-Karte
 

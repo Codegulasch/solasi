@@ -23,6 +23,7 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
         items:[{area:"Zähler",item:"Netzleistung",status:"warn",text:"sensor.g liefert kW statt W",hint:"Einheit umrechnen"},{area:"Speicher A",item:"Modus-Option",status:"error",text:"nicht vorhanden",hint:""},{area:"Verbindung",item:"Home Assistant",status:"ok",text:"verbunden",hint:""}]}),
       "api/stats":()=>({days:[{date:"2026-10-03",pv:10,house:12,imp:4,exp:2,bat_dis:3,bat_chg:4,autarky:.66,selfcons:.8},{date:"2026-10-04",pv:8,house:11,imp:5,exp:1,bat_dis:2,bat_chg:3,autarky:.55,selfcons:.9}],
         total:{pv:18,house:23,imp:9,exp:3,bat_dis:5,bat_chg:7,autarky:.61,selfcons:.83,saved_eur:4.9,battery_eur:1.75,feedin_eur:.24}}),
+      "api/meter_history":()=>({ok:true,entity:"sensor.wh",unit:"m³",name:"Wasserzähler Haus",source:"statistik",days:[{date:"2026-10-14",value:0.2},{date:"2026-10-15",value:0.15},{date:"2026-10-16",value:null},{date:"2026-10-17",value:0.18}]}),
       "api/kill":()=>{calls.push("kill");status.safety={state:"stopped",reason:"Von Hand gestoppt",since:"04.10. 12:00:00"};return {ok:true}},
       "api/resume":()=>{calls.push("resume");status.safety={state:"active",reason:"",since:null};return {ok:true}},
       "api/entity_options":()=>({options:["third_party_control","self_consumption"]}),
@@ -312,5 +313,29 @@ const w=dom.window,d=w.document;
   const nm=[...d.querySelectorAll("#p-status .sfm-n")].map(n=>n.textContent);
   ok(nm[0]==="Wasserzähler Haus"||nm.length>0,"Übersicht übernimmt die Reihenfolge");
   cfg.meters.order=[];}
+
+ // ---- Statistik je Kachel ----
+ {w.showPage("status");w.renderStatus(status);
+  const tiles=[...d.querySelectorAll("#p-status [data-tile]")].map(t=>t.dataset.tile);
+  ok(tiles.includes("day")&&tiles.includes("m:sensor.wh"),"Kacheln tragen ihren Schlüssel");
+  d.querySelector('#p-status [data-tile="m:sensor.wh"]').click();
+  await new Promise(r=>setTimeout(r,200));
+  const pt=d.querySelector("#p-tile");
+  ok(d.querySelector("#p-tile").classList.contains("act")&&pt.textContent.includes("Wasserzähler Haus"),"Klick auf Wasserkachel öffnet deren Statistik");
+  ok(pt.textContent.includes("150 l")&&pt.textContent.includes("Höchster Tag")&&pt.textContent.includes("200 l"),"Wasser-Statistik in Litern, höchster Tag 200 l");
+  ok(pt.querySelectorAll("svg.chart rect").length>=3,"Balkendiagramm gezeichnet");
+  pt.querySelector('[data-tdays="7"]').click();await new Promise(r=>setTimeout(r,150));
+  ok(d.querySelector("#p-tile").textContent.includes("Zeitraum"),"Zeitraum umschaltbar");
+  pt.querySelector("#tile_back").click();
+  ok(d.querySelector("#p-status").classList.contains("act"),"Zurück zur Übersicht");
+  w.renderStatus(status);
+  d.querySelector('#p-status [data-tile="day"]').click();await new Promise(r=>setTimeout(r,200));
+  ok(d.querySelector("#p-tile").textContent.includes("Tagesverbrauch")&&d.querySelector("#p-tile").textContent.includes("kWh"),"Tagesverbrauch-Kachel zeigt Statistik in kWh");
+  w.showPage("status");}
+ {w.showPage("look");await new Promise(r=>setTimeout(r,80));
+  const cb=d.getElementById("look_dbg");cb.checked=true;cb.dispatchEvent(new w.Event("change"));
+  ok(w.eval("dbg.on")&&w.localStorage.getItem("solasi_debug")==="1","Sprung-Diagnose lässt sich einschalten");
+  cb.checked=false;cb.dispatchEvent(new w.Event("change"));ok(!w.eval("dbg.on"),"Sprung-Diagnose lässt sich ausschalten");
+  w.showPage("status");}
  process.exit(process.exitCode||0);
 })();

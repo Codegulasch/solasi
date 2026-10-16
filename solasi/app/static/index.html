@@ -299,6 +299,7 @@ body.dens-large{font-size:16.5px}
       <section class="page" id="p-extras"></section>
       <section class="page" id="p-look"></section>
       <section class="page" id="p-stats"></section>
+      <section class="page" id="p-tile"></section>
       <section class="page" id="p-replay"></section>
       <section class="page" id="p-selftest"></section>
       <section class="page" id="p-card"></section>
@@ -718,7 +719,7 @@ const NAVS=[["Betrieb",[["status","Übersicht"],["units","Speicher"],["surplus",
   ["Auswertung",[["stats","Statistik"],["replay","Replay"]]],
   ["System",[["selftest","Selbsttest"],["log","Protokoll"],["card","Dashboard-Karte"],["mqtt","Entitäten (MQTT)"]]]];
 const NAV_FOOT=[["setup","Einrichtung"],["control","Einstellungen"]];
-const TITLES={status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",stats:"Statistik",replay:"Replay",selftest:"Selbsttest",log:"Protokoll",
+const TITLES={tile:"Kachel-Statistik",status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",stats:"Statistik",replay:"Replay",selftest:"Selbsttest",log:"Protokoll",
   card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung"};
 const SET_SUB=[["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]];
 const SETTINGS_PAGES=["units","control","surplus","extras","meters","look"];
@@ -732,7 +733,7 @@ function renderNav(){
   $("#nav").innerHTML=h;
   $("#tabbar").innerHTML=TAB_ITEMS.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")+`<button type="button" id="moreBtn">${svgi("more")}Mehr</button>`;
 }
-function navActive(p){return SET_GROUP.includes(p)?"control":p}
+function navActive(p){return SET_GROUP.includes(p)?"control":p==="tile"?"status":p}
 function showPage(p){
   if(!document.getElementById("p-"+p))p="status";
   curPage=p;
@@ -751,6 +752,7 @@ function showPage(p){
   if(p==="mqtt")loadMqtt();
   if(p==="selftest")loadSelfcheck();
   if(p==="stats")loadStats();
+  if(p==="tile")loadTile();
   if(p==="replay")renderReplayForm();
   if(p==="setup")renderSetup();
   if(p==="look")renderLook();
@@ -768,6 +770,26 @@ $("#q_expert").addEventListener("change",e=>{expert=e.target.checked;try{localSt
   if(cfg)renderForms();toast(expert?"Experten-Modus an":"Experten-Modus aus");});
 renderNav();
 
+
+// ---------- Sprung-Diagnose (Einstellungen → Darstellung) ----------
+const dbg={on:false,log:[],input:0,y:0,box:null};
+function dbgNote(t){dbg.log.unshift(new Date().toLocaleTimeString("de-DE")+" "+t);dbg.log.length=Math.min(dbg.log.length,8);if(dbg.box)dbg.box.textContent=dbg.log.join("\n");}
+function dbgSet(on){
+  dbg.on=on;lookSet("debug",on?"1":"0");
+  if(on&&!dbg.box){
+    dbg.box=document.createElement("pre");
+    dbg.box.style.cssText="position:fixed;left:6px;bottom:70px;max-width:92vw;z-index:99;margin:0;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.8);color:#fff;font:11px/1.35 monospace;white-space:pre-wrap;pointer-events:none";
+    document.body.appendChild(dbg.box);dbgNote("Diagnose an");}
+  if(dbg.box)dbg.box.style.display=on?"block":"none";
+}
+["wheel","touchstart","touchmove","keydown","pointerdown","mousedown"].forEach(ev=>addEventListener(ev,()=>{dbg.input=Date.now()},{passive:true,capture:true}));
+addEventListener("scroll",()=>{
+  const y=scrollY;
+  if(dbg.on&&y<dbg.y-15&&Date.now()-dbg.input>150)dbgNote(`Sprung nach oben um ${Math.round(dbg.y-y)} px ohne Eingabe (y ${Math.round(dbg.y)}→${Math.round(y)})`);
+  dbg.y=y;},{passive:true});
+try{new PerformanceObserver(l=>{if(!dbg.on)return;for(const e of l.getEntries()){if(e.hadRecentInput||e.value<0.0005)continue;
+  dbgNote("Layout-Verschiebung "+e.value.toFixed(3)+" bei "+(e.sources||[]).map(s=>s.node?(s.node.id||(s.node.className&&String(s.node.className).slice(0,20))||s.node.nodeName):"?").join(", "));}}).observe({type:"layout-shift",buffered:false});}catch(e){}
+
 // ---------- Darstellung (gilt nur für dieses Gerät) ----------
 const LOOK_START=[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"],["selftest","Selbsttest"]];
 function lookGet(k,d){try{return localStorage.getItem("solasi_"+k)||d}catch(e){return d}}
@@ -778,6 +800,7 @@ function renderLook(){
   $("#p-look").innerHTML=`<details class="fsec" open><summary>Start und Aussehen <span class="sub">gilt nur für dieses Gerät</span></summary><div class="fbody">
     <div class="f"><label for="look_start">Startseite</label><div><select id="look_start">${LOOK_START.map(([k,l])=>`<option value="${k}" ${k===st?"selected":""}>${l}</option>`).join("")}</select></div><div class="hint">Diese Seite öffnet SOLASI beim Aufrufen.</div></div>
     <div class="f"><label>Dichte</label><div class="seg" id="look_dens" role="group" aria-label="Dichte">${[["compact","Kompakt"],["normal","Normal"],["large","Groß"]].map(([k,l])=>`<button type="button" data-d="${k}" aria-pressed="${k===d}">${l}</button>`).join("")}</div><div class="hint">Schriftgröße und Abstände.</div></div>
+    <div class="f"><label for="look_dbg">Sprung-Diagnose</label><div><input type="checkbox" id="look_dbg" ${lookGet("debug","0")==="1"?"checked":""}></div><div class="hint">Blendet unten links ein, wenn die Seite von allein springt oder sich verschiebt. Hilft bei der Fehlersuche; bitte den Text als Foto schicken.</div></div>
   </div></details>`;
   $("#p-look").insertAdjacentHTML("beforeend",
     [["status","Übersicht",STATUS_BLOCKS],["stats","Statistik",STATS_BLOCKS]].map(([k,t,bl])=>{
@@ -797,10 +820,11 @@ function renderLook(){
       const u=uiBlocks(k,bl),h=u.hidden.filter(x=>x!==c.dataset.show);if(!c.checked)h.push(c.dataset.show);store(u.full,h);});});
   $("#p-look").querySelectorAll("[data-reset]").forEach(b=>b.addEventListener("click",()=>{
     const k=b.dataset.reset;cfg.ui=cfg.ui||{};cfg.ui[k+"_order"]=[];cfg.ui[k+"_hidden"]=[];markDirty();renderLook();if(k==="status"&&lastStatus)renderStatus(lastStatus);}));
+  $("#look_dbg").addEventListener("change",e=>dbgSet(e.target.checked));
   $("#look_start").addEventListener("change",e=>{lookSet("start",e.target.value);toast("Startseite gespeichert")});
   $("#look_dens").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;lookSet("density",b.dataset.d);applyDensity();renderLook()});
 }
-applyDensity();
+applyDensity();dbgSet(lookGet("debug","0")==="1");
 
 // ---------- Diagramme ----------
 function niceStep(range,ticks=4){const raw=Math.max(range,1e-9)/ticks,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return(f<=1?1:f<=2?2:f<=5?5:10)*p}
@@ -817,7 +841,7 @@ function lineChart(series,{h=210,unit="W",title=""}={}){
   const legend=series.map((x,i)=>`<span class="lg"><i style="background:${x.color}"></i>${esc(x.name)}</span>`).join("");
   return `<div class="legend">${legend}<span class="sub">${esc(title)}</span></div><svg viewBox="0 0 ${W0} ${h}" class="chart" role="img">${g}${zero}${lines}<text x="${pl}" y="${h-4}" class="axis">Start</text><text x="${W0-pr}" y="${h-4}" text-anchor="end" class="axis">Ende</text></svg>`;
 }
-function barChart(days,keys,{h=200}={}){
+function barChart(days,keys,{h=200,unit="kWh"}={}){
   if(!days.length)return "";
   const W0=640,pl=40,pr=8,pt=8,pb=34,iw=W0-pl-pr,ih=h-pt-pb;
   const top=Math.max(1,...days.flatMap(d=>keys.map(k=>d[k.key]||0))),bst=niceStep(top),hi=Math.ceil(top/bst)*bst,bt=Math.max(1,Math.round(hi/bst));
@@ -826,10 +850,10 @@ function barChart(days,keys,{h=200}={}){
   for(let i=0;i<=bt;i++){const v=hi*i/bt,y=pt+(1-i/bt)*ih;g+=`<line x1="${pl}" x2="${W0-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-5}" y="${y+4}" text-anchor="end" class="axis">${bst<1?v.toFixed(1):Math.round(v)}</text>`;}
   let bars="";
   days.forEach((d,i)=>{const x0=pl+i*gw+(gw-bw*keys.length)/2;
-    keys.forEach((k,j)=>{const v=d[k.key]||0,bh=(v/hi)*ih;bars+=`<rect x="${x0+j*bw}" y="${pt+ih-bh}" width="${bw-1}" height="${bh}" rx="2" fill="${k.color}"><title>${d.date}: ${k.name} ${v} kWh</title></rect>`;});
+    keys.forEach((k,j)=>{const v=d[k.key]||0,bh=(v/hi)*ih;bars+=`<rect x="${x0+j*bw}" y="${pt+ih-bh}" width="${bw-1}" height="${bh}" rx="2" fill="${k.color}"><title>${d.date}: ${k.name} ${v} ${esc(unit)}</title></rect>`;});
     if(days.length<=16||i%Math.ceil(days.length/12)===0)bars+=`<text x="${pl+i*gw+gw/2}" y="${h-pb+14}" text-anchor="middle" class="axis">${d.date.slice(8)}.${d.date.slice(5,7)}.</text>`;});
   const legend=keys.map(k=>`<span class="lg"><i style="background:${k.color}"></i>${esc(k.name)}</span>`).join("");
-  return `<div class="legend">${legend}<span class="sub">kWh pro Tag</span></div><svg viewBox="0 0 ${W0} ${h}" class="chart" role="img">${g}${bars}</svg>`;
+  return `<div class="legend">${legend}<span class="sub">${esc(unit)} pro Tag</span></div><svg viewBox="0 0 ${W0} ${h}" class="chart" role="img">${g}${bars}</svg>`;
 }
 
 // ---------- Selbsttest ----------
@@ -879,6 +903,55 @@ async function loadStats(){
   const h=`<div class="stack">${uiBlocks("stats",STATS_BLOCKS).visible.map(id=>SB[id]).join("")}</div>`;
   patchEl($("#p-stats"),h);
   document.querySelectorAll("#p-stats [data-days]").forEach(b=>b.addEventListener("click",()=>{statsDays=+b.dataset.days;loadStats();}));
+}
+
+
+// ---------- Statistik einer Kachel ----------
+let tileKey=null,tileDays=30;
+function openTile(k){tileKey=k;showPage("tile");}
+document.addEventListener("click",e=>{const t=e.target.closest("#p-status [data-tile]");if(t)openTile(t.dataset.tile);});
+document.addEventListener("keydown",e=>{if(e.key!=="Enter"&&e.key!==" ")return;const t=e.target.closest&&e.target.closest("#p-status [data-tile]");if(t){e.preventDefault();openTile(t.dataset.tile);}});
+async function loadTile(){
+  const box=$("#p-tile"),k=tileKey;
+  if(!k){showPage("status");return;}
+  if(box._k!==k){box._k=k;box._html=null;box.innerHTML=`<div class="card">Lade …</div>`;}
+  const mv=lastStatus&&lastStatus.meter_view,meta={day:["Tagesverbrauch","kWh","house","#94a3b8"],pv:["Solarertrag","kWh","pv","#f59e0b"],imp:["Netzbezug","kWh","imp","#6366f1"]};
+  let name,unit,color="#f59e0b",rows,err="";
+  try{
+    if(meta[k]){
+      [name,unit,,color]=meta[k];
+      const r=await (await fetch("api/stats?days="+tileDays)).json();
+      rows=(r.days||[]).map(d=>({date:d.date,value:d[meta[k][2]]}));
+    }else if(k.startsWith("m:")){
+      const eid=k.slice(2),item=((mv&&mv.items)||[]).find(i=>i.entity===eid)||{};
+      const r=await (await fetch("api/meter_history?entity="+encodeURIComponent(eid)+"&days="+tileDays)).json();
+      if(!r.ok)throw new Error(r.error||"kein Verlauf");
+      name=item.name||r.name;unit=r.unit||item.unit||"";
+      const water=SF.isWater({unit,icon:item.icon,name:name,entity:eid});
+      if(water){unit="l";}
+      rows=r.days.map(d=>({date:d.date,value:d.value==null?null:(water?d.value*1000:d.value)}));
+      color=({water:"#3b82f6"})[item.color]||color;
+    }else throw new Error("Unbekannte Kachel");
+  }catch(e){err=e.message;}
+  if(k!==tileKey)return;
+  const back=`<p><button type="button" id="tile_back" style="background:var(--chip);color:var(--fg);border:0;border-radius:10px;padding:7px 14px;cursor:pointer">← Übersicht</button></p>`;
+  if(err){patchEl(box,back+`<div class="card"><h2>${esc(name||"Kachel")}</h2><div class="sub">Dafür liegt kein Verlauf vor: ${esc(err)}</div></div>`);}
+  else{
+    const vals=rows.map(r=>r.value).filter(v=>v!=null&&isFinite(v)),sum=vals.reduce((a,b)=>a+b,0);
+    const dec=unit==="l"?0:(Math.max(...vals,0)<10?2:1),fmt=v=>v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:dec,maximumFractionDigits:dec})+" "+unit;
+    const best=rows.reduce((b,r)=>r.value!=null&&(b==null||r.value>b.value)?r:b,null);
+    const today=rows.length?rows[rows.length-1].value:null;
+    const tl=c=>`<div class="card"><h3>${c[0]}</h3><div class="big">${c[1]}</div><div class="sub">${c[2]||""}</div></div>`;
+    const chartRows=rows.map(r=>({date:r.date,v:r.value==null?0:Math.round(r.value*100)/100}));
+    patchEl(box,back+`<div class="hero"><div class="headline">${esc(name)}</div><div class="sub">Zeitraum:
+      ${[7,30,90].map(d=>`<button class="primary" style="padding:3px 12px;margin-left:6px;${tileDays===d?"":"background:var(--chip);color:var(--fg)"}" data-tdays="${d}">${d} Tage</button>`).join("")}</div></div>
+      <div class="grid" style="margin-top:14px">${tl(["Heute",fmt(today),""])}${tl(["Summe",fmt(vals.length?sum:null),`letzte ${rows.length} Tage`])}
+        ${tl(["Ø pro Tag",fmt(vals.length?sum/vals.length:null),vals.length?`aus ${vals.length} Tagen mit Daten`:""])}${tl(["Höchster Tag",fmt(best&&best.value),best?best.date.slice(8)+"."+best.date.slice(5,7)+".":""])}</div>
+      <div class="card" style="margin-top:14px">${vals.length?barChart(chartRows,[{key:"v",name,color}],{unit}):'<div class="sub">Für diesen Zeitraum liegen noch keine Werte vor.</div>'}</div>
+      <div class="sub" style="margin-top:8px">${k.startsWith("m:")?"Der Verbrauch kommt aus der Langzeitstatistik von Home Assistant (oder, falls der Sensor keine hat, aus dem Verlauf des Recorders).":"Die Werte sind Näherungen aus den Messwerten im Regeltakt."}</div>`);
+  }
+  $("#tile_back").onclick=()=>showPage("status");
+  box.querySelectorAll("[data-tdays]").forEach(b=>b.onclick=()=>{tileDays=+b.dataset.tdays;loadTile();});
 }
 
 // ---------- Replay ----------
@@ -1309,7 +1382,7 @@ const SF = (() => {
     .sfm.even{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
     .sfm.big{grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr)}
     .sfm-r{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
-    .sfm-t{display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-radius:14px;padding:12px 14px;min-width:0;background:var(--sf-tile,rgba(128,128,128,.12))}
+    .sfm-t{cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-radius:14px;padding:12px 14px;min-width:0;background:var(--sf-tile,rgba(128,128,128,.12))}
     .sfm-h{display:grid}
     .sfm-h .sfm-t{justify-content:center;gap:8px;padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--sf-sun) 18%,var(--sf-tile,transparent)),var(--sf-tile,transparent) 85%)}
     .sfm-hd{display:flex;align-items:center;gap:9px;min-width:0;width:100%}
@@ -1369,14 +1442,14 @@ const SF = (() => {
     const first = seq[0];
     const hero = first.hero ? first : null;
     const tiles = hero ? seq.slice(1) : seq;
-    const tile = x => `<div class="sfm-t" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
+    const tile = x => `<div class="sfm-t" data-tile="${esc(x.k)}" role="button" tabindex="0" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
       <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
     if (hero && tiles.length && d.layout !== "even")
       return `${MCSS}<div class="sfm-w"><div class="sfm big"><div class="sfm-h">${tile(hero)}</div><div class="sfm-r">${tiles.map(tile).join("")}</div></div></div>`;
     return `${MCSS}<div class="sfm-w"><div class="sfm even">${(hero ? [hero, ...tiles] : tiles).map(x => x === hero ? `<div class="sfm-h">${tile(x)}</div>` : tile(x)).join("")}</div></div>`;
   }
 
-  return { flow, trend, headline, wl, meters };
+  return { flow, trend, headline, wl, meters, isWater };
 })();
 /*FLOW-END*/
 function flowData(s){
@@ -1447,6 +1520,14 @@ function patchEl(el,html){
   if(dh&&r.bottom<=0)window.scrollBy(0,dh);
   return true;
 }
+/* Ein Block wird nie niedriger als zuvor (bei gleicher Breite): so schrumpft die Seite nicht, und der Browser
+   muss die Scrollposition nicht nach oben schieben, wenn z. B. Protokollzeilen kürzer umbrechen. */
+function keepHeight(el){
+  const w=innerWidth;
+  if(el._rw!==w){el._rw=w;el._mh=0;el.style.minHeight="";}
+  const h=el.offsetHeight;
+  if(h>(el._mh||0)){el._mh=h;el.style.minHeight=h+"px";}
+}
 function rawStatus(html){const el=$("#p-status");el._sig=null;el._html=null;patchEl(el,html);el._sig=null;}
 function layoutBlocks(root,B,order,weights){
   const shown=order.filter(id=>B[id]);
@@ -1466,7 +1547,7 @@ function layoutBlocks(root,B,order,weights){
     root._sig=sig;root._html=null;
     root.innerHTML=`<div data-blk="banners"></div>`+segs.map(sg=>sg.full?blk(sg.full):
       `<div class="cols${sg.right.length?"":" one"}"><div class="stack">${sg.left.map(blk).join("")}</div>${sg.right.length?`<div class="stack">${sg.right.map(blk).join("")}</div>`:""}</div>`).join("");}
-  root.querySelectorAll("[data-blk]").forEach(el=>patchEl(el,B[el.dataset.blk]||""));
+  root.querySelectorAll("[data-blk]").forEach(el=>{patchEl(el,B[el.dataset.blk]||"");if(el.dataset.blk!=="banners")keepHeight(el);});
 }
 let firstRun=false,wizDismissed=false;
 function renderStatus(s){
