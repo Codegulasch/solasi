@@ -179,5 +179,33 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  e=mk({},st("Entladen",td));
  ok(e.shadowRoot.textContent.includes("Aus Speichern heute")&&e.shadowRoot.textContent.includes("0,6 kWh geladen"),"Heute-Reihe: Aus Speichern mit geladener Menge");
 }
+{ // Farbverlauf: Standard an, per gradient:false aus
+ let e=mk({},st("Entladen",attrs));
+ ok(e.shadowRoot.querySelector("ha-card").classList.contains("grad")&&e.shadowRoot.innerHTML.includes("ha-card.grad{background:linear-gradient"),"Karte hat standardmäßig den Farbverlauf");
+ e=mk({gradient:false},st("Entladen",attrs));
+ ok(!e.shadowRoot.querySelector("ha-card").classList.contains("grad"),"gradient:false schaltet den Verlauf aus");
+ e.setConfig({});e.hass={states:st("Entladen",attrs)};
+ ok(e.shadowRoot.querySelector("ha-card").classList.contains("grad"),"Umschalten ändert die Klasse am bestehenden ha-card");
+}
+{ // Energiefluss: Vorlagen, Ausblenden, Reihenfolge aus Add-on und Kartenoptionen
+ const U2=[{name:"Anker HÜTTE",pv:400,bat:-100,soc:50,kwh:2.5},{name:"Anker DACH",pv:500,bat:-200,soc:70,kwh:7}];
+ const a2={...attrs,units:U2,flow_cfg:{layout:"total",total:true,solar:true,bat:true,grid:true,house:true,grid_pos:"mid",order:[]}};
+ const labels=e=>[...e.shadowRoot.querySelectorAll("svg[aria-label='Energiefluss'] .sf-l")].map(x=>x.textContent);
+ let e=mk({},st("Entladen",a2));
+ ok(labels(e).length===7&&labels(e).includes("Solar")&&txt(e).includes("alle Anlagen")&&txt(e).includes("900 W"),"Gesamt-Solar oben: sieben Kacheln, Summe 900 W");
+ e=mk({flow_layout:"pairs"},st("Entladen",a2));
+ ok(labels(e).length===6&&!txt(e).includes("alle Anlagen"),"Vorlage Paare: ohne Gesamt-Kachel");
+ e=mk({flow_layout:"compact"},st("Entladen",a2));
+ ok(labels(e).length===4&&labels(e).includes("Speicher"),"Vorlage Kompakt: vier Kacheln");
+ e=mk({flow_hide:["grid","solar"]},st("Entladen",a2));
+ ok(!labels(e).includes("Netz")&&!labels(e).some(l=>l.startsWith("SOLAR ")||l.startsWith("Solar ")),"flow_hide blendet Netz und Solar je Anlage aus");
+ e=mk({},st("Entladen",{...a2,flow_cfg:{...a2.flow_cfg,bat:false,house:false}}));
+ ok(!labels(e).includes("Haus")&&labels(e).length===4,"Einstellung aus dem Add-on wird übernommen (ohne Speicher und Haus)");
+ e=mk({flow_order:["Anker DACH","Anker HÜTTE"]},st("Entladen",a2));
+ const names=[...e.shadowRoot.querySelectorAll("svg[aria-label='Energiefluss'] .sf-l")].map(x=>x.textContent).filter(x=>/DACH|HÜTTE/.test(x));
+ ok(names[0].includes("DACH")&&names[2].includes("HÜTTE"),"flow_order tauscht die Anlagen");
+ e=mk({flow_grid_pos:"side"},st("Entladen",a2));
+ ok(/viewBox="0 0 640 454"/.test(e.shadowRoot.innerHTML)||labels(e).length===7,"Netz neben dem Haus bleibt vollständig");
+}
 ok(w.__kwScrollGuard===true,"Scroll-Wächter ist aktiv");
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

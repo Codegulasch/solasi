@@ -153,6 +153,21 @@ def run(cfg, ha, ctrl=None):
             elif not obs and key == "lim_dis":
                 add(area, label, "info", "nicht gewählt (optional)",
                     "Mit der Entladegrenze des Speichers richtet sich SOLASI nach der Grenze aus der Hersteller-App. Sonst bekommt der Speicher unterhalb seiner Grenze Sollwerte, die er nicht ausführt.")
+        if u.get("write_limits") and not obs:
+            from controller import clamp_limit, wanted_limit
+            for key, label, which in (("lim_dis", "Entladegrenze", "min"), ("lim_chg", "Ladeobergrenze", "max")):
+                if not u.get(key):
+                    add(area, f"{label} schreiben", "warn", "keine Entität gewählt",
+                        f"„Grenzen in den Speicher schreiben“ ist an, aber die Entität „{label}“ fehlt. Ohne sie kann SOLASI den Wert nicht setzen.")
+                    continue
+                if u[key].split(".")[0] not in ("number", "input_number"):
+                    add(area, f"{label} schreiben", "warn", "keine number-Entität", "Schreiben geht nur bei number- oder input_number-Entitäten.")
+                    continue
+                v = ha.state(u[key])
+                if is_num(v):
+                    val, note = clamp_limit(ha, u[key], wanted_limit(cfg, u, which))
+                    add(area, f"{label} schreiben", "ok" if abs(float(v) - val) < 0.5 else "info",
+                        f"soll {val:g} %, aktuell {float(v):g} %" + (f" ({note})" if note else ""))
         if check_entity(area, "Ladestand (SOC)", u["soc"], "sensor", numeric=True):
             v = ha.state(u["soc"])
             if is_num(v) and not (0 <= float(v) <= 100):

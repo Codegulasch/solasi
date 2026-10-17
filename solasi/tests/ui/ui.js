@@ -213,6 +213,11 @@ const w=dom.window,d=w.document;
  cfg.units[0].mode="select.mode_a";w.renderUnits();
  w.showPage("units");await new Promise(r=>setTimeout(r,300));
  ok(d.getElementById("f_units_0_fallback_mode")!==null,"Rückfall-Modus beim Anker-Speicher");
+ { const mn=d.getElementById("f_units_0_min_soc"),wl=d.getElementById("f_units_0_write_limits");
+   ok(!!mn&&!!d.getElementById("f_units_0_max_soc")&&!!wl,"Speicher: eigener Mindest-/Höchst-Ladestand und Schalter „Grenzen schreiben“");
+   mn.value="25";mn.dispatchEvent(new w.Event("input"));ok(cfg.units[0].min_soc===25,"Eigener Mindest-Ladestand wird gespeichert");
+   mn.value="";mn.dispatchEvent(new w.Event("input"));ok(cfg.units[0].min_soc===null,"Leeres Feld bedeutet globaler Wert (null)");
+   wl.checked=true;wl.dispatchEvent(new w.Event("change"));ok(cfg.units[0].write_limits===true,"Schalter „Grenzen schreiben“ wird gespeichert"); }
  ok(d.querySelectorAll("#dl-fb0 option").length===2&&d.querySelector("#dl-fb0 option").value==="third_party_control","Vorschläge aus den Optionen des Betriebsmodus");
  // --- Speichertypen ---
  ex.checked=false;ex.dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,100));
@@ -290,7 +295,19 @@ const w=dom.window,d=w.document;
   ok(ids.indexOf("log")<ids.indexOf("meters"),"Log steht vor den übrigen Blöcken");
   cfg.ui={status_order:[],status_hidden:[],stats_order:[],stats_hidden:[]};w.renderStatus(status);
   w.showPage("look");await new Promise(r=>setTimeout(r,100));
-  ok(d.querySelectorAll("#p-look .ordlist").length===2&&d.querySelectorAll('#p-look .ordlist[data-k="status"] .ordrow').length===7,"Darstellung: Anordnungslisten für Übersicht und Statistik");
+  ok(d.querySelectorAll("#p-look .ordlist[data-k]").length===2&&d.querySelectorAll('#p-look .ordlist[data-k="status"] .ordrow').length===7,"Darstellung: Anordnungslisten für Übersicht und Statistik");
+  { // Energiefluss konfigurieren
+    const fsel=d.querySelector("#fl_layout");
+    ok(!!fsel&&d.querySelectorAll("#p-look [data-fl]").length===5&&!!d.querySelector("#fl_gp"),"Energiefluss: Vorlage, fünf Kachel-Schalter, Platz des Netzes");
+    fsel.value="pairs";fsel.dispatchEvent(new w.Event("change"));
+    ok(cfg.flow.layout==="pairs","Vorlage wird in die Einstellungen übernommen");
+    d.querySelector('#p-look [data-fl="grid"]').click();
+    ok(cfg.flow.grid===false&&cfg.flow.layout==="pairs","Kachel ausblenden speichert den Schalter");
+    const n=(cfg.units||[]).length;
+    if(n>1){const first=cfg.units[0].name;d.querySelector('#fl_ord [data-fm="1"]').click();ok(cfg.flow.order[1]===first,"Pfeil ändert die Reihenfolge der Anlagen");}
+    d.querySelector("#fl_reset").click();
+    ok(cfg.flow.layout==="total"&&cfg.flow.grid===true&&cfg.flow.order.length===0,"Standard wiederherstellen setzt den Energiefluss zurück");
+  }
   d.querySelector('#p-look [data-k="status"] button[data-mv="1"][data-id="kpis"]').click();
   ok(cfg.ui.status_order[0]==="meters"&&cfg.ui.status_order[1]==="kpis","Pfeil nach unten ändert die Reihenfolge");
   d.querySelector('#p-look [data-k="status"] input[data-show="log"]').click();

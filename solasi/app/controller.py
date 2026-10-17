@@ -43,9 +43,44 @@ def default_unit(name):
         "power_basis": "",   # "" = automatisch, "ac" oder "battery" (siehe drivers.basis)
         "lim_dis": "",       # optional: Entität „Entladegrenze“ (% , vom Speicher). Wirksamer Mindest-Ladestand = der höhere Wert
         "lim_chg": "",       # optional: Entität „Ladeobergrenze“ (%). Darüber gilt der Speicher als voll
+        "min_soc": None,     # eigener Mindest-Ladestand dieses Speichers (None = globaler Wert aus „Akku-Grenzen“)
+        "max_soc": None,     # eigener Höchst-Ladestand dieses Speichers (None = globaler Wert)
+        "write_limits": False,   # SOLASI schreibt Mindest-/Höchst-Ladestand in Entladegrenze/Ladeobergrenze des Speichers
         # Rückfall beim Stoppen (Kill-Switch): Modus, den der Speicher dann bekommt (z. B. Eigenverbrauch)
         "fallback_mode": "", "fallback_value": "",
     }
+
+
+def own_pct(uc, key):
+    """Eigener Prozentwert eines Speichers (0..100) oder None, wenn leer oder ungültig."""
+    v = uc.get(key)
+    if isinstance(v, bool) or not is_num(v):
+        return None
+    x = float(v)
+    return x if 0 <= x <= 100 else None
+
+
+def wanted_limit(cfg, uc, which):
+    """Mindest- („min“) oder Höchst-Ladestand („max“) eines Speichers: eigener Wert, sonst der globale."""
+    own = own_pct(uc, which + "_soc")
+    return own if own is not None else cfg["soc"][which]
+
+
+def clamp_limit(ha, eid, want):
+    """Passt einen Wunschwert an Minimum, Maximum und Schrittweite der Entität an. -> (Wert, Hinweis)."""
+    v, note = float(want), ""
+    lo, hi, step = ha.attr(eid, "min"), ha.attr(eid, "max"), ha.attr(eid, "step")
+    ok = lambda x: isinstance(x, (int, float)) and not isinstance(x, bool)  # noqa: E731
+    if ok(lo) and v < lo:
+        v, note = float(lo), f"{want:g} % liegt unter dem kleinsten Wert der Entität, es werden {lo:g} % geschrieben"
+    if ok(hi) and v > hi:
+        v, note = float(hi), f"{want:g} % liegt über dem größten Wert der Entität, es werden {hi:g} % geschrieben"
+    if ok(step) and step > 0:
+        base = float(lo) if ok(lo) else 0.0
+        r = base + round((v - base) / step) * step
+        if abs(r - v) > 1e-9:
+            v, note = r, note or f"{want:g} % passt nicht zur Schrittweite {step:g}, es werden {r:g} % geschrieben"
+    return (int(v) if float(v).is_integer() else round(v, 2)), note
 
 
 def _pct(ha, eid):
@@ -86,6 +121,9 @@ DEFAULT_CONFIG = {
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
     "meters": {"show_day": True, "extra": False, "items": [], "order": []},
     # Anordnung der Blöcke in Übersicht und Statistik (leer = Standardreihenfolge, gilt für alle Geräte)
+    # Energiefluss: Vorlage (total, pairs, compact), einzelne Kacheln, Platz des Netzes, Reihenfolge der Anlagen (Namen)
+    "flow": {"layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
+             "grid_pos": "mid", "order": []},
     "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
     "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
     "safety": {"kill_entity": "", "release_on_stop": True, "release_on_disable": True,
@@ -114,6 +152,18 @@ def clean_order(raw):
         if isinstance(x, str) and 0 < len(x) <= 120 and x not in out:
             out.append(x)
     return out[:40]
+
+
+def clean_flow(raw):
+    """Energiefluss-Einstellungen mit festen Werten; Unbekanntes wird zum Standard."""
+    raw = raw if isinstance(raw, dict) else {}
+    d = DEFAULT_CONFIG["flow"]
+    out = {"layout": raw.get("layout") if raw.get("layout") in ("total", "pairs", "compact") else d["layout"],
+           "grid_pos": raw.get("grid_pos") if raw.get("grid_pos") in ("mid", "side") else d["grid_pos"],
+           "order": clean_order(raw.get("order"))}
+    for k in ("total", "solar", "bat", "grid", "house"):
+        out[k] = bool(raw.get(k, d[k]))
+    return out
 
 
 def clean_ui(ui):
@@ -275,8 +325,11 @@ def decide(cfg, snap):
         # Wirksame Grenzen: Die Grenzen im Speicher (Entladegrenze, Ladeobergrenze) kann SOLASI nicht überschreiben.
         lo = u.get("lim_dis")
         hi = u.get("lim_chg")
-        u["min"] = max(so["min"], lo) if lo is not None else so["min"]
-        u["max"] = min(so["max"], hi) if hi is not None else so["max"]
+        own_lo, own_hi = own_pct(u["cfg"], "min_soc"), own_pct(u["cfg"], "max_soc")
+        base_lo = own_lo if own_lo is not None else so["min"]
+        base_hi = own_hi if own_hi is not None else so["max"]
+        u["min"] = max(base_lo, lo) if lo is not None else base_lo
+        u["max"] = min(base_hi, hi) if hi is not None else base_hi
         u["full"] = ok and soc >= u["max"]
         u["elig_dis"] = ok and (soc > u["min"] if st > 5 else soc >= u["min"] + so["hyst"])
         u["elig_chg"] = bool(f["ac_charge"]) and drivers.can_charge(u["cfg"]) and ok and (
@@ -393,6 +446,8 @@ class Controller:
         self._wd_hash = load_json(self._wd_path, {}).get("hash", "")
         self.watchdog = {"state": "unbekannt", "detail": "Noch nicht abgeglichen", "json": "", "managed": False}
         self._hb_stopped = False
+        self._lim_try = {}           # (Speicher, min|max) -> (Zeitpunkt, Wert) des letzten Schreibversuchs der Grenzen
+        self._lim_note = {}          # zuletzt gemeldeter Hinweis je Grenze, damit er nicht dauernd im Protokoll steht
         self._mode_try = {}          # Speicher -> Zeitpunkt des letzten Versuchs, den Modus zu setzen
         self._releasing = False
         self._shutdown = False
@@ -618,10 +673,55 @@ class Controller:
             if isinstance(r, Exception):
                 log.error("Fehler beim Ansteuern eines Speichers: %r", r)
                 self.event("error", f"Fehler beim Ansteuern eines Speichers: {r}")
+        if not (self.stopped or self._releasing or self._shutdown):
+            try:
+                await self._enforce_limits(snap, dry)
+            except Exception as e:  # noqa: BLE001
+                log.error("Fehler beim Schreiben der Grenzen: %r", e)
+                self.event("error", f"Fehler beim Schreiben der Grenzen: {e}")
         self._after_cycle(snap, d)
         self._publish(snap, d)
         await self.publish_entities()
         await self.notifier.check(self._problems(snap, d))
+
+    limit_retry_s = 300       # so oft wird eine abweichende Grenze im Speicher höchstens zurückgesetzt
+
+    async def _enforce_limits(self, snap, dry):
+        """Schreibt Mindest- und Höchst-Ladestand in Entladegrenze und Ladeobergrenze der Speicher (je Speicher abschaltbar).
+        SOLASI ist die Steuereinheit: Weicht der Wert im Speicher ab, auch durch die Hersteller-App, wird er zurückgesetzt."""
+        for u in snap["units"]:
+            uc = u["cfg"]
+            if u.get("obs") or not uc.get("write_limits"):
+                continue
+            want = {w: wanted_limit(self.cfg, uc, w) for w in ("min", "max")}
+            if want["min"] >= want["max"]:
+                note = f"Mindest-Ladestand {want['min']:g} % ist nicht kleiner als Höchst-Ladestand {want['max']:g} %, die Grenzen werden nicht geschrieben"
+                if self._lim_note.get((u["k"], "pair")) != note:
+                    self._lim_note[(u["k"], "pair")] = note
+                    self.event("error", f"{u['k']}: {note}")
+                continue
+            self._lim_note.pop((u["k"], "pair"), None)
+            for which, key, label in (("min", "lim_dis", "Entladegrenze"), ("max", "lim_chg", "Ladeobergrenze")):
+                eid = uc.get(key)
+                if not eid or eid.split(".")[0] not in ("number", "input_number"):
+                    continue
+                cur = self.ha.state(eid)
+                if not is_num(cur):
+                    continue
+                val, note = clamp_limit(self.ha, eid, want[which])
+                if self._lim_note.get((u["k"], which)) != note:
+                    self._lim_note[(u["k"], which)] = note
+                    if note:
+                        self.event("info", f"{u['k']}: {label}: {note}")
+                if abs(float(cur) - val) < 0.5:
+                    self._lim_try.pop((u["k"], which), None)
+                    continue
+                now, last = time.monotonic(), self._lim_try.get((u["k"], which))
+                if last and last[1] == val and now - last[0] < self.limit_retry_s:
+                    continue
+                self._lim_try[(u["k"], which)] = (now, val)
+                await self.act(dry, f"{u['k']}: {label} {float(cur):g} % → {val:g} %", eid.split(".")[0], "set_value",
+                               {"entity_id": eid, "value": val})
 
     async def _apply_unit(self, u, d, dry):
         """Setzt den berechneten Sollwert über den Treiber des Speichers um."""
@@ -753,6 +853,8 @@ class Controller:
         was_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
         if isinstance(data, dict) and "ui" in data:
             data = {**data, "ui": clean_ui(data["ui"])}
+        if isinstance(data, dict) and "flow" in data:
+            data = {**data, "flow": clean_flow(data["flow"])}
         if isinstance(data, dict) and isinstance(data.get("meters"), dict):
             data = {**data, "meters": {**data["meters"], "order": clean_order(data["meters"].get("order"))}}
         self.store.save(data)
@@ -1096,6 +1198,7 @@ class Controller:
             "trend": self.trend_series(),
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
+            "flow_cfg": clean_flow(self.cfg.get("flow")),
             "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"], "order": self.meter_view()["order"]},
         }
         out = {"sensor.solasi": (state, main)}

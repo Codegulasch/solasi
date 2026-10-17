@@ -309,3 +309,98 @@ def test_sperre_im_testmodus_und_bei_beobachtern_aus(tmp_path, monkeypatch):
             u = {"k": "B", "has": True, "obs": obs, "soc": 10, "set": 340, "ac": 0.0, "locked": False}
             ctrl._update_locks([u]); clock["t"] += 60
             assert not u["locked"]
+
+
+# ---------------- Grenzen in den Speicher schreiben ----------------
+def _lim_ctl(tmp_path, monkeypatch, write=True, **ucfg):
+    import controller as C
+    store = ConfigStore(str(tmp_path / "c.json")); ctrl = Controller(None, store); ha = ctrl.ha = HA("ws://x", "t"); ha.connected = True
+    ctrl.cfg["enabled"] = True; ctrl.cfg["dry_run"] = False
+    u = ctrl.cfg["units"][0]
+    u.update({"lim_dis": "number.dis", "lim_chg": "number.chg", "write_limits": write, **ucfg})
+    ha.states["number.dis"] = {"state": "10", "attributes": {"min": 5, "max": 50, "step": 1}}
+    ha.states["number.chg"] = {"state": "100", "attributes": {"min": 60, "max": 100, "step": 5}}
+    calls = []
+    async def call(domain, service, data): calls.append((domain, service, data))
+    ha.call_service = call
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(C.time, "monotonic", lambda: clock["t"])
+    snap = {"units": [{"cfg": u, "k": u["name"], "obs": False}]}
+    return ctrl, snap, calls, clock
+
+
+def test_grenzen_werden_geschrieben_und_angepasst(tmp_path, monkeypatch):
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch)
+    ctrl.cfg["soc"].update({"min": 15, "max": 97})
+    asyncio.run(ctrl._enforce_limits(snap, False))
+    assert ("number", "set_value", {"entity_id": "number.dis", "value": 15}) in calls
+    assert ("number", "set_value", {"entity_id": "number.chg", "value": 95}) in calls       # Schrittweite 5: 97 -> 95
+
+
+def test_eigene_grenzen_gehen_vor(tmp_path, monkeypatch):
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch, min_soc=20, max_soc=80)
+    ctrl.cfg["soc"].update({"min": 15, "max": 97})
+    asyncio.run(ctrl._enforce_limits(snap, False))
+    vals = {c[2]["entity_id"]: c[2]["value"] for c in calls}
+    assert vals["number.dis"] == 20 and vals["number.chg"] == 80
+
+
+def test_grenzen_zurueck_setzen_aber_gedrosselt(tmp_path, monkeypatch):
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch, min_soc=10, max_soc=100)
+    asyncio.run(ctrl._enforce_limits(snap, False)); assert calls == []                      # passt schon
+    ctrl.ha.states["number.dis"]["state"] = "30"                                            # in der App verstellt
+    asyncio.run(ctrl._enforce_limits(snap, False)); assert len(calls) == 1
+    asyncio.run(ctrl._enforce_limits(snap, False)); assert len(calls) == 1                  # noch zu früh für den nächsten Versuch
+    clock["t"] += 301
+    asyncio.run(ctrl._enforce_limits(snap, False)); assert len(calls) == 2
+
+
+def test_grenzen_schalter_aus_beobachtet_und_testmodus(tmp_path, monkeypatch):
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch, write=False, min_soc=20)
+    asyncio.run(ctrl._enforce_limits(snap, False)); assert calls == []                      # Schalter aus
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch, min_soc=20)
+    snap["units"][0]["obs"] = True
+    asyncio.run(ctrl._enforce_limits(snap, False)); assert calls == []                      # nur beobachtet
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch, min_soc=20)
+    asyncio.run(ctrl._enforce_limits(snap, True)); assert calls == []                       # Testmodus schreibt nicht
+    assert any(e["msg"].startswith("Test:") and "Entladegrenze" in e["msg"] for e in ctrl.events)
+
+
+def test_grenzen_widerspruch_und_hinweis(tmp_path, monkeypatch):
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch, min_soc=90, max_soc=80)
+    asyncio.run(ctrl._enforce_limits(snap, False)); assert calls == []
+    assert any("nicht kleiner" in e["msg"] for e in ctrl.events)
+    ctrl, snap, calls, clock = _lim_ctl(tmp_path, monkeypatch, min_soc=2, max_soc=100)       # Entität erlaubt erst ab 5
+    asyncio.run(ctrl._enforce_limits(snap, False))
+    assert calls[0][2]["value"] == 5 and any("kleinsten Wert" in e["msg"] for e in ctrl.events)
+
+
+def test_eigene_grenzen_in_decide():
+    cfg = mk_cfg(); cfg["soc"].update({"min": 15, "max": 97})
+    cfg["units"][0].update({"min_soc": 30, "max_soc": 60})
+    a, b = mk_unit(cfg, 0, 35), mk_unit(cfg, 1, 35)
+    a.update({"lim_dis": None, "lim_chg": None, "locked": False}); b.update({"lim_dis": None, "lim_chg": None, "locked": False})
+    decide(cfg, mk_snap(cfg, 400, [a, b]))
+    assert a["min"] == 30 and a["max"] == 60 and b["min"] == 15 and b["max"] == 97
+
+
+def test_flow_einstellungen_werden_bereinigt(tmp_path):
+    from controller import clean_flow
+    f = clean_flow({"layout": "quatsch", "grid_pos": "x", "grid": 0, "order": ["B", "A", "B", 5]})
+    assert f["layout"] == "total" and f["grid_pos"] == "mid" and f["grid"] is False and f["order"] == ["B", "A"]
+    assert f["total"] and f["solar"] and f["bat"] and f["house"]
+    assert clean_flow(None) == DEFAULT_CONFIG["flow"]
+    ctrl = mk_ctrl(tmp_path)
+    asyncio.run(ctrl.save_config({**ctrl.cfg, "flow": {"layout": "pairs", "house": False}}))
+    assert ctrl.cfg["flow"]["layout"] == "pairs" and ctrl.cfg["flow"]["house"] is False and ctrl.cfg["flow"]["total"] is True
+
+
+def test_selfcheck_grenzen_schreiben(tmp_path):
+    ctrl = mk_ctrl(tmp_path); cfg, ha = ctrl.cfg, ctrl.ha
+    ha.connected = True
+    u = cfg["units"][0]; u.update(write_limits=True, lim_dis="", lim_chg="number.chg", soc="sensor.soc", min_soc=20, max_soc=90)
+    ha.states["number.chg"] = {"state": "100", "attributes": {"min": 60, "max": 100, "step": 5}}
+    r = selfcheck.run(cfg, ha, ctrl)
+    by = {(i["area"], i["item"]): i for i in r["items"]}
+    assert by[("Speicher A", "Entladegrenze schreiben")]["status"] == "warn"        # Entität fehlt
+    assert by[("Speicher A", "Ladeobergrenze schreiben")]["status"] == "info"       # soll 90, ist 100

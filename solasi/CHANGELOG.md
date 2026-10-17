@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.6.0
+- **Grenzen in den Speicher schreiben:** Neu je Speicher (*Einrichtung*): „Eigener Mindest-Ladestand“, „Eigener Höchst-Ladestand“ (leer = globaler Wert) und der Schalter „Grenzen in den Speicher schreiben“. Ist er an, schreibt SOLASI den Mindest-Ladestand in die Entladegrenze und den Höchst-Ladestand in die Ladeobergrenze des Speichers und setzt sie zurück, wenn sie sich ändern (auch durch die Anker-App), höchstens alle 5 Minuten. Werte werden an Minimum, Maximum und Schrittweite der Entität angepasst; was geändert wurde, steht im Protokoll. Im Testmodus wird nur protokolliert, beobachtete Speicher werden nie beschrieben. Der Selbsttest zeigt Soll und Ist.
+- **Energiefluss mit Gesamt-Solar oben:** Bei zwei Anlagen steht oben in der Mitte die Solarleistung aller Anlagen, die sich auf die beiden Solar-Kacheln verteilt.
+- **Energiefluss einstellbar:** *Einstellungen → Darstellung → Energiefluss*: Vorlage (Gesamt-Solar oben, Paare, Kompakt), Kacheln einzeln ein- und ausblenden (Solar gesamt, Solar je Anlage, Speicher, Netz, Haus), Netz in der Mitte oder neben dem Haus, Reihenfolge der Anlagen. Die Karte übernimmt das; mit den Optionen `flow_layout`, `flow_hide`, `flow_grid_pos` und `flow_order` (oder im Karteneditor) lässt es sich je Karte überschreiben. Bei mehr als zwei Anlagen gelten Reihenfolge sowie Netz und Haus.
+
+## 1.5.1
+- **Farbverlauf in der Dashboard-Karte:** Die Karte hat jetzt denselben sanften Verlauf wie die Übersicht im Add-on (Akzentfarbe oben links, läuft in die Kartenfarbe aus). Er folgt der Karten-Option `accent` und passt sich Hell- und Dunkelmodus an. Mit `gradient: false` (oder im Editor „Farbverlauf im Hintergrund“) bleibt die Karte einfarbig.
+
 ## 1.5.0
 - **Überschrift zeigt, was wirklich fließt:** Bisher stand dort bei Flüssen unter 5 W der Sollwert („Die Speicher versorgen dein Haus mit 339 W“), obwohl das Netz das Haus versorgte. Jetzt kommt der Text aus den echten Flüssen. „Überschuss lädt …“ steht nur noch, wenn wirklich nichts aus dem Netz kommt; sonst „Solar lädt den Speicher mit 80 W“ und „Haus bezieht 511 W aus dem Netz“.
 - **Speicher-Kacheln:** Statt zweimal derselben Wattzahl zeigt die Kachel „lädt“ oder „entlädt“, bei Ruhe „bereit“, bei vollem Speicher „voll“.
