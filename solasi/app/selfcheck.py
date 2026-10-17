@@ -78,6 +78,9 @@ def run(cfg, ha, ctrl=None):
         d = drivers.driver(u)
         if not (drivers.entities(u) or u["soc"] or u["pv"]):
             continue
+        if u.get("state") in ("maint", "off"):       # Wartung oder deaktiviert: keine Prüfung, keine Fehler
+            add(area, "Betrieb", "info", "Wartung, wird nicht gesteuert und nicht geprüft" if u["state"] == "maint" else "deaktiviert, wird ignoriert")
+            continue
         configured += 1
         o = drivers.opts(u, names)
         add(area, "Speichertyp", "info", labels[d])

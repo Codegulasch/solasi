@@ -45,3 +45,15 @@ def save_json(path, obj):
         os.replace(tmp, path)
     except OSError:
         pass
+
+
+def snap_at(snaps, last, hour, minute):
+    """Wert zur Uhrzeit aus Stundenständen {"0": v, "1": v, …} (Stand zu Beginn der Stunde); last = Stand am Tagesende.
+    Dazwischen wird linear gerechnet. None, wenn für diese Stunde nichts gespeichert wurde."""
+    a = (snaps or {}).get(str(hour))
+    if a is None:
+        return None
+    b = last if hour >= 23 else (snaps or {}).get(str(hour + 1))
+    if b is None:
+        return a
+    return a + (b - a) * minute / 60.0

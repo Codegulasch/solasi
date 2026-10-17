@@ -345,3 +345,10 @@ SOLASI läuft lokal und spricht nur mit deinem Home Assistant. Es gibt keine Clo
 
 Die Software steuert Hardware und wird **ohne Gewähr** bereitgestellt. Du nutzt sie auf eigene Verantwortung. Beachte die Einspeisegrenzen deiner Anlage, die Anmeldepflichten und die Vorgaben deines Netzbetreibers sowie die Hinweise deines Speicherherstellers.
 SOLASI ist ein unabhängiges Projekt und steht in keiner Verbindung zu SolarAssistant (solar-assistant.io), zu Anker oder zu anderen Herstellern.
+
+**Speicher in Wartung oder deaktiviert:** Soll an der Anlage etwas umgebaut werden, stellst du den Speicher unter *Einrichtung* bei „Betrieb“ auf **Wartung** (ausgegraut, wird nicht gesteuert und nicht geprüft) oder **Deaktiviert** (ausgeblendet, wird ignoriert). Dasselbe geht über die Home-Assistant-Entität „… Betrieb“. SOLASI gibt den Speicher dabei an sein eigenes Regelverhalten zurück (der Rückfall-Modus muss dafür eingetragen sein). Antwortet der Ladestand eines Speichers 2 Minuten lang nicht, geht er automatisch in Wartung und kommt von selbst wieder zurück (*Sicherheit → Nicht erreichbare Speicher automatisch in Wartung*).
+
+**Vergleich mit gestern:** Unter *Zähler* stellst du ein, ob die Heute-Kacheln eine Zeile mit gestern zeigen: bis zur gleichen Uhrzeit, ganzer Tag oder aus. In der Karte überschreibt `meters_compare` (auto, same, full, off) das. Am ersten Tag nach der Installation fehlen die Stundenstände von gestern, dann steht dort der ganze Tag oder nichts.
+
+**Dashboard-Karte im Add-on einstellen:** *Einstellungen → Darstellung → Dashboard-Karte* gilt für alle Karten. Optionen in der Karte selbst (YAML) gehen vor. Der Energiefluss hat dort eine eigene Gruppe mit Größe (`flow_size`), Vorlage, Kacheln und Reihenfolge. Auf breiten Anzeigen wächst der Energiefluss mit und rückt die Kacheln auseinander.
+

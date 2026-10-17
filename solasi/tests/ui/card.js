@@ -81,7 +81,7 @@ ok(got&&got.size==="compact"&&got.title==="Mein Solar","Editor meldet Änderunge
 // ---- Zählerreihe ----
 el=mk({},st("Entladen",attrs));
 ok(q(el,".sfm").length===1&&txt(el).includes("Tagesverbrauch")&&txt(el).includes("8,4")&&txt(el).includes("552,62")&&txt(el).includes("13.141,74")&&txt(el).includes("+180 l")&&!txt(el).includes("0,18 m³"),"Zählerreihe: Tagesverbrauch, Zähler, Tageswert");
-ok(q(el,".mwrap").length===1&&q(el,".mwrap")[0].nextElementSibling&&q(el,".mwrap")[0].nextElementSibling.classList.contains("headline"),"Reihe steht ganz oben, vor der Überschrift");
+ok(q(el,".mwrap").length===1&&q(el,".mwrap")[0].nextElementSibling&&(q(el,".mwrap")[0].nextElementSibling.classList.contains("headline")||q(el,".mwrap")[0].nextElementSibling.querySelector(".headline")),"Reihe steht ganz oben, vor der Überschrift");
 ok(q(el,".sfm b").length===1&&q(el,".sfm")[0].innerHTML.includes("&lt;b&gt;x"),"Zählernamen werden maskiert");
 el=mk({show_meters:false},st("Entladen",attrs));
 ok(q(el,".sfm").length===0&&q(el,".mwrap").length===0,"Zählerreihe abschaltbar");
@@ -179,13 +179,60 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  e=mk({},st("Entladen",td));
  ok(e.shadowRoot.textContent.includes("Aus Speichern heute")&&e.shadowRoot.textContent.includes("0,6 kWh geladen"),"Heute-Reihe: Aus Speichern mit geladener Menge");
 }
-{ // Farbverlauf: Standard an, per gradient:false aus
+{ // Farbverlauf: nur hinter Überschrift und Energiefluss, Standard an, per gradient:false aus
  let e=mk({},st("Entladen",attrs));
- ok(e.shadowRoot.querySelector("ha-card").classList.contains("grad")&&e.shadowRoot.innerHTML.includes("ha-card.grad{background:linear-gradient"),"Karte hat standardmäßig den Farbverlauf");
+ const hero=e.shadowRoot.querySelector(".hero.grad");
+ ok(hero&&hero.querySelector(".headline")&&hero.querySelector('svg[aria-label="Energiefluss"]')&&e.shadowRoot.innerHTML.includes(".hero.grad{background:linear-gradient"),"Farbverlauf liegt hinter Überschrift und Energiefluss");
+ ok(!e.shadowRoot.querySelector("ha-card").classList.contains("grad")&&!e.shadowRoot.innerHTML.includes("ha-card.grad"),"Karte selbst bleibt einfarbig");
  e=mk({gradient:false},st("Entladen",attrs));
- ok(!e.shadowRoot.querySelector("ha-card").classList.contains("grad"),"gradient:false schaltet den Verlauf aus");
+ ok(!e.shadowRoot.querySelector(".hero"),"gradient:false: kein Verlauf-Block");
  e.setConfig({});e.hass={states:st("Entladen",attrs)};
- ok(e.shadowRoot.querySelector("ha-card").classList.contains("grad"),"Umschalten ändert die Klasse am bestehenden ha-card");
+ ok(!!e.shadowRoot.querySelector(".hero.grad"),"Umschalten zeichnet den Block neu");
+ e=mk({order:["flow","meters","headline"]},st("Entladen",attrs));
+ ok(e.shadowRoot.querySelector(".hero.grad")&&!e.shadowRoot.querySelector(".hero.grad .headline"),"Nicht benachbarte Überschrift bleibt außerhalb des Blocks");
+}
+{ // Aussehen aus dem Add-on, Optionen der Karte gehen vor
+ const ac={size:"large",show_headline:false,show_trend:false,gradient:false,show_meters:true,meters_layout:"big",show_batteries:true,show_surplus:true,show_tags:true,show_kill:true,accent:"",order:[]};
+ let e=mk({},st("Entladen",{...attrs,card_cfg:ac}));
+ ok(!e.shadowRoot.querySelector(".headline")&&!e.shadowRoot.querySelector(".hero"),"Einstellungen aus dem Add-on gelten (ohne Überschrift, ohne Verlauf)");
+ e=mk({show_headline:true,gradient:true},st("Entladen",{...attrs,card_cfg:ac}));
+ ok(!!e.shadowRoot.querySelector(".hero.grad .headline"),"Optionen der Karte überschreiben das Add-on");
+}
+{ // Breite: Energiefluss wächst mit der Karte
+ const el2=w.document.createElement("solasi-card");w.document.body.appendChild(el2);
+ Object.defineProperty(el2,"offsetWidth",{value:1400,configurable:true});
+ el2.setConfig({});el2.hass={states:st("Entladen",attrs)};
+ const vb=el2.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').getAttribute("viewBox").split(" ")[2];
+ ok(Number(vb)>800&&Number(vb)<=1100,"Breite Karte: Zeichnung wird breiter ("+vb+")");
+ const el3=w.document.createElement("solasi-card");w.document.body.appendChild(el3);
+ Object.defineProperty(el3,"offsetWidth",{value:380,configurable:true});
+ el3.setConfig({});el3.hass={states:st("Entladen",attrs)};
+ ok(el3.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').getAttribute("viewBox")==="0 0 640 340","Schmale Karte: bisherige Zeichnung");
+}
+{ // Vergleich mit gestern
+ const t={house:6.5,pv:3.1,imp:2.6,bat:1.7,chg:0.8,cmp:{house:{y:5.8,full:9},pv:{y:2.0,full:6},imp:{y:3.0,full:4},bat:{y:1.7,full:2}}};
+ const a={...attrs,today:t,meters_cfg:{show_day:true,extra:true,compare:"same"}};
+ let e=mk({},st("Entladen",a));
+ const tx=e.shadowRoot.textContent;
+ ok(tx.includes("gestern 5,8 kWh")&&tx.includes("▲ 12 %"),"Tagesverbrauch: gestern 5,8 kWh, ▲ 12 %");
+ ok(e.shadowRoot.innerHTML.includes('class="cg">▲ 55 %')&&e.shadowRoot.innerHTML.includes('class="cb">▼ 13 %')===false,"Mehr Solar ist grün");
+ ok(e.shadowRoot.innerHTML.includes('class="cg">▼ 13 %'),"Weniger Netzbezug ist grün");
+ ok(tx.includes("≈ gleich"),"Gleicher Wert: ≈ gleich");
+ e=mk({meters_compare:"full"},st("Entladen",a));
+ ok(e.shadowRoot.textContent.includes("gestern gesamt 9,0 kWh"),"Option ganzer Tag");
+ e=mk({meters_compare:"off"},st("Entladen",a));
+ ok(!e.shadowRoot.textContent.includes("gestern"),"Option aus");
+ const a2={...a,today:{...t,cmp:{...t.cmp,house:{y:null,full:9}}}};
+ e=mk({},st("Entladen",a2));
+ ok(e.shadowRoot.textContent.includes("gestern gesamt 9,0 kWh"),"Ohne Stundenstand: Rückfall auf den ganzen Tag");
+ e=mk({},st("Entladen",{...a,meters_cfg:{show_day:true,extra:true,compare:"off"}}));
+ ok(!e.shadowRoot.textContent.includes("gestern"),"Einstellung aus dem Add-on: Aus");
+}
+{ // Speicher in Wartung: ausgegraut, ohne Werte; deaktivierte fehlen in den Daten
+ const U=[{name:"Anker HÜTTE",pv:0,bat:0,soc:50,kwh:2.5,paused:true},{name:"Anker DACH",pv:500,bat:-200,soc:70,kwh:7}];
+ let e=mk({},st("Entladen",{...attrs,units:U}));
+ ok(e.shadowRoot.innerHTML.includes('opacity=".42"')&&e.shadowRoot.textContent.includes("Wartung")&&e.shadowRoot.textContent.includes("pausiert"),"Wartung: Kacheln ausgegraut mit „Wartung“");
+ ok(e.shadowRoot.textContent.includes("500 W")&&!e.shadowRoot.textContent.includes("1.300 W"),"Wartungs-Speicher zählt nicht in Solar gesamt");
 }
 { // Energiefluss: Vorlagen, Ausblenden, Reihenfolge aus Add-on und Kartenoptionen
  const U2=[{name:"Anker HÜTTE",pv:400,bat:-100,soc:50,kwh:2.5},{name:"Anker DACH",pv:500,bat:-200,soc:70,kwh:7}];

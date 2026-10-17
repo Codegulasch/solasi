@@ -1,10 +1,12 @@
 """Tagesstatistik: integriert Leistungen zu Energie (Wh) und berechnet Kennzahlen."""
 import time
+from datetime import timedelta
 
-from util import load_json, now_local, save_json
+from util import load_json, now_local, save_json, snap_at
 
 KEYS = ("pv", "house", "imp", "exp", "bat_dis", "bat_chg")
 KEEP_DAYS = 400
+KEEP_HOURS = 3        # Tage mit Stundenständen (für den Vergleich mit gestern zur gleichen Uhrzeit)
 
 
 class Stats:
@@ -16,6 +18,7 @@ class Stats:
         # Laufende Gesamtzähler (Wh) für das Energie-Dashboard: wachsen nur, auch wenn alte Tage gekürzt werden
         self.totals = {k: float(raw.get("totals", {}).get(k, sum(r.get(k, 0.0) for r in self.days.values())))
                        for k in KEYS}
+        self.hours = raw.get("hours", {})       # {Datum: {Stunde: {Schlüssel: Wh}}}: Stand zu Beginn jeder Stunde
         self._last = None
         self._last_save = time.monotonic()
 
@@ -42,14 +45,33 @@ class Stats:
             rec[k] += v
             self.totals[k] += v
         rec["secs"] += dt
+        now = self.clock()
+        hs = self.hours.setdefault(now.strftime("%Y-%m-%d"), {})
+        if str(now.hour) not in hs:
+            hs[str(now.hour)] = {k: round(rec[k], 3) for k in KEYS}
+            if len(self.hours) > KEEP_HOURS:
+                self.hours = {d: self.hours[d] for d in sorted(self.hours)[-KEEP_HOURS:]}
+            self.save()
         if now_mono - self._last_save > 60:
             self.save()
 
     def save(self):
         keep = sorted(self.days)[-KEEP_DAYS:]
         self.days = {d: self.days[d] for d in keep}
-        save_json(self.path, {"days": self.days, "totals": self.totals})
+        save_json(self.path, {"days": self.days, "totals": self.totals, "hours": self.hours})
         self._last_save = time.monotonic()
+
+    def compare(self):
+        """Gestern in kWh je Schlüssel: {"y": bis zur gleichen Uhrzeit oder None, "full": ganzer Tag oder None}."""
+        now = self.clock()
+        yd = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        rec, hs = self.days.get(yd), self.hours.get(yd) or {}
+        out = {}
+        for k in KEYS:
+            full = None if not rec else rec.get(k, 0.0)
+            y = snap_at({h: v.get(k) for h, v in hs.items() if v.get(k) is not None}, full, now.hour, now.minute)
+            out[k] = {"y": None if y is None else round(y / 1000.0, 3), "full": None if full is None else round(full / 1000.0, 3)}
+        return out
 
     @staticmethod
     def kpis(rec):

@@ -404,3 +404,136 @@ def test_selfcheck_grenzen_schreiben(tmp_path):
     by = {(i["area"], i["item"]): i for i in r["items"]}
     assert by[("Speicher A", "Entladegrenze schreiben")]["status"] == "warn"        # Entität fehlt
     assert by[("Speicher A", "Ladeobergrenze schreiben")]["status"] == "info"       # soll 90, ist 100
+
+
+# ---------------- Vergleich mit gestern ----------------
+def test_statistik_vergleich_gleiche_uhrzeit(tmp_path):
+    cur = {"d": datetime(2026, 10, 4, 0, 5, tzinfo=timezone.utc)}
+    st = Stats(str(tmp_path / "s.json"), clock=lambda: cur["d"])
+    t = 1000.0
+    st.update(t, 1000, 1000, 0, 0)
+    for h in range(0, 24):                                     # gestern: jede Stunde 1 kW Haus, 1 kW Solar
+        cur["d"] = datetime(2026, 10, 4, h, 5, tzinfo=timezone.utc)
+        for _ in range(360):
+            t += 10; st.update(t, 1000, 1000, 0, 0)
+    cur["d"] = datetime(2026, 10, 5, 12, 30, tzinfo=timezone.utc)
+    t += 10; st.update(t, 1000, 1000, 0, 0)
+    c = st.compare()
+    assert c["house"]["full"] == 24.0                          # kWh gestern gesamt
+    assert 11.5 <= c["house"]["y"] <= 12.6                     # gestern bis 12:30
+    cur["d"] = datetime(2026, 10, 7, 12, 30, tzinfo=timezone.utc)   # kein Vortag gespeichert
+    assert st.compare()["house"] == {"y": None, "full": None}
+
+
+def test_zaehler_vergleich_gestern(tmp_path, monkeypatch):
+    import meters as M
+    m = M.Meters(str(tmp_path / "m.json"))
+    seq = iter([])
+    hour = {"h": 0}
+    monkeypatch.setattr(M, "now_local", lambda: datetime(2026, 10, 4, hour["h"], 0, tzinfo=timezone.utc))
+    items = [{"entity": "sensor.w"}]
+    val = {"v": 100.0}
+    lookup = lambda eid: (str(val["v"]), "m³", "Wasser")  # noqa: E731
+    for h in range(0, 24):
+        hour["h"] = h; val["v"] = 100.0 + h * 0.1
+        m.compute(items, lookup, "2026-10-04")
+    hour["h"] = 12; val["v"] = 100.0
+    out = m.compute(items, lookup, "2026-10-05")[0]
+    assert out["cmp"]["full"] is not None and out["cmp"]["y"] is not None and 0.5 < out["cmp"]["y"] < 1.5
+    assert Meters_path_roundtrip(tmp_path) is True
+
+
+def Meters_path_roundtrip(tmp_path):
+    import meters as M
+    return M.Meters(str(tmp_path / "m.json")).hist != {}
+
+
+# ---------------- Speicher: aktiv, Wartung, deaktiviert ----------------
+def _state_ctl(tmp_path, monkeypatch):
+    import controller as C
+    ctrl = mk_ctrl(tmp_path); ha = ctrl.ha; ha.connected = True
+    ctrl.cfg["enabled"], ctrl.cfg["dry_run"] = True, False
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(C.time, "monotonic", lambda: clock["t"])
+    return ctrl, clock
+
+
+def test_speicher_deaktiviert_fehlt_in_den_daten(tmp_path, monkeypatch):
+    ctrl, clock = _state_ctl(tmp_path, monkeypatch)
+    u = ctrl.cfg["units"][0]; u.update(num="number.a", dir="select.dir", soc="sensor.soc", state="off")
+    ctrl.ha.states["sensor.soc"] = {"state": "50", "attributes": {}}
+    snap = ctrl.gather()
+    assert all(x["k"] != u["name"] for x in snap["units"])
+    d = decide(ctrl.cfg, snap)                                  # auch ohne Speicher keine Ausnahme
+    assert d["avg_soc"] == 100.0
+
+
+def test_speicher_wartung_ist_ausgegraut_und_ohne_steuerung(tmp_path, monkeypatch):
+    ctrl, clock = _state_ctl(tmp_path, monkeypatch)
+    u = ctrl.cfg["units"][0]; u.update(num="number.a", dir="select.dir", soc="sensor.soc", state="maint")
+    ctrl.ha.states["sensor.soc"] = {"state": "50", "attributes": {}}
+    snap = ctrl.gather()
+    pu = [x for x in snap["units"] if x["k"] == u["name"]][0]
+    assert pu["paused"] and pu["obs"] and pu["soc"] == 50
+    d = decide(ctrl.cfg, snap)
+    assert pu["p"] == 0 and d["avg_soc"] == 100.0               # zählt nicht in den mittleren Ladestand
+
+
+def test_speicher_automatische_wartung_bei_ausfall(tmp_path, monkeypatch):
+    ctrl, clock = _state_ctl(tmp_path, monkeypatch)
+    u = ctrl.cfg["units"][0]; u.update(soc="sensor.soc", state="active")
+    ctrl.ha.states["sensor.soc"] = {"state": "unavailable", "attributes": {}}
+    assert ctrl.unit_state(u) == ("active", False)               # noch nicht lange genug
+    clock["t"] += 125
+    assert ctrl.unit_state(u) == ("maint", True)
+    assert any("automatisch in Wartung" in e["msg"] for e in ctrl.events)
+    ctrl.ha.states["sensor.soc"] = {"state": "60", "attributes": {}}
+    clock["t"] += 10
+    assert ctrl.unit_state(u) == ("maint", True)                 # erst nach 30 s stabil wieder aktiv
+    clock["t"] += 31
+    assert ctrl.unit_state(u) == ("active", False)
+    ctrl.cfg["safety"]["auto_maint"] = False
+    ctrl.ha.states["sensor.soc"] = {"state": "unavailable", "attributes": {}}
+    clock["t"] += 600
+    assert ctrl.unit_state(u) == ("active", False)               # abgeschaltet
+
+
+def test_speicher_wechsel_in_wartung_gibt_frei(tmp_path):
+    ctrl = mk_ctrl(tmp_path); ctrl.ha.connected = True
+    ctrl.cfg["enabled"], ctrl.cfg["dry_run"] = True, False
+    u = ctrl.cfg["units"][0]; u.update(num="number.a", dir="select.dir", mode="select.mode", soc="sensor.soc", fallback_mode="self_consumption")
+    ha = ctrl.ha
+    ha.states.update({"number.a": {"state": "100", "attributes": {}}, "select.dir": {"state": "discharge", "attributes": {"options": ["discharge", "charge"]}},
+                      "select.mode": {"state": "third_party_control", "attributes": {}}, "sensor.soc": {"state": "50", "attributes": {}}})
+    calls = []
+    async def call(domain, service, data): calls.append((domain, service, data))
+    ha.call_service = call
+    asyncio.run(ctrl._unit_transitions({}))                      # erster Durchlauf merkt sich nur den Zustand
+    assert calls == []
+    u["state"] = "maint"
+    asyncio.run(ctrl._unit_transitions({}))
+    assert any(c[1] == "select_option" and c[2].get("option") == "self_consumption" for c in calls)
+    n = len(calls)
+    asyncio.run(ctrl._unit_transitions({}))
+    assert len(calls) == n                                       # nur einmal beim Wechsel
+
+
+def test_mqtt_select_je_speicher(tmp_path):
+    ctrl = mk_ctrl(tmp_path)
+    ctrl.cfg["units"][0]["name"] = "Anker HÜTTE"
+    msgs = ctrl.mqtt.discovery_messages()
+    key = "homeassistant/select/solasi/unit0/config"
+    assert key in msgs and msgs[key]["options"] == ["Aktiv", "Wartung", "Deaktiviert"] and msgs[key]["name"] == "Anker HÜTTE Betrieb"
+    asyncio.run(ctrl.mqtt._on_message(ctrl.mqtt.prefix + "/unit0/set", "Wartung"))
+    assert ctrl.cfg["units"][0]["state"] == "maint"
+    assert ctrl.mqtt.values()["unit0"] == "Wartung" if ctrl.status else True
+
+
+def test_karten_einstellungen_werden_bereinigt(tmp_path):
+    from controller import clean_card
+    c = clean_card({"size": "x", "order": ["flow", "flow", "foo", "meters"], "gradient": 0, "accent": "#123456"})
+    assert c["size"] == "large" and c["order"] == ["flow", "meters"] and c["gradient"] is False and c["accent"] == "#123456"
+    assert clean_card(None) == DEFAULT_CONFIG["card"]
+    ctrl = mk_ctrl(tmp_path)
+    asyncio.run(ctrl.save_config({**ctrl.cfg, "card": {"show_trend": False}}))
+    assert ctrl.cfg["card"]["show_trend"] is False and ctrl.cfg["card"]["show_headline"] is True

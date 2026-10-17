@@ -4,6 +4,7 @@ Enthält einen kleinen, abhängigkeitsfreien MQTT-3.1.1-Client (QoS 0) und die B
 die Messwerte veröffentlicht und Schalter von Home Assistant entgegennimmt.
 """
 import asyncio
+import copy
 import json
 import logging
 import os
@@ -189,6 +190,10 @@ SWITCHES = (
 )
 
 
+UNIT_OPTS = {"active": "Aktiv", "maint": "Wartung", "off": "Deaktiviert"}
+UNIT_BY_LABEL = {v.lower(): k for k, v in UNIT_OPTS.items()}
+
+
 class MqttBridge:
     """Veröffentlicht Messwerte als MQTT-Entitäten und setzt Befehle aus Home Assistant um."""
 
@@ -322,6 +327,11 @@ class MqttBridge:
         for key, name, icon in SWITCHES:
             add("switch", key, {"name": name, "icon": icon, "state_topic": f"{p}/{key}",
                                 "command_topic": f"{p}/{key}/set", "payload_on": "ON", "payload_off": "OFF"})
+        for i, u in enumerate(self.ctrl.cfg.get("units") or []):
+            if not u.get("name"):
+                continue
+            add("select", f"unit{i}", {"name": f"{u['name']} Betrieb", "icon": "mdi:battery-sync", "state_topic": f"{p}/unit{i}",
+                                       "command_topic": f"{p}/unit{i}/set", "options": list(UNIT_OPTS.values())})
         return out
 
     async def _discovery(self):
@@ -355,6 +365,9 @@ class MqttBridge:
         }
         for key, src, _n, _i in ENERGY:
             v[key] = round(c.stats.totals.get(src, 0.0) / 1000.0, 3)
+        for i, u in enumerate(cfg.get("units") or []):
+            if u.get("name"):
+                v[f"unit{i}"] = UNIT_OPTS.get(u.get("state"), "Aktiv")
         return v
 
     async def publish_state(self):
@@ -385,6 +398,17 @@ class MqttBridge:
         if not (topic.startswith(p) and topic.endswith("/set")):
             return
         key = topic[len(p):-4]
+        if key.startswith("unit") and key[4:].isdigit():
+            i, new = int(key[4:]), UNIT_BY_LABEL.get(payload.strip().lower())
+            units = self.ctrl.cfg.get("units") or []
+            if new and i < len(units):
+                cfg = copy.deepcopy(self.ctrl.cfg)
+                cfg["units"][i]["state"] = new
+                await self.ctrl.save_config(cfg)
+                self.ctrl.event("info", f"MQTT: {units[i].get('name')} → {UNIT_OPTS[new]}")
+                self._sent.pop(f"{self.prefix}/{key}", None)
+                await self.publish_state()
+            return
         on = payload.strip().upper() in ("ON", "TRUE", "1")
         c = self.ctrl
         if key == "control":

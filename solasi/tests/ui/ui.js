@@ -217,6 +217,10 @@ const w=dom.window,d=w.document;
    ok(!!mn&&!!d.getElementById("f_units_0_max_soc")&&!!wl,"Speicher: eigener Mindest-/Höchst-Ladestand und Schalter „Grenzen schreiben“");
    mn.value="25";mn.dispatchEvent(new w.Event("input"));ok(cfg.units[0].min_soc===25,"Eigener Mindest-Ladestand wird gespeichert");
    mn.value="";mn.dispatchEvent(new w.Event("input"));ok(cfg.units[0].min_soc===null,"Leeres Feld bedeutet globaler Wert (null)");
+   const stt=d.getElementById("f_units_0_state");
+   ok(!!stt&&[...stt.options].map(o=>o.value).join()==="active,maint,off","Speicher: Betrieb Aktiv, Wartung, Deaktiviert");
+   stt.value="maint";stt.dispatchEvent(new w.Event("change"));ok(cfg.units[0].state==="maint","Betrieb Wartung wird gespeichert");
+   stt.value="active";stt.dispatchEvent(new w.Event("change"));
    wl.checked=true;wl.dispatchEvent(new w.Event("change"));ok(cfg.units[0].write_limits===true,"Schalter „Grenzen schreiben“ wird gespeichert"); }
  ok(d.querySelectorAll("#dl-fb0 option").length===2&&d.querySelector("#dl-fb0 option").value==="third_party_control","Vorschläge aus den Optionen des Betriebsmodus");
  // --- Speichertypen ---
@@ -305,6 +309,15 @@ const w=dom.window,d=w.document;
     ok(cfg.flow.grid===false&&cfg.flow.layout==="pairs","Kachel ausblenden speichert den Schalter");
     const n=(cfg.units||[]).length;
     if(n>1){const first=cfg.units[0].name;d.querySelector('#fl_ord [data-fm="1"]').click();ok(cfg.flow.order[1]===first,"Pfeil ändert die Reihenfolge der Anlagen");}
+    const fz=d.querySelector("#fl_size");fz.value="large";fz.dispatchEvent(new w.Event("change"));
+    ok(cfg.flow.size==="large","Größe des Energieflusses wird gespeichert");
+    ok(!!d.querySelector("#cd_size")&&d.querySelectorAll("#p-look [data-cd]").length===8&&d.querySelectorAll("#cd_ord .ordrow").length===7,"Dashboard-Karte: Aussehen mit acht Schaltern und sieben Blöcken");
+    d.querySelector('#p-look [data-cd="gradient"]').click();
+    ok(cfg.card.gradient===false,"Farbverlauf der Karte abschaltbar");
+    d.querySelector('#cd_ord [data-cm="1"]').click();
+    ok(cfg.card.order[0]==="headline"&&cfg.card.order[1]==="meters","Reihenfolge der Kartenblöcke ändern");
+    d.querySelector("#cd_reset").click();
+    ok(cfg.card.gradient===true&&cfg.card.order.length===0,"Kartenaussehen zurücksetzen");
     d.querySelector("#fl_reset").click();
     ok(cfg.flow.layout==="total"&&cfg.flow.grid===true&&cfg.flow.order.length===0,"Standard wiederherstellen setzt den Energiefluss zurück");
   }

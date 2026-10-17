@@ -44,7 +44,7 @@ const SF = (() => {
 
   function tile(k, label, val, sub, col, icon, pos, tag) {
     const t = pos || T[k], w = t.w || TW;
-    return `<g><rect x="${t.x}" y="${t.y}" width="${w}" height="${TH}" rx="18" style="fill:var(--sf-card)"/>
+    return `<g${t.dim ? ' opacity=".42"' : ""}><rect x="${t.x}" y="${t.y}" width="${w}" height="${TH}" rx="18" style="fill:var(--sf-card)"/>
       <rect x="${t.x}" y="${t.y}" width="${w}" height="${TH}" rx="18" style="fill:var(${col});fill-opacity:.13;stroke:var(${col});stroke-width:1.6"/>
       <g transform="translate(${t.x + 14} ${t.y + 14})">${icon}</g>
       <text x="${t.x + 54}" y="${t.y + 27}" class="sf-l">${label}</text>
@@ -79,6 +79,14 @@ const SF = (() => {
     return idle + live + dots + chips;
   }
 
+  /* Breite der Zeichnung in Einheiten: bei schmalen Anzeigen 640, bei breiten wächst sie mit (bis 1100).
+     Die Kacheln behalten ihre Größe, der Platz geht in Abstand zwischen den Spalten. */
+  function flowW(d, o) {
+    const px = Number(d.w) || 0;
+    if (!px) return 640;
+    const k = o.size === "large" ? 1.15 : o.size === "compact" ? 0.8 : 0.95, max = o.size === "large" ? 900 : o.size === "compact" ? 1200 : 1100;
+    return Math.round(Math.max(640, Math.min(max, px / k)) / 20) * 20;
+  }
   const nf1 = v => Number(v).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const kwhTxt = v => v == null || isNaN(v) ? "" : nf1(v) + " kWh";
   /* Kurznamen: gemeinsamen Anfang abschneiden („Anker Solix 4 HÜTTE“ und „… DACH“ -> „HÜTTE“, „DACH“) */
@@ -94,6 +102,7 @@ const SF = (() => {
 
   /* Anzeige eines Speichers: Wert und Richtung. Unter 5 W gilt er als bereit, mit Grenze/voll als solcher. */
   function batState(u, bat) {
+    if (u && u.paused) return ["pausiert", "Wartung"];
     if (u && u.locked) return ["Grenze", ""];
     if (bat == null) return ["–", ""];
     if (Math.abs(bat) < 5) return [u && u.full ? "voll" : "bereit", ""];
@@ -103,8 +112,8 @@ const SF = (() => {
   /* Zwei Anlagen. Zeilen von oben nach unten: Solar gesamt, Solar je Anlage, Speicher je Anlage, Haus; das Netz sitzt in der
      Mitte der ersten freien Zeile (oder neben dem Haus). Ausgeblendete Kacheln nehmen ihre Zeile und ihre Linien mit. */
   function flowPairs(d, U, o) {
-    const names = shortNames(U.map(u => u.name)), th = TH, w = 170;
-    const cx = [10, 460], mx = 245, mc = mx + TW / 2;
+    const names = shortNames(U.map(u => u.name)), th = TH, w = 170, W = flowW(d, o);
+    const cx = [10, W - 10 - w], mx = (W - TW) / 2, mc = W / 2;
     const showT = o.layout !== "pairs" && o.total, showS = o.solar, showB = o.bat, showG = o.grid, showH = o.house;
     const gridSide = showG && showH && o.grid_pos === "side";
     const gridRow = !showG || gridSide ? "" : showS ? "s" : showB ? "b" : "g";
@@ -118,7 +127,8 @@ const SF = (() => {
     const total = known.length ? known.reduce((a, u) => a + Math.max(u.pv, 0), 0) : (d.pv == null ? null : Math.max(d.pv, 0));
     U.forEach((u, i) => {
       const x = cx[i], c = x + w / 2, left = i === 0;
-      const pv = u.pv == null ? null : Math.max(u.pv, 0), bat = u.bat == null ? 0 : u.bat;
+      const pz = !!u.paused;                            // Wartung: ausgegraut, ohne Werte und Linien
+      const pv = pz || u.pv == null ? null : Math.max(u.pv, 0), bat = pz || u.bat == null ? 0 : u.bat;
       const chg = Math.max(-bat, 0), dis = Math.max(bat, 0);
       const toHouse = pv == null ? null : Math.max(pv - chg, 0);
       const ex = left ? x + w : x;                       // Seite zur Mitte
@@ -131,21 +141,21 @@ const SF = (() => {
       if (showB && showH) lines.push({ pts: [[c, Y.b + th], [c, Y.h + 52], [left ? ex + 25 : ex - 25, Y.h + 52], [hin, Y.h + 52]], col: "--sf-bat", val: dis });
       const soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null;
       const sub = [soc != null ? soc + " %" : "", kwhTxt(u.kwh)].filter(Boolean).join(" · ");
-      if (showS) tiles.push(tile("sun", "Solar " + esc(clip(names[i], 9)), wl(u.pv), u.pv != null && u.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), { x, y: Y.s, w }));
+      if (showS) tiles.push(tile("sun", "Solar " + esc(clip(names[i], 9)), pz ? "–" : wl(u.pv), pz ? "Wartung" : u.pv != null && u.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), { x, y: Y.s, w, dim: pz }));
       if (showB) {
         const [bv, bt] = batState(u, u.bat);
-        tiles.push(tile("bat", esc(clip(names[i], bt ? 7 : 12)), bv, sub, "--sf-bat", ICON.bat("var(--sf-bat)", soc), { x, y: Y.b, w }, bt));
+        tiles.push(tile("bat", esc(clip(names[i], bt ? 7 : 12)), bv, sub, "--sf-bat", ICON.bat("var(--sf-bat)", soc), { x, y: Y.b, w, dim: pz }, bt));
       }
     });
     const grid = d.grid == null ? 0 : d.grid, gv = d.f ? d.f.gh : grid;
     if (showG && showH) {
-      if (gridSide) lines.push({ pts: [[470, Y.h + 38], [445, Y.h + 38], [420, Y.h + 38], [mx + TW, Y.h + 38]], col: "--sf-grid", val: gv });
+      if (gridSide) lines.push({ pts: [[W - 170, Y.h + 38], [W - 195, Y.h + 38], [mx + TW + 25, Y.h + 38], [mx + TW, Y.h + 38]], col: "--sf-grid", val: gv });
       else lines.push({ pts: [[mc, Y[gridRow] + th], [mc, Y[gridRow] + th + 40], [mc, Y.h - 40], [mc, Y.h]], col: "--sf-grid", val: gv });
     }
     if (showT) tiles.push(tile("sun", "Solar", wl(total), total != null && total < 5 ? "keine Sonne" : "alle Anlagen", "--sf-sun", ICON.sun("var(--sf-sun)"), { x: mx, y: Y.t, w: TW }));
-    if (showG) tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), gridSide ? { x: 470, y: Y.h, w: TW } : { x: mx, y: Y[gridRow], w: TW }));
+    if (showG) tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), gridSide ? { x: W - 170, y: Y.h, w: TW } : { x: mx, y: Y[gridRow], w: TW }));
     if (showH) tiles.push(tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), { x: mx, y: Y.h, w: TW }));
-    return `<svg viewBox="0 0 640 ${H}" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}${tiles.join("")}</svg>`;
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}${tiles.join("")}</svg>`;
   }
 
   /* Mehrere Speicher: je Solaranlage und je Speicher eine Kachel */
@@ -189,16 +199,17 @@ const SF = (() => {
     const grid = d.grid == null ? 0 : d.grid;
     if (o.grid) tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), { x: gx, y: gy, w: TW }));
     if (o.house) tiles.push(tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), { x: hx, y: hy, w: TW }));
-    // Linien zuerst, dann Kacheln (Chips liegen über den Linien, Kacheln darüber)
-    return `<svg viewBox="0 0 640 ${H}" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}${tiles.join("")}</svg>`;
+    // Linien zuerst, dann Kacheln (Chips liegen über den Linien, Kacheln darüber); bei breiter Anzeige mittig
+    const W = flowW(d, o);
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Energiefluss">${CSS}<g transform="translate(${(W - 640) / 2} 0)">${drawLines(lines)}${tiles.join("")}</g></svg>`;
   }
 
-  const FLOW_DEF = { layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", order: [] };
+  const FLOW_DEF = { size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", order: [] };
   /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}],
          fl?:{layout: total|pairs|compact, total, solar, bat, grid, house, grid_pos: mid|side, order:[Namen]}} */
   function flow(d) {
     const o = Object.assign({}, FLOW_DEF, d.fl || {});
-    let U = (d.units || []).filter(u => u && u.name && u.soc != null && u.soc >= 0);
+    let U = (d.units || []).filter(u => u && u.name && !u.off && u.soc != null && u.soc >= 0);
     const ord = Array.isArray(o.order) ? o.order : [];
     if (ord.length) {
       const rk = u => { const i = ord.indexOf(u.name); return i < 0 ? 999 : i; };
@@ -213,7 +224,10 @@ const SF = (() => {
     if (!o.bat) { drop.sb = 1; drop.bh = 1; }
     if (!o.grid) drop.gh = 1;
     if (!o.house) { drop.sh = 1; drop.bh = 1; drop.gh = 1; }
-    const lines = Object.keys(L).filter(k => !drop[k]).map(k => ({ pts: L[k].pts, col: L[k].col, val: f[k] }));
+    const W = flowW(d, o), ex = W - 640;
+    const sx = x => x <= 200 ? x : x >= 400 ? x + ex : x + ex / 2;      // linke Spalte bleibt, rechte rückt nach außen, Mitte mittig
+    const P = k => ({ ...T[k], x: k === "bat" ? T[k].x : k === "grid" ? T[k].x + ex : T[k].x + ex / 2 });
+    const lines = Object.keys(L).filter(k => !drop[k]).map(k => ({ pts: L[k].pts.map(([x, y]) => [sx(x), y]), col: L[k].col, val: f[k] }));
     const bat = d.bat, grid = d.grid == null ? 0 : d.grid, soc = d.soc != null && d.soc >= 0 ? Math.round(d.soc) : null;
     const u0 = o.layout === "compact" ? { locked: d.limited, full: U.length > 0 && U.every(u => u.full) } : (d.units || [])[0] || { locked: d.limited };
     const [bv1, bt1] = batState(u0, bat);
@@ -221,11 +235,11 @@ const SF = (() => {
     const gridSub = grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen";
     const kw = kwhTxt(d.kwh);
     const socPart = soc != null ? soc + " %" + (kw ? " · " + kw : "") : kw;
-    return `<svg viewBox="0 0 640 340" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}
-      ${o.solar ? tile("sun", "Solar", wl(d.pv), d.pv != null && d.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)")) : ""}
-      ${o.bat ? tile("bat", "Speicher", bv1, batSub ? batSub + (socPart ? " · " + socPart : "") : socPart, "--sf-bat", ICON.bat("var(--sf-bat)", soc)) : ""}
-      ${o.grid ? tile("grid", "Netz", wl(Math.abs(grid)), gridSub, "--sf-grid", ICON.grid("var(--sf-grid)")) : ""}
-      ${o.house ? tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)")) : ""}
+    return `<svg viewBox="0 0 ${W} 340" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}
+      ${o.solar ? tile("sun", "Solar", wl(d.pv), d.pv != null && d.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), P("sun")) : ""}
+      ${o.bat ? tile("bat", "Speicher", bv1, batSub ? batSub + (socPart ? " · " + socPart : "") : socPart, "--sf-bat", ICON.bat("var(--sf-bat)", soc), P("bat")) : ""}
+      ${o.grid ? tile("grid", "Netz", wl(Math.abs(grid)), gridSub, "--sf-grid", ICON.grid("var(--sf-grid)"), P("grid")) : ""}
+      ${o.house ? tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), P("home")) : ""}
     </svg>`;
   }
 
@@ -352,6 +366,8 @@ const SF = (() => {
     .sfm-v small{font-size:12.5px;font-weight:600;color:var(--sf-muted);margin-left:3px}
     .sfm-d{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:nowrap}
     .sfm-d b{color:var(--sf-ok);font-weight:700}
+    .sfm-c{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:nowrap}
+    .sfm-c i{font-style:normal;font-weight:700}.sfm-c .cg{color:var(--sf-ok)}.sfm-c .cb{color:var(--sf-bad)}
     .sfm.even .sfm-h .sfm-t{height:100%}
     .sfm.big .sfm-r .sfm-t{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
     .sfm.big .sfm-r .sfm-hd{width:auto;flex:1}
@@ -379,18 +395,41 @@ const SF = (() => {
     return `<b>${m.day >= 0 ? "+" : ""}${nd(m.day)} ${esc(m.unit)}</b> heute`;
   };
 
-  /* d: {items:[{name,value,dec,unit,icon,color,day}], today:{house,pv,imp}|null, show_day, extra, layout} */
+  /* Vergleich mit gestern: cur = Wert heute, c = {y, full}, mode = same (bis zur gleichen Uhrzeit, sonst ganzer Tag) | full | off.
+     good: +1 = mehr ist gut (grün), -1 = mehr ist schlecht (rot), 0 = neutral. fmt formatiert den Vergleichswert. */
+  function cmpLine(cur, c, mode, good, fmtv) {
+    if (mode === "off" || !c || cur == null) return "";
+    let ref = mode === "full" ? c.full : c.y, lab = mode === "full" ? "gestern gesamt" : "gestern";
+    if (ref == null && mode !== "full" && c.full != null) { ref = c.full; lab = "gestern gesamt"; }
+    if (ref == null) return "";
+    const diff = cur - ref;
+    let delta = "";
+    if (ref > 0) {
+      const pc = Math.round(diff / ref * 100);
+      if (Math.abs(pc) < 1) delta = ` · <i>≈ gleich</i>`;
+      else {
+        const cls = good === 0 ? "" : (diff > 0) === (good > 0) ? "cg" : "cb";
+        delta = ` · <i class="${cls}">${diff > 0 ? "▲" : "▼"} ${Math.abs(pc).toLocaleString("de-DE")} %</i>`;
+      }
+    }
+    return `<div class="sfm-c">${lab} ${fmtv(ref)}${delta}</div>`;
+  }
+
+  /* d: {items:[{name,value,dec,unit,icon,color,day,cmp}], today:{house,pv,imp,cmp}|null, show_day, extra, layout, compare} */
   function meters(d) {
     const all = [];
+    const cm = d.compare === "full" || d.compare === "off" ? d.compare : "same";
     const t = d.today;
     if (d.show_day !== false && t && t.house != null)
-      all.push({ k: "day", n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute", hero: true });
+      all.push({ k: "day", n: "Tagesverbrauch", v: nf(t.house, 1), u: "kWh", ic: "haus", c: "accent", sub: "Haus heute", hero: true,
+        cmp: cmpLine(t.house, t.cmp && t.cmp.house, cm, 0, v => nf(v, 1) + " kWh") });
     (d.items || []).forEach(m => all.push({ k: "m:" + (m.entity || ""), n: m.name, v: nf(m.value, m.dec || 0), u: m.unit, ic: m.icon, c: m.color,
-      sub: m.day != null && m.value != null ? dayText(m) : "" }));
+      sub: m.day != null && m.value != null ? dayText(m) : "",
+      cmp: m.day != null && m.value != null ? cmpLine(m.day, m.cmp, cm, 0, v => isWater(m) ? Math.round(v * 1000).toLocaleString("de-DE") + " l" : nd(v) + " " + esc(m.unit)) : "" }));
     if (d.extra && t) {
-      if (t.pv != null) all.push({ k: "pv", n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
-      if (t.imp != null) all.push({ k: "imp", n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
-      if (t.bat != null) all.push({ k: "bat", n: "Aus Speichern heute", v: nf(t.bat, 1), u: "kWh", ic: "akku", c: "bat", sub: t.chg != null ? nf(t.chg, 1) + " kWh geladen" : "" });
+      if (t.pv != null) all.push({ k: "pv", n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "", cmp: cmpLine(t.pv, t.cmp && t.cmp.pv, cm, 1, v => nf(v, 1) + " kWh") });
+      if (t.imp != null) all.push({ k: "imp", n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "", cmp: cmpLine(t.imp, t.cmp && t.cmp.imp, cm, -1, v => nf(v, 1) + " kWh") });
+      if (t.bat != null) all.push({ k: "bat", n: "Aus Speichern heute", v: nf(t.bat, 1), u: "kWh", ic: "akku", c: "bat", sub: t.chg != null ? nf(t.chg, 1) + " kWh geladen" : "", cmp: cmpLine(t.bat, t.cmp && t.cmp.bat, cm, 0, v => nf(v, 1) + " kWh") });
     }
     // eigene Reihenfolge: genannte Kacheln zuerst, der Rest in Standardreihenfolge
     const ord = Array.isArray(d.order) ? d.order : [];
@@ -401,7 +440,7 @@ const SF = (() => {
     const hero = first.hero ? first : null;
     const tiles = hero ? seq.slice(1) : seq;
     const tile = x => `<div class="sfm-t" data-tile="${esc(x.k)}" role="button" tabindex="0" style="--c:${MCOL[x.c] || MCOL.zaehl}"><div class="sfm-hd"><span class="sfm-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${MI[x.ic] || MI.zaehler}</svg></span><span class="sfm-n">${esc(x.n)}</span></div>
-      <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}</div></div>`;
+      <div class="sfm-val"><div class="sfm-v">${x.v}<small>${esc(x.u)}</small></div>${x.sub ? `<div class="sfm-d">${x.sub}</div>` : ""}${x.cmp || ""}</div></div>`;
     if (hero && tiles.length && d.layout !== "even")
       return `${MCSS}<div class="sfm-w"><div class="sfm big"><div class="sfm-h">${tile(hero)}</div><div class="sfm-r">${tiles.map(tile).join("")}</div></div></div>`;
     return `${MCSS}<div class="sfm-w"><div class="sfm even">${(hero ? [hero, ...tiles] : tiles).map(x => x === hero ? `<div class="sfm-h">${tile(x)}</div>` : tile(x)).join("")}</div></div>`;

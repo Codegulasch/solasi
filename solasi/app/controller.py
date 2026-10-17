@@ -45,6 +45,7 @@ def default_unit(name):
         "lim_chg": "",       # optional: Entität „Ladeobergrenze“ (%). Darüber gilt der Speicher als voll
         "min_soc": None,     # eigener Mindest-Ladestand dieses Speichers (None = globaler Wert aus „Akku-Grenzen“)
         "max_soc": None,     # eigener Höchst-Ladestand dieses Speichers (None = globaler Wert)
+        "state": "active",   # active | maint (Wartung: ausgegraut, wird nicht gesteuert) | off (deaktiviert: unsichtbar, wie nicht vorhanden)
         "write_limits": False,   # SOLASI schreibt Mindest-/Höchst-Ladestand in Entladegrenze/Ladeobergrenze des Speichers
         # Rückfall beim Stoppen (Kill-Switch): Modus, den der Speicher dann bekommt (z. B. Eigenverbrauch)
         "fallback_mode": "", "fallback_value": "",
@@ -119,16 +120,21 @@ DEFAULT_CONFIG = {
     "notify": {"service": "", "delay_min": 2, "cooldown_min": 60, "recovery": True,
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
-    "meters": {"show_day": True, "extra": False, "items": [], "order": []},
+    "meters": {"show_day": True, "extra": False, "items": [], "order": [], "compare": "same"},
+    # Aussehen der Dashboard-Karte (gilt für alle Karten; Optionen in der Karte selbst gehen vor)
+    "card": {"size": "large", "show_headline": True, "show_meters": True, "meters_layout": "big", "show_trend": True,
+             "show_batteries": True, "show_surplus": True, "show_tags": True, "show_kill": True,
+             "accent": "", "gradient": True, "order": []},
     # Anordnung der Blöcke in Übersicht und Statistik (leer = Standardreihenfolge, gilt für alle Geräte)
     # Energiefluss: Vorlage (total, pairs, compact), einzelne Kacheln, Platz des Netzes, Reihenfolge der Anlagen (Namen)
-    "flow": {"layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
+    "flow": {"size": "auto", "layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
              "grid_pos": "mid", "order": []},
     "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
     "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
     "safety": {"kill_entity": "", "release_on_stop": True, "release_on_disable": True,
                "auto_meter_min": 5, "auto_errors": True, "resume_auto": False,
-               "watchdog": True, "watchdog_min": 3},
+               "watchdog": True, "watchdog_min": 3,
+               "auto_maint": True, "auto_maint_min": 2},     # nicht erreichbarer Speicher geht nach dieser Zeit automatisch in Wartung
     "names": {"mode_option": "third_party_control", "dis": "discharge", "chg": "charge"},
     "surplus": {
         "enabled": False, "dry_run": True, "source": "pv",
@@ -158,10 +164,28 @@ def clean_flow(raw):
     """Energiefluss-Einstellungen mit festen Werten; Unbekanntes wird zum Standard."""
     raw = raw if isinstance(raw, dict) else {}
     d = DEFAULT_CONFIG["flow"]
-    out = {"layout": raw.get("layout") if raw.get("layout") in ("total", "pairs", "compact") else d["layout"],
+    out = {"size": raw.get("size") if raw.get("size") in ("auto", "compact", "large") else d["size"],
+           "layout": raw.get("layout") if raw.get("layout") in ("total", "pairs", "compact") else d["layout"],
            "grid_pos": raw.get("grid_pos") if raw.get("grid_pos") in ("mid", "side") else d["grid_pos"],
            "order": clean_order(raw.get("order"))}
     for k in ("total", "solar", "bat", "grid", "house"):
+        out[k] = bool(raw.get(k, d[k]))
+    return out
+
+
+CARD_BLOCKS = ("meters", "headline", "flow", "trend", "batteries", "surplus", "tags")
+
+
+def clean_card(raw):
+    """Karten-Einstellungen mit festen Werten; Unbekanntes wird zum Standard."""
+    raw = raw if isinstance(raw, dict) else {}
+    d = DEFAULT_CONFIG["card"]
+    out = {"size": raw.get("size") if raw.get("size") in ("large", "compact") else d["size"],
+           "meters_layout": raw.get("meters_layout") if raw.get("meters_layout") in ("big", "even") else d["meters_layout"],
+           "accent": str(raw.get("accent") or "")[:32],
+           "order": [x for i, x in enumerate(raw.get("order") if isinstance(raw.get("order"), list) else [])
+                     if x in CARD_BLOCKS and x not in raw["order"][:i]]}
+    for k in ("show_headline", "show_meters", "show_trend", "show_batteries", "show_surplus", "show_tags", "show_kill", "gradient"):
         out[k] = bool(raw.get(k, d[k]))
     return out
 
@@ -353,8 +377,8 @@ def decide(cfg, snap):
     want_dis = any(u["dcap"] > 0 for u in units) and net_dis >= (eff_off if dis_now else eff_on)
     want_chg = any(u["elig_chg"] for u in units) and net_balance <= -(eff_off if chg_now else eff_on)
 
-    socs = [u["soc"] for u in units if u["soc"] >= 0]
-    known = [u for u in units if u["soc"] >= 0]
+    socs = [u["soc"] for u in units if u["soc"] >= 0 and not u.get("paused")]
+    known = [u for u in units if u["soc"] >= 0 and not u.get("paused")]
     cap_all = sum(u.get("cap") or 5.0 for u in known)
     avg_soc = (sum(u["soc"] * (u.get("cap") or 5.0) for u in known) / cap_all) if known else 100.0   # nach Kapazität gewichtet
     kwh_now = sum(max(0.0, min(100.0, u["soc"])) / 100.0 * (u.get("cap") or 5.0) for u in known)
@@ -446,6 +470,8 @@ class Controller:
         self._wd_hash = load_json(self._wd_path, {}).get("hash", "")
         self.watchdog = {"state": "unbekannt", "detail": "Noch nicht abgeglichen", "json": "", "managed": False}
         self._hb_stopped = False
+        self._reach = {}             # Speicher -> Erreichbarkeit: {"bad": seit, "good": seit, "auto": Wartung automatisch}
+        self._unit_prev = {}         # Speicher -> zuletzt bekannter eingestellter Zustand (für das Freigeben beim Wechsel)
         self._lim_try = {}           # (Speicher, min|max) -> (Zeitpunkt, Wert) des letzten Schreibversuchs der Grenzen
         self._lim_note = {}          # zuletzt gemeldeter Hinweis je Grenze, damit er nicht dauernd im Protokoll steht
         self._mode_try = {}          # Speicher -> Zeitpunkt des letzten Versuchs, den Modus zu setzen
@@ -501,6 +527,64 @@ class Controller:
             self.event("error", f"{what} fehlgeschlagen: {e}")
             return False
 
+    # ---------- Zustand je Speicher: aktiv, Wartung, deaktiviert ----------
+    def unit_state(self, u):
+        """-> (Zustand, automatisch). Eingestellt: active, maint, off. Ein nicht erreichbarer Speicher geht nach einigen
+        Minuten von selbst in Wartung (ohne Fehlermeldungen) und kehrt zurück, sobald er wieder antwortet."""
+        k = u.get("name")
+        r = self._reach.setdefault(k, {"bad": None, "good": None, "auto": False})
+        st = u.get("state") if u.get("state") in ("maint", "off") else "active"
+        if st != "active":
+            r.update(bad=None, good=None, auto=False)
+            return st, False
+        sf = self.cfg["safety"]
+        if sf.get("auto_maint", True) and u.get("soc") and not u.get("observe") and self.ha.connected:
+            now = time.monotonic()
+            if self.ha.state(u["soc"]) in (None, "unavailable", "unknown"):
+                r["good"] = None
+                r["bad"] = r["bad"] or now
+                mins = sf.get("auto_maint_min", 2)
+                if not r["auto"] and now - r["bad"] >= mins * 60:
+                    r["auto"] = True
+                    self.event("info", f"{k}: Ladestand seit {mins:g} Minuten nicht erreichbar, Speicher geht automatisch in Wartung")
+            else:
+                r["bad"] = None
+                if r["auto"]:
+                    r["good"] = r["good"] or now
+                    if now - r["good"] >= 30:
+                        r.update(auto=False, good=None)
+                        self._mode_try.pop(k, None)
+                        self.event("info", f"{k}: wieder erreichbar, Wartung beendet")
+            if r["auto"]:
+                return "maint", True
+        return "active", False
+
+    async def _unit_transitions(self, snap):
+        """Wechselt ein Speicher von Hand in Wartung oder aus, gibt SOLASI ihn an sein eigenes Regelverhalten zurück."""
+        cfg = self.cfg
+        live = bool(cfg["enabled"]) and not cfg["dry_run"] and not self.stopped
+        for uc in cfg["units"]:
+            k, cur = uc.get("name"), uc.get("state") if uc.get("state") in ("maint", "off") else "active"
+            prev = self._unit_prev.get(k)
+            self._unit_prev[k] = cur
+            if prev is None or prev == cur:
+                continue
+            if cur == "active":
+                self._mode_try.pop(k, None)
+                self.event("info", f"{k}: wieder aktiv")
+                self.wake.set()
+                continue
+            self.event("info", f"{k}: {'Wartung' if cur == 'maint' else 'deaktiviert'}")
+            if live and drivers.configured(uc) and not uc.get("observe"):
+                s = drivers.read(self.ha, uc, cfg["names"], self._script_mem)
+                for dom, svc, data, what in drivers.release_commands(uc, s, cfg["names"], self.ha):
+                    try:
+                        await self.ha.call_service(dom, svc, data)
+                        self.event("act", f"Freigabe ({cur}): {what}")
+                    except Exception as e:  # noqa: BLE001
+                        self.event("info", f"Freigabe ({what}) nicht möglich: {e}")
+                    await asyncio.sleep(0.4)
+
     # ---------- Zustand einlesen ----------
     def gather(self):
         cfg, ha = self.cfg, self.ha
@@ -518,6 +602,16 @@ class Controller:
         pv_w, pv_cfg, pv_known = 0.0, False, True
         out_cfg, out_known, bat_known = False, True, True
         for u in cfg["units"]:
+            stt, _auto = self.unit_state(u)
+            if stt == "off":
+                continue                       # deaktiviert: wie nicht vorhanden
+            if stt == "maint":                 # Wartung: sichtbar (ausgegraut), aber ohne Steuerung, Messwerte und Fehlerprüfung
+                soc_m = ha.state(u["soc"]) if u.get("soc") else None
+                units.append({"cfg": u, "k": u["name"], "has": False, "obs": True, "paused": True, "cap": cap_kwh(u),
+                              "soc": num(soc_m, -1) if is_num(soc_m) else -1, "set": 0.0, "real": 0.0, "pv": None, "ac": None,
+                              "bat": None, "dir": None, "num_state": None, "mode": None, "nmax_dis": None, "nmax_chg": None,
+                              "lim_dis": None, "lim_chg": None, "locked": False})
+                continue
             obs = bool(u.get("observe"))
             fl = drivers.flows(ha, u) if (drivers.configured(u) or u.get("pv") or obs) else None
             if u["pv"]:
@@ -666,6 +760,7 @@ class Controller:
         d = decide(cfg, snap)
         dry = cfg["dry_run"]
         await self._safety_check(snap, d)
+        await self._unit_transitions(snap)
         # Speicher gleichzeitig ansteuern: ein hängender Speicher soll die anderen nicht aufhalten
         todo = [] if (self.stopped or self._releasing or self._shutdown) else snap["units"]
         results = await asyncio.gather(*(self._apply_unit(u, d, dry) for u in todo), return_exceptions=True)
@@ -853,6 +948,8 @@ class Controller:
         was_live = bool(self.cfg["enabled"]) and not self.cfg["dry_run"]
         if isinstance(data, dict) and "ui" in data:
             data = {**data, "ui": clean_ui(data["ui"])}
+        if isinstance(data, dict) and "card" in data:
+            data = {**data, "card": clean_card(data["card"])}
         if isinstance(data, dict) and "flow" in data:
             data = {**data, "flow": clean_flow(data["flow"])}
         if isinstance(data, dict) and isinstance(data.get("meters"), dict):
@@ -928,7 +1025,7 @@ class Controller:
         try:
             checks = []
             for uc in cfg["units"]:
-                if not drivers.configured(uc) or uc.get("observe"):
+                if not drivers.configured(uc) or uc.get("observe") or uc.get("state") in ("maint", "off"):
                     continue
                 s = drivers.read(ha, uc, cfg["names"], self._script_mem)
                 cmds = drivers.release_commands(uc, s, cfg["names"], ha)
@@ -1067,10 +1164,13 @@ class Controller:
 
         day = self.stats.days.get(now_local().strftime("%Y-%m-%d"))
         k = Stats.kpis(day) if day else None
+        cmp_ = self.stats.compare()
         self._meters_view = {
             "items": self.meters.compute(mc.get("items"), lookup, now_local().strftime("%Y-%m-%d")),
             "today": None if k is None else {"house": k["house"], "pv": k["pv"], "imp": k["imp"], "autarky": k["autarky"],
-                                             "bat": k["bat_dis"], "chg": k["bat_chg"]},
+                                             "bat": k["bat_dis"], "chg": k["bat_chg"],
+                                             "cmp": {"house": cmp_["house"], "pv": cmp_["pv"], "imp": cmp_["imp"], "bat": cmp_["bat_dis"]}},
+            "compare": mc.get("compare") if mc.get("compare") in ("off", "same", "full") else "same",
             "show_day": bool(mc.get("show_day", True)), "extra": bool(mc.get("extra", False)),
             "order": clean_order(mc.get("order")),
         }
@@ -1104,7 +1204,7 @@ class Controller:
     def _curtail_update(self, snap, d, now, hold_s=180):
         """Beobachtet, ob die Abregelung bei vollem Speicher wirkt (Einspeisung trotz vollem Speicher)."""
         cfg = self.cfg
-        units = [u for u in snap["units"] if u["soc"] >= 0]
+        units = [u for u in snap["units"] if u["soc"] >= 0 and not u.get("paused")]
         full = bool(units) and all(u["soc"] >= u.get("max", cfg["soc"]["max"]) for u in units)
         sun_ok = (snap["pv_w"] + snap["extra_pv"] > 100) if (snap["has_pv"] or snap["extra_pv"]) else True
         active = bool(cfg["features"]["strict_zero"]) and full and sun_ok and d["meter_ok"]
@@ -1129,7 +1229,7 @@ class Controller:
     def _problems(self, snap, d):
         now = time.monotonic()
         self._fail_times = [t for t in self._fail_times if now - t < 600]
-        units = snap["units"]
+        units = [u for u in snap["units"] if not u.get("paused")]
         valid = [u for u in units if u["soc"] >= 0]
         return {
             "meter": not d["meter_ok"],
@@ -1199,7 +1299,9 @@ class Controller:
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
             "flow_cfg": clean_flow(self.cfg.get("flow")),
-            "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"], "order": self.meter_view()["order"]},
+            "card_cfg": clean_card(self.cfg.get("card")),
+            "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"], "order": self.meter_view()["order"],
+                           "compare": self.meter_view()["compare"]},
         }
         out = {"sensor.solasi": (state, main)}
         if self.mqtt.active:
@@ -1264,7 +1366,8 @@ class Controller:
             "units": [{
                 "name": u["k"], "soc": u["soc"], "set": round(u["set"]), "real": round(u["real"]),
                 "plan": u["p"], "force": u["force"], "available": u["has"], "pv": None if u.get("pv") is None else round(u["pv"]),
-                "mode": u["mode"], "dir": u["dir"], "obs": u["obs"],
+                "mode": u["mode"], "dir": u["dir"], "obs": u["obs"] and not u.get("paused"), "paused": bool(u.get("paused")),
+                "auto_paused": bool(self._reach.get(u["k"], {}).get("auto")),
                 "cap": u["cap"], "kwh": None if u["soc"] < 0 else round(max(0.0, min(100.0, u["soc"])) / 100 * u["cap"], 2),
                 "ac": None if u.get("ac") is None else round(u["ac"]), "bat": None if u.get("bat") is None else round(u["bat"]),
                 "locked": bool(u.get("locked")), "full": bool(u.get("full")),
