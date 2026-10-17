@@ -154,5 +154,30 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  ok(e2.shadowRoot.querySelector('svg[aria-label^="Verlauf"]').textContent.includes("aus Speichern"),"Verlauf zeigt die Abgabe der Speicher");
  ok(e2.shadowRoot.textContent.includes("5,5 von 10 kWh"),"Speicherliste mit kWh");
 }
+{ // Überschrift richtet sich nach den echten Flüssen, nicht nach dem Sollwert
+ const base={meters:[],today:{},pv_w:0,house_w:229,battery_w:0,grid_w:229,avg_soc:8,kwh:1.3,cap_kwh:15,target_w:339,
+  flows:{solar_house:0,solar_battery:0,battery_house:0,grid_house:229},
+  units:[{name:"Anker Solix 4 HÜTTE",pv:0,soc:5,kwh:0.3,cap:5,bat:0,available:true},{name:"Anker Solix 4 DACH",pv:0,soc:10,kwh:1,cap:10,bat:0,available:true}]};
+ let e=mk({},st("Entladen",base)),h=e.shadowRoot.querySelector(".headline").textContent;
+ ok(h.startsWith("Das Netz versorgt dein Haus")&&!h.includes("339 W versorgen")&&!/Speicher versorgen dein Haus mit 339/.test(h),"Überschrift: Speicher liefern nichts -> Netz versorgt das Haus");
+ ok(e.shadowRoot.textContent.includes("liefern noch nichts (Sollwert 339 W)"),"Zweite Zeile nennt den Sollwert als Anforderung");
+ const lim=JSON.parse(JSON.stringify(base));lim.limited=true;lim.units[1].locked=true;
+ e=mk({},st("Entladen",lim));
+ ok(e.shadowRoot.querySelector(".headline").textContent.startsWith("Speicher an der Entladegrenze"),"Überschrift: gesperrter Speicher -> Entladegrenze");
+ ok(e.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent.includes("Grenze"),"Gesperrter Speicher zeigt Grenze statt Watt");
+ const sol=JSON.parse(JSON.stringify(base));sol.flows={solar_house:0,solar_battery:80,battery_house:0,grid_house:511};sol.house_w=511;sol.grid_w=511;sol.pv_w=80;sol.battery_w=-80;sol.units[1].pv=80;sol.units[1].bat=-80;
+ e=mk({},st("Entladen",sol));h=e.shadowRoot.querySelector(".headline").textContent;
+ ok(h.startsWith("Solar lädt den Speicher mit 80 W")&&!h.includes("Überschuss"),"Solar lädt, Haus am Netz: kein „Überschuss“");
+ ok(e.shadowRoot.textContent.includes("Haus bezieht 511 W aus dem Netz"),"Zweite Zeile nennt den Netzbezug");
+ const sv=e.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent;
+ ok(sv.includes("lädt")&&sv.includes("bereit"),"Speicher-Kacheln: lädt / bereit statt zweimal derselben Wattzahl");
+ const dis=JSON.parse(JSON.stringify(base));dis.flows={solar_house:0,solar_battery:0,battery_house:330,grid_house:150};dis.units[1].bat=330;dis.battery_w=330;
+ e=mk({},st("Entladen",dis));
+ ok(e.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent.includes("entlädt"),"Speicher-Kachel: entlädt");
+ // Heute: Aus Speichern
+ const td=JSON.parse(JSON.stringify(base));td.today={house:3,pv:0,imp:1.7,bat:1.4,chg:0.6};td.meters_cfg={show_day:true,extra:true};
+ e=mk({},st("Entladen",td));
+ ok(e.shadowRoot.textContent.includes("Aus Speichern heute")&&e.shadowRoot.textContent.includes("0,6 kWh geladen"),"Heute-Reihe: Aus Speichern mit geladener Menge");
+}
 ok(w.__kwScrollGuard===true,"Scroll-Wächter ist aktiv");
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

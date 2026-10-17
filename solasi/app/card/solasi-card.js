@@ -197,6 +197,7 @@ const SF = (() => {
   const socCol = s => s == null || s < 0 ? "var(--sf-muted)" : s < 20 ? "var(--sf-bad)" : s < 45 ? "var(--sf-warn)" : "var(--sf-ok)";
   const CSS = `<style>
     .sf-l{font-size:12.5px;font-weight:700;letter-spacing:.08em;fill:var(--sf-muted);text-transform:uppercase}
+    .sf-t{font-size:11px;font-weight:600;fill:var(--sf-muted);text-anchor:end}
     .sf-v{font-size:22px;font-weight:800;fill:var(--sf-fg)}
     .sf-s{font-size:12.5px;font-weight:500;fill:var(--sf-muted)}
     .sf-c{font-size:12.5px;font-weight:700;fill:var(--sf-fg)}
@@ -217,12 +218,13 @@ const SF = (() => {
     }
   };
 
-  function tile(k, label, val, sub, col, icon, pos) {
+  function tile(k, label, val, sub, col, icon, pos, tag) {
     const t = pos || T[k], w = t.w || TW;
     return `<g><rect x="${t.x}" y="${t.y}" width="${w}" height="${TH}" rx="18" style="fill:var(--sf-card)"/>
       <rect x="${t.x}" y="${t.y}" width="${w}" height="${TH}" rx="18" style="fill:var(${col});fill-opacity:.13;stroke:var(${col});stroke-width:1.6"/>
       <g transform="translate(${t.x + 14} ${t.y + 14})">${icon}</g>
       <text x="${t.x + 54}" y="${t.y + 27}" class="sf-l">${label}</text>
+      ${tag ? `<text x="${t.x + w - 12}" y="${t.y + 27}" class="sf-t">${esc(tag)}</text>` : ""}
       <text x="${t.x + 54}" y="${t.y + 50}" class="sf-v">${val}</text>
       ${sub ? `<text x="${t.x + 54}" y="${t.y + 66}" class="sf-s">${sub}</text>` : ""}</g>`;
   }
@@ -266,6 +268,14 @@ const SF = (() => {
   }
   const clip = (t, n) => { t = String(t); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 
+  /* Anzeige eines Speichers: Wert und Richtung. Unter 5 W gilt er als bereit, mit Grenze/voll als solcher. */
+  function batState(u, bat) {
+    if (u && u.locked) return ["Grenze", ""];
+    if (bat == null) return ["–", ""];
+    if (Math.abs(bat) < 5) return [u && u.full ? "voll" : "bereit", ""];
+    return [wl(Math.abs(bat)), bat > 0 ? "entlädt" : "lädt"];
+  }
+
   /* Zwei Anlagen: links und rechts je ein Paar aus Solar und Speicher, in der Mitte Netz und Haus.
      Jede Solaranlage lädt ihren eigenen Speicher und versorgt das Haus. */
   function flowPairs(d, U) {
@@ -287,8 +297,9 @@ const SF = (() => {
       const soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null;
       const sub = [soc != null ? soc + " %" : "", kwhTxt(u.kwh)].filter(Boolean).join(" · ");
       tiles.push(tile("sun", "Solar " + esc(clip(names[i], 9)), wl(u.pv), u.pv != null && u.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), { x, y: sy, w }));
-      tiles.push(tile("bat", esc(clip(names[i], 12)), u.bat == null ? "–" : wl(Math.abs(u.bat)), sub,
-        "--sf-bat", ICON.bat("var(--sf-bat)", soc), { x, y: by, w }));
+      const [bv, bt] = batState(u, u.bat);
+      tiles.push(tile("bat", esc(clip(names[i], bt ? 7 : 12)), bv, sub,
+        "--sf-bat", ICON.bat("var(--sf-bat)", soc), { x, y: by, w }, bt));
     });
     const grid = d.grid == null ? 0 : d.grid;
     lines.push({ pts: [[nx + TW / 2, ny + th], [nx + TW / 2, ny + th + 50], [nx + TW / 2, hy - 50], [nx + TW / 2, hy]], col: "--sf-grid", val: d.f ? d.f.gh : grid });
@@ -331,8 +342,9 @@ const SF = (() => {
     U.forEach((u, i) => {
       const soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null;
       const sub = [soc != null ? soc + " %" : "", kwhTxt(u.kwh)].filter(Boolean).join(" · ");
-      tiles.push(tile("bat", esc(clip(names[i], 12)), u.bat == null ? "–" : wl(Math.abs(u.bat)), sub, "--sf-bat", ICON.bat("var(--sf-bat)", soc),
-        { x: bx, y: by0 + i * step, w: bw }));
+      const [bv, bt] = batState(u, u.bat);
+      tiles.push(tile("bat", esc(clip(names[i], bt ? 8 : 12)), bv, sub, "--sf-bat", ICON.bat("var(--sf-bat)", soc),
+        { x: bx, y: by0 + i * step, w: bw }, bt));
     });
     const grid = d.grid == null ? 0 : d.grid;
     tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), { x: gx, y: gy, w: TW }));
@@ -349,31 +361,43 @@ const SF = (() => {
     const f = d.f || {};
     const lines = Object.keys(L).map(k => ({ pts: L[k].pts, col: L[k].col, val: f[k] }));
     const bat = d.bat, grid = d.grid == null ? 0 : d.grid, soc = d.soc != null && d.soc >= 0 ? Math.round(d.soc) : null;
-    const batSub = bat == null ? "" : bat >= 5 ? "gibt ab" : bat <= -5 ? "lädt" : "ruht";
+    const [bv1, bt1] = batState((d.units || [])[0] || { locked: d.limited }, bat);
+    const batSub = bt1 === "entlädt" ? "gibt ab" : bt1;
     const gridSub = grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen";
     const kw = kwhTxt(d.kwh);
     const socPart = soc != null ? soc + " %" + (kw ? " · " + kw : "") : kw;
     return `<svg viewBox="0 0 640 340" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}
       ${tile("sun", "Solar", wl(d.pv), d.pv != null && d.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"))}
-      ${tile("bat", "Speicher", bat == null ? "–" : wl(Math.abs(bat)), batSub ? batSub + (socPart ? " · " + socPart : "") : socPart, "--sf-bat", ICON.bat("var(--sf-bat)", soc))}
+      ${tile("bat", "Speicher", bv1, batSub ? batSub + (socPart ? " · " + socPart : "") : socPart, "--sf-bat", ICON.bat("var(--sf-bat)", soc))}
       ${tile("grid", "Netz", wl(Math.abs(grid)), gridSub, "--sf-grid", ICON.grid("var(--sf-grid)"))}
       ${tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"))}
     </svg>`;
   }
 
-  /* Überschrift aus den Flüssen; ohne Flüsse aus dem Sollwert. d: {f, grid, soc, target} */
+  /* Überschrift aus den echten Flüssen; nur ohne Batterie-Messwert aus dem Sollwert.
+     d: {f, grid, soc, bat, target, limited} */
   function headline(d) {
     const f = d.f, s = d.soc != null && d.soc >= 0 ? ` · mittlerer Ladestand ${Math.round(d.soc)} %` + (d.cap ? ` (${nf1(d.kwh)} von ${Number(d.cap).toLocaleString("de-DE", { maximumFractionDigits: 1 })} kWh)` : "") : "";
     const g = d.grid == null ? 0 : d.grid;
     const gs = Math.abs(g) < 30 ? "Netzbezug nahe null" : g > 0 ? `Netzbezug ${fmt(g)} W` : `Einspeisung ${fmt(-g)} W`;
-    if (f) {
+    if (f && f.bh != null && d.bat != null) {
       const sh = f.sh >= 5, sb = f.sb >= 5, bh = f.bh >= 5, gh = f.gh >= 5;
       if (sh && sb) return ["Solar versorgt dein Haus und lädt den Speicher", gs + s];
       if (sh && bh && gh) return ["Solar, Speicher und Netz versorgen dein Haus", `Der Verbrauch ist höher als die Abgabe der Speicher${s}`];
       if (sh && bh) return ["Solar und Speicher versorgen dein Haus", gs + s];
+      if (bh && gh) return ["Speicher und Netz versorgen dein Haus", `Speicher ${fmt(f.bh)} W · Netz ${fmt(f.gh)} W${s}`];
       if (bh) return [`Der Speicher versorgt dein Haus mit ${fmt(f.bh)} W`, gs + s];
-      if (sb) return [`Überschuss lädt den Speicher mit ${fmt(f.sb)} W`, (Math.abs(g) < 30 ? "Einspeisung wird vermieden" : gs) + s];
-      if (sh && !gh) return ["Solar versorgt dein Haus", gs + s];
+      if (sb) return gh
+        ? [`Solar lädt den Speicher mit ${fmt(f.sb)} W`, `Haus bezieht ${fmt(f.gh)} W aus dem Netz${s}`]
+        : [`Überschuss lädt den Speicher mit ${fmt(f.sb)} W`, (Math.abs(g) < 30 ? "Einspeisung wird vermieden" : gs) + s];
+      if (sh && gh) return ["Solar und Netz versorgen dein Haus", gs + s];
+      if (sh) return ["Solar versorgt dein Haus", gs + s];
+      if (f.bh <= -5) return [`Der Speicher wird aus dem Netz geladen (${fmt(-f.bh)} W)`, gs + s];
+      if (gh) {
+        if (d.limited) return ["Speicher an der Entladegrenze, das Netz versorgt dein Haus", gs + s];
+        return ["Das Netz versorgt dein Haus", (d.target > 0 ? `Die Speicher liefern noch nichts (Sollwert ${fmt(d.target)} W)` : gs) + s];
+      }
+      return ["Alles ausgeglichen", `Gerade ist keine Regelung nötig${s}`];
     }
     const t = d.target == null ? 0 : d.target;
     if (t > 0) return [`Die Speicher versorgen dein Haus mit ${fmt(t)} W`, `Netzbezug wird auf nahe null geregelt${s}`];
@@ -451,7 +475,8 @@ const SF = (() => {
     gas: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.5 1 2.3 1.8 2.5C10.5 8.5 11 5.5 12 3z" fill="currentColor"/>',
     waerme: '<path d="M10 14.2V5a2 2 0 0 1 4 0v9.2a4 4 0 1 1-4 0z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="16.5" r="1.6" fill="currentColor"/>',
     sonne: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></g>',
-    netz: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v19M7 21.5l5-12.5 5 12.5M8 9h8M9.5 15h5"/></g>'
+    netz: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v19M7 21.5l5-12.5 5 12.5M8 9h8M9.5 15h5"/></g>',
+    akku: '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="6.5" width="16.4" height="11" rx="3"/><path d="M21.6 10.5v3M7 12h6.4"/></g>'
   };
   const MCSS = `<style>
     .sfm-w{container-type:inline-size}
@@ -510,6 +535,7 @@ const SF = (() => {
     if (d.extra && t) {
       if (t.pv != null) all.push({ k: "pv", n: "Solarertrag heute", v: nf(t.pv, 1), u: "kWh", ic: "sonne", c: "sun", sub: "" });
       if (t.imp != null) all.push({ k: "imp", n: "Netzbezug heute", v: nf(t.imp, 1), u: "kWh", ic: "netz", c: "grid", sub: "" });
+      if (t.bat != null) all.push({ k: "bat", n: "Aus Speichern heute", v: nf(t.bat, 1), u: "kWh", ic: "akku", c: "bat", sub: t.chg != null ? nf(t.chg, 1) + " kWh geladen" : "" });
     }
     // eigene Reihenfolge: genannte Kacheln zuerst, der Rest in Standardreihenfolge
     const ord = Array.isArray(d.order) ? d.order : [];
@@ -533,7 +559,8 @@ const SF = (() => {
     const f = a.flows;
     return { pv: num(a.pv_w), house: num(a.house_w), bat: num(a.battery_w), grid: num(a.grid_w) ?? 0, soc: num(a.avg_soc), target: num(a.target_w),
       kwh: num(a.kwh), cap: num(a.cap_kwh),
-      units: (a.units || []).map(u => ({ name: u.name, soc: u.soc, kwh: u.kwh, pv: u.pv, bat: u.bat })),
+      limited: !!a.limited,
+      units: (a.units || []).map(u => ({ name: u.name, soc: u.soc, kwh: u.kwh, pv: u.pv, bat: u.bat, locked: !!u.locked, full: !!u.full })),
       f: f ? { sh: f.solar_house, sb: f.solar_battery, bh: f.battery_house, gh: f.grid_house } : null };
   }
   const flowSVG = a => SF.flow(flowData(a));

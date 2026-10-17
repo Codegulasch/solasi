@@ -41,9 +41,20 @@ def default_unit(name):
         "can_charge": True, "curtail": True,
         "observe": False,    # nur beobachten: Werte lesen und anzeigen, aber nichts schreiben (z. B. wenn die Hersteller-App regelt)
         "power_basis": "",   # "" = automatisch, "ac" oder "battery" (siehe drivers.basis)
+        "lim_dis": "",       # optional: Entität „Entladegrenze“ (% , vom Speicher). Wirksamer Mindest-Ladestand = der höhere Wert
+        "lim_chg": "",       # optional: Entität „Ladeobergrenze“ (%). Darüber gilt der Speicher als voll
         # Rückfall beim Stoppen (Kill-Switch): Modus, den der Speicher dann bekommt (z. B. Eigenverbrauch)
         "fallback_mode": "", "fallback_value": "",
     }
+
+
+def _pct(ha, eid):
+    """Prozentwert aus einer Entität (0..100) oder None."""
+    v = ha.state(eid) if eid else None
+    if not is_num(v):
+        return None
+    x = float(v)
+    return x if 0 <= x <= 100 else None
 
 
 def default_slot(i, on_w, off_w, soc):
@@ -261,15 +272,21 @@ def decide(cfg, snap):
     for u in units:
         soc, st = u["soc"], u["set"]
         ok = soc >= 0   # Verfügbarkeit der Leistungs-Entität ist hier egal: der Modus-Wächter macht sie verfügbar
-        u["elig_dis"] = ok and (soc > so["min"] if st > 5 else soc >= so["min"] + so["hyst"])
+        # Wirksame Grenzen: Die Grenzen im Speicher (Entladegrenze, Ladeobergrenze) kann SOLASI nicht überschreiben.
+        lo = u.get("lim_dis")
+        hi = u.get("lim_chg")
+        u["min"] = max(so["min"], lo) if lo is not None else so["min"]
+        u["max"] = min(so["max"], hi) if hi is not None else so["max"]
+        u["full"] = ok and soc >= u["max"]
+        u["elig_dis"] = ok and (soc > u["min"] if st > 5 else soc >= u["min"] + so["hyst"])
         u["elig_chg"] = bool(f["ac_charge"]) and drivers.can_charge(u["cfg"]) and ok and (
-            soc < so["max"] if st < -5 else soc <= so["max"] - so["hyst"])
+            soc < u["max"] if st < -5 else soc <= u["max"] - so["hyst"])
         # PV-Durchleitung: Der Speicher darf so viel ins Haus geben, wie seine Module gerade liefern, auch wenn die
         # Batterie unter dem Mindest-Ladestand ist. Die Batterie wird dadurch nicht entladen.
         pv_u = u.get("pv")
         pass_ok = bool(f.get("pv_passthrough", True)) and pv_u is not None
         u["pvcap"] = min(u["cfg"]["max_dis"], max(pv_u - 10.0, 0.0)) if pass_ok else 0.0
-        u["dcap"] = u["cfg"]["max_dis"] if u["elig_dis"] else u["pvcap"]
+        u["dcap"] = u["cfg"]["max_dis"] if (u["elig_dis"] and not u.get("locked")) else u["pvcap"]
         u["ccap"] = u["cfg"]["max_chg"] if u["elig_chg"] else 0
         if u.get("obs"):
             u["dcap"] = u["ccap"] = u["pvcap"] = 0
@@ -316,7 +333,7 @@ def decide(cfg, snap):
             if len(units) > 1:
                 w.append((0 if a_first else 1) if caps[1] > 0 else 0)
         elif mode == "soc":
-            w = [(max(u["soc"] - so["min"], 0) + 1) if caps[i] > 0 else 0 for i, u in enumerate(units)]
+            w = [(max(u["soc"] - u["min"], 0) + 1) if caps[i] > 0 else 0 for i, u in enumerate(units)]
         else:
             w = [1 if caps[i] > 0 else 0 for i in range(len(units))]
         plan = _split(t, caps, w)
@@ -329,7 +346,7 @@ def decide(cfg, snap):
             if len(units) > 1:
                 w.append((0 if a_first else 1) if caps[1] > 0 else 0)
         elif mode == "soc":
-            w = [(max(so["max"] - u["soc"], 0) + 1) if caps[i] > 0 else 0 for i, u in enumerate(units)]
+            w = [(max(u["max"] - u["soc"], 0) + 1) if caps[i] > 0 else 0 for i, u in enumerate(units)]
         else:
             w = [1 if caps[i] > 0 else 0 for i in range(len(units))]
         plan = [-p for p in _split(total, caps, w)]
@@ -338,7 +355,7 @@ def decide(cfg, snap):
         p = _round_step(plan[i], c["step"]) if meter_ok else 0
         u["p"] = p
         u["force"] = (bool(f["strict_zero"]) and drivers.curtail_enabled(u["cfg"])
-                      and u["soc"] >= so["max"] and u["soc"] >= 0 and p == 0)
+                      and u["soc"] >= u["max"] and u["soc"] >= 0 and p == 0)
 
     surplus_w = surplus_value(cfg, snap) if sp_on else None
     return {
@@ -479,7 +496,9 @@ class Controller:
                 "pv": fl["pv"], "ac": fl["ac"], "bat": fl["bat"],
                 "dir": r["dir"], "num_state": r["num_state"], "mode": r["mode"],
                 "nmax_dis": _ent_max(ha, u["num"]), "nmax_chg": _ent_max(ha, u.get("num_chg") or u["num"]),
+                "lim_dis": _pct(ha, u.get("lim_dis")), "lim_chg": _pct(ha, u.get("lim_chg")), "locked": False,
             })
+        self._update_locks(units)
         has_pv = pv_cfg and pv_known
         has_out = out_cfg and out_known
         bat_total = bat_w if (out_cfg and bat_known) else None
@@ -510,6 +529,42 @@ class Controller:
             "sun": ha.state("sun.sun"),
             "base_load": self.base_load_effective(),
         }
+
+    # ---------- Speicher, der trotz Sollwert nichts liefert ----------
+    LOCK_AFTER_S = 90          # so lange Sollwert > 0 und keine Abgabe, bis der Speicher als gesperrt gilt
+    LOCK_RETRY_S = 1200        # nach dieser Zeit wird es erneut versucht
+    LOCK_SOC_STEP = 3          # oder wenn der Ladestand um so viel gestiegen ist
+
+    def _update_locks(self, units):
+        """Erkennt Speicher, die eine Abgabe angefordert bekommen, aber nichts liefern (z. B. Entladegrenze in der
+        Hersteller-App). Solche Speicher bekommen keinen Anteil mehr, bis sich etwas ändert."""
+        cfg = self.cfg
+        lk = getattr(self, "_locks", None)
+        if lk is None:
+            lk = self._locks = {}
+        now = time.monotonic()
+        live = bool(cfg["enabled"]) and not cfg["dry_run"] and not self.stopped
+        for u in units:
+            st = lk.setdefault(u["k"], {"bad": None, "at": None, "soc": None})
+            if u.get("obs") or not live or not u["has"]:
+                st["bad"] = st["at"] = None
+                continue
+            if st["at"] is not None:
+                if u["soc"] >= (st["soc"] if st["soc"] is not None else 0) + self.LOCK_SOC_STEP or now - st["at"] > self.LOCK_RETRY_S:
+                    st["at"] = st["bad"] = None
+                    self.event("info", f"{u['k']}: wird wieder angefragt")
+            else:
+                real = u.get("ac")
+                bad = u["set"] > 30 and real is not None and abs(real) < 10 and u["soc"] >= 0
+                if not bad:
+                    st["bad"] = None
+                else:
+                    st["bad"] = st["bad"] or now
+                    if now - st["bad"] >= self.LOCK_AFTER_S:
+                        st["at"], st["soc"] = now, u["soc"]
+                        self.event("info", f"{u['k']}: liefert trotz {u['set']:.0f} W Sollwert nichts (bei {u['soc']:.0f} %). "
+                                           "Vermutlich greift die Entladegrenze im Speicher. Er bekommt vorerst keinen Anteil.")
+            u["locked"] = st["at"] is not None
 
     # ---------- Hauptschleifen ----------
     async def run(self):
@@ -912,7 +967,8 @@ class Controller:
         k = Stats.kpis(day) if day else None
         self._meters_view = {
             "items": self.meters.compute(mc.get("items"), lookup, now_local().strftime("%Y-%m-%d")),
-            "today": None if k is None else {"house": k["house"], "pv": k["pv"], "imp": k["imp"], "autarky": k["autarky"]},
+            "today": None if k is None else {"house": k["house"], "pv": k["pv"], "imp": k["imp"], "autarky": k["autarky"],
+                                             "bat": k["bat_dis"], "chg": k["bat_chg"]},
             "show_day": bool(mc.get("show_day", True)), "extra": bool(mc.get("extra", False)),
             "order": clean_order(mc.get("order")),
         }
@@ -947,7 +1003,7 @@ class Controller:
         """Beobachtet, ob die Abregelung bei vollem Speicher wirkt (Einspeisung trotz vollem Speicher)."""
         cfg = self.cfg
         units = [u for u in snap["units"] if u["soc"] >= 0]
-        full = bool(units) and all(u["soc"] >= cfg["soc"]["max"] for u in units)
+        full = bool(units) and all(u["soc"] >= u.get("max", cfg["soc"]["max"]) for u in units)
         sun_ok = (snap["pv_w"] + snap["extra_pv"] > 100) if (snap["has_pv"] or snap["extra_pv"]) else True
         active = bool(cfg["features"]["strict_zero"]) and full and sun_ok and d["meter_ok"]
         export = -snap["grid_w"]
@@ -976,7 +1032,7 @@ class Controller:
         return {
             "meter": not d["meter_ok"],
             "offline": any(u["soc"] < 0 for u in units),
-            "empty": bool(valid) and all(u["soc"] <= self.cfg["soc"]["min"] for u in valid),
+            "empty": bool(valid) and all(u["soc"] <= u.get("min", self.cfg["soc"]["min"]) for u in valid),
             "curtail": self.curtail["state"] == "fehlgeschlagen",
             "errors": len(self._fail_times) >= 3,
         }
@@ -1030,7 +1086,7 @@ class Controller:
             "pv_w": st.get("pv_w"), "house_w": st.get("house_w"), "grid_w": st.get("grid_w"),
             "battery_w": st.get("bat_w"), "target_w": st.get("t_target"),
             "surplus_w": st.get("surplus_w"), "avg_soc": st.get("avg_soc"),
-            "kwh": st.get("kwh"), "cap_kwh": st.get("cap_kwh"),
+            "kwh": st.get("kwh"), "cap_kwh": st.get("cap_kwh"), "limited": st.get("limited"),
             "eco_active": st.get("eco_active"), "meter_ok": st.get("meter_ok"),
             "blocked_w": st.get("blocked_w"), "want": st.get("want"),
             "units": st.get("units", []), "slots": st.get("slots", []),
@@ -1108,7 +1164,10 @@ class Controller:
                 "mode": u["mode"], "dir": u["dir"], "obs": u["obs"],
                 "cap": u["cap"], "kwh": None if u["soc"] < 0 else round(max(0.0, min(100.0, u["soc"])) / 100 * u["cap"], 2),
                 "ac": None if u.get("ac") is None else round(u["ac"]), "bat": None if u.get("bat") is None else round(u["bat"]),
+                "locked": bool(u.get("locked")), "full": bool(u.get("full")),
+                "min": u.get("min"), "max": u.get("max"), "lim_dis": u.get("lim_dis"), "lim_chg": u.get("lim_chg"),
             } for u in snap["units"]],
+            "limited": any(u.get("locked") for u in snap["units"]),
             "kwh": round(d["kwh"], 2), "cap_kwh": round(d["cap_kwh"], 2),
             "slots": [{
                 "name": s["name"], "ent": s["ent"], "num": s["num"],

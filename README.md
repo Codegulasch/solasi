@@ -14,9 +14,9 @@ Solaranlage erzeugt: kaum Einspeisung ins Netz, kaum Bezug aus dem Netz. Alles l
 - **Eco-Modus:** Schont den Akku bei niedrigem Ladestand und lernt auf Wunsch die nächtliche Grundlast deines Hauses.
 - **Überschuss nutzen:** Heizstab, Wallbox (stufenlos) oder beliebige Schalter laufen, wenn mehr Solarstrom da ist, als das Haus braucht.
 - **Mehrere Speichertypen:** Anker SOLIX, Marstek und andere, dazu Wechselrichter-Limits und ein eigenes Skript für alles Weitere. Typen lassen sich mischen.
-- **Live-Übersicht:** Energiefluss mit Solar, Speicher, Haus und Netz, dazu eine Karte für dein Dashboard.
+- **Live-Übersicht:** Energiefluss mit Solar, Speicher, Haus und Netz (bei zwei Anlagen jede mit ihrem Speicher), Gesamt-Ladestand in kWh und eine Karte für dein Dashboard.
 - **Feste Entitäten (MQTT):** Sensoren, Energiezähler für das Energie-Dashboard und Schalter für Regelung, Testmodus und Not-Aus.
-- **Auswertung:** Tagesstatistik mit Autarkie und Ersparnis sowie ein „Was wäre wenn“-Replay mit deinen echten Verlaufsdaten.
+- **Auswertung:** Tagesstatistik mit Autarkie, Ersparnis und der Energie aus den Speichern sowie ein „Was wäre wenn“-Replay mit deinen echten Verlaufsdaten.
 - **Sicherheit:** Testmodus, Not-Aus-Knopf, automatischer Rückfall auf den eigenen Modus des Herstellers (z. B. Eigenverbrauch), ein Wächter, der bei einem
   Ausfall eingreift, Benachrichtigungen aufs Handy und ein Selbsttest, der deine Einrichtung prüft.
 
@@ -47,12 +47,32 @@ Die ausführliche Anleitung steht in der [Dokumentation](solasi/DOCS.md), die du
 
 | Speicher | Anbindung | Stand |
 |---|---|---|
-| Anker SOLIX Solarbank 4 E5000 Pro (auch zwei) | Anker Solix Official | im Praxiseinsatz entwickelt und getestet |
+| Anker SOLIX Solarbank 4 E5000 Pro (auch zwei) | Anker Solix Official | im Alltag getestet |
 | Marstek (z. B. Venus), Speicher mit einer Leistungszahl mit Vorzeichen oder mit Modus und Leistungen | passende Home-Assistant-Integration | nach Herstellerbeschreibung umgesetzt, bisher nur in Simulationen getestet |
 | Wechselrichter mit Leistungsbegrenzung (z. B. über OpenDTU) | Zahl für die Abgabe | wie oben |
 | Alle anderen (z. B. Victron, Huawei, Sungrow) | eigenes Skript | wie oben |
 
 Bei allem außer Anker bitte **zuerst im Testmodus beobachten** und gern eine Rückmeldung geben.
+
+## Häufige Fragen
+
+**Mein Speicher liefert nichts mehr, obwohl der Ladestand noch über 0 % liegt.**
+Die meisten Speicher haben eine eigene Entladegrenze (bei Anker in der App einstellbar), unter der sie nichts mehr abgeben. SOLASI kann diese Grenze nicht überschreiben.
+Trage unter *Einrichtung* die Entität „Entladegrenze“ deines Speichers ein, dann richtet sich SOLASI automatisch danach. Merkt SOLASI, dass ein Speicher trotz Anforderung nichts abgibt,
+zeigt es „Grenze“ an und fragt ihn eine Weile nicht mehr an, bis sich sein Ladestand ändert.
+
+**Warum steht in der Überschrift „Das Netz versorgt dein Haus“, obwohl SOLASI Entladen anfordert?**
+Die Überschrift zeigt, was wirklich fließt, nicht was SOLASI anfordert. Liefert der Speicher gerade nichts (zum Beispiel an seiner Entladegrenze), siehst du das sofort.
+
+**Was passiert bei vollem Speicher?**
+Je nach Gerät reicht der Speicher den Solarstrom nur durch und folgt Vorgaben der Software nicht. Ob dann trotzdem eingespeist wird, zeigt dir der Selbsttest unter *System*
+(„Abregelung bei vollem Speicher“).
+
+**Wie bekomme ich das Menü auf dem Handy?**
+Die Leiste mit Übersicht, Speicher, Statistik, Überschuss und „Mehr“ steht oben. Unter „Mehr“ findest du alles Weitere.
+
+**Wie stoppe ich SOLASI sofort?**
+Mit dem **Not-Aus** oben rechts. Der Speicher geht dann zurück in seinen eigenen Modus. „Fortsetzen“ übergibt die Regelung wieder an SOLASI.
 
 ## Wichtige Hinweise
 
@@ -69,8 +89,6 @@ Bei allem außer Anker bitte **zuerst im Testmodus beobachten** und gern eine R�
 
 ## Über das Projekt
 
-**SOLASI** steht für **SOL**ar-**A**nlagen-**S**peicher-**I**nterface. Das Projekt ist unabhängig und steht in keiner Verbindung zu *SolarAssistant* (solar-assistant.io), zu Anker
-oder zu anderen Herstellern. Die Regelstrategie orientiert sich am Forum-Blueprint „Anker SOLIX 4 Pro – Lokale Nulleinspeisung & Eco-Modus“ von MBP996 im Home-Assistant-Forum.
-Der Code ist eine eigene Umsetzung. Freie Software unter der [MIT-Lizenz](LICENSE).
-
-Entwickler finden Hinweise zum Mitmachen in [DEVELOPMENT.md](DEVELOPMENT.md).
+**SOLASI** steht für **SOL**ar-**A**nlagen-**S**peicher-**I**nterface. Das Projekt ist unabhängig und nicht mit *SolarAssistant*, Anker oder anderen Herstellern verbunden.
+Die Regelstrategie orientiert sich am Forum-Blueprint „Anker SOLIX 4 Pro – Lokale Nulleinspeisung & Eco-Modus“ von MBP996 im Home-Assistant-Forum, der Code ist eine eigene Umsetzung.
+Freie Software unter der [MIT-Lizenz](LICENSE).

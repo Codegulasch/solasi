@@ -138,6 +138,21 @@ def run(cfg, ha, ctrl=None):
         elif d == "anker" and not obs:
             add(area, "Rückfall-Modus", "warn", "kein Betriebsmodus gewählt",
                 "Ohne Betriebsmodus kann SOLASI den Speicher beim Stoppen nicht auf Eigenverbrauch zurückstellen.")
+        for key, label, hint in (("lim_dis", "Entladegrenze", "SOLASI entlädt nicht unter diesen Wert (mindestens aber der eigene Mindest-Ladestand)."),
+                                 ("lim_chg", "Ladeobergrenze", "Darüber gilt der Speicher als voll.")):
+            if u.get(key):
+                if check_entity(area, label, u[key], None, numeric=True):
+                    v = ha.state(u[key])
+                    if is_num(v) and not (0 <= float(v) <= 100):
+                        add(area, label, "warn", f"{v} liegt nicht zwischen 0 und 100", "Die Entität muss einen Prozentwert liefern.")
+                    elif is_num(v) and key == "lim_dis":
+                        eff = max(float(v), cfg["soc"]["min"])
+                        add(area, "Wirksamer Mindest-Ladestand", "info", f"{eff:.0f} % (Entladegrenze {float(v):.0f} %, eigener Wert {cfg['soc']['min']} %)")
+                    elif is_num(v):
+                        add(area, "Wirksamer Höchst-Ladestand", "info", f"{min(float(v), cfg['soc']['max']):.0f} % (Ladeobergrenze {float(v):.0f} %)")
+            elif not obs and key == "lim_dis":
+                add(area, label, "info", "nicht gewählt (optional)",
+                    "Mit der Entladegrenze des Speichers richtet sich SOLASI nach der Grenze aus der Hersteller-App. Sonst bekommt der Speicher unterhalb seiner Grenze Sollwerte, die er nicht ausführt.")
         if check_entity(area, "Ladestand (SOC)", u["soc"], "sensor", numeric=True):
             v = ha.state(u["soc"])
             if is_num(v) and not (0 <= float(v) <= 100):

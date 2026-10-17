@@ -1,5 +1,14 @@
 # Änderungen
 
+## 1.5.0
+- **Überschrift zeigt, was wirklich fließt:** Bisher stand dort bei Flüssen unter 5 W der Sollwert („Die Speicher versorgen dein Haus mit 339 W“), obwohl das Netz das Haus versorgte. Jetzt kommt der Text aus den echten Flüssen. „Überschuss lädt …“ steht nur noch, wenn wirklich nichts aus dem Netz kommt; sonst „Solar lädt den Speicher mit 80 W“ und „Haus bezieht 511 W aus dem Netz“.
+- **Speicher-Kacheln:** Statt zweimal derselben Wattzahl zeigt die Kachel „lädt“ oder „entlädt“, bei Ruhe „bereit“, bei vollem Speicher „voll“.
+- **Entladegrenze und Ladeobergrenze:** Neue optionale Entitäten je Speicher (*Einrichtung*). SOLASI richtet sich nach der Entladegrenze des Speichers (der höhere Wert aus Entladegrenze und eigenem Mindest-Ladestand) und sieht den Speicher ab der Ladeobergrenze als voll. Der Selbsttest zeigt die wirksamen Werte.
+- **Speicher, der nichts liefert:** Gibt ein Speicher trotz Anforderung etwa 90 Sekunden nichts ab (zum Beispiel an einer Grenze im Gerät), bekommt er vorerst keinen Anteil, die Kachel zeigt „Grenze“, und der andere Speicher übernimmt.
+- **Aus Speichern heute:** Neue Kachel in der Heute-Reihe (bei „Solarertrag, Netzbezug und Speicher heute dazu“), mit der geladenen Menge darunter, antippbar für den Verlauf. Das Tagesdiagramm in der Statistik hat eine Reihe „Aus Speichern“.
+- **Menü am Handy:** Die Schnellleiste steht jetzt oben (mit Statistik) und öffnet „Mehr“ von oben. Unten verschwand sie bei manchen Geräten hinter der Browserleiste.
+- **README** ist jetzt rein für Anwender geschrieben, mit häufigen Fragen. Technisches steht in DEVELOPMENT.md.
+
 ## 1.4.1
 - **Energiefluss bei zwei Anlagen:** Jede Solaranlage steht jetzt mit ihrem eigenen Speicher als Paar da (HÜTTE links, DACH rechts, Netz und Haus in der Mitte). Je Anlage gibt es drei Linien: Solar → eigener Speicher (Ladeleistung), Solar → Haus und Speicher → Haus. Vorher gab es nur eine Sammellinie „Solar → Speicher“, die immer beim ersten Speicher endete.
 ## 1.4.0

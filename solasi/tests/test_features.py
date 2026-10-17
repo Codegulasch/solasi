@@ -266,3 +266,46 @@ def test_trend_series_hat_zeitstempel(tmp_path):
     ctrl._trend_add(100, 300); ctrl._trend_add(200, 310)
     s = ctrl.trend_series()
     assert len(s["t"]) == len(s["pv"]) == len(s["house"]) == 2 and s["pv"] == [100, 200]
+
+
+# ---- Gesperrte Speicher erkennen ----
+def test_speicher_ohne_abgabe_trotz_sollwert_wird_gesperrt_und_wieder_freigegeben(tmp_path, monkeypatch):
+    import controller as C
+    ctrl = mk_ctrl(tmp_path)
+    ctrl.cfg["enabled"], ctrl.cfg["dry_run"] = True, False
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(C.time, "monotonic", lambda: clock["t"])
+
+    def unit(soc, setv, ac, obs=False):
+        return {"k": "DACH", "has": True, "obs": obs, "soc": soc, "set": setv, "ac": ac, "locked": False}
+
+    u = unit(10, 340, 0.0); ctrl._update_locks([u]); assert not u["locked"]          # erst beobachten
+    clock["t"] += 60; u = unit(10, 340, 0.0); ctrl._update_locks([u]); assert not u["locked"]
+    clock["t"] += 40; u = unit(10, 340, 0.0); ctrl._update_locks([u]); assert u["locked"]      # nach 90 s gesperrt
+    clock["t"] += 10; u = unit(10, 0, 0.0); ctrl._update_locks([u]); assert u["locked"]        # bleibt gesperrt
+    clock["t"] += 10; u = unit(13, 0, 0.0); ctrl._update_locks([u]); assert not u["locked"]    # Ladestand +3 % -> neu versuchen
+
+
+def test_speicher_mit_abgabe_wird_nicht_gesperrt(tmp_path, monkeypatch):
+    import controller as C
+    ctrl = mk_ctrl(tmp_path)
+    ctrl.cfg["enabled"], ctrl.cfg["dry_run"] = True, False
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(C.time, "monotonic", lambda: clock["t"])
+    for _ in range(5):
+        u = {"k": "A", "has": True, "obs": False, "soc": 50, "set": 300, "ac": 290.0, "locked": False}
+        ctrl._update_locks([u]); clock["t"] += 60
+        assert not u["locked"]
+
+
+def test_sperre_im_testmodus_und_bei_beobachtern_aus(tmp_path, monkeypatch):
+    import controller as C
+    ctrl = mk_ctrl(tmp_path)
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(C.time, "monotonic", lambda: clock["t"])
+    for enabled, dry, obs in ((True, True, False), (True, False, True)):
+        ctrl.cfg["enabled"], ctrl.cfg["dry_run"] = enabled, dry
+        for _ in range(4):
+            u = {"k": "B", "has": True, "obs": obs, "soc": 10, "set": 340, "ac": 0.0, "locked": False}
+            ctrl._update_locks([u]); clock["t"] += 60
+            assert not u["locked"]

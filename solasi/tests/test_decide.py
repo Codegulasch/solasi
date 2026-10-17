@@ -159,3 +159,54 @@ def test_beobachteter_speicher_wird_nicht_gesteuert_und_nicht_gezaehlt():
     assert units[1]["p"] == 0 and units[1]["dcap"] == 0      # nichts für den beobachteten Speicher
     assert d["net_balance"] == 300                             # seine 800 W zählen nicht als eigener Sollwert
     assert units[0]["p"] > 0
+
+
+# ---- Entladegrenze / Ladeobergrenze des Speichers, gesperrte Speicher ----
+def _lim(cfg, i, soc, setv=0.0, lim_dis=None, lim_chg=None, locked=False):
+    u = mk_unit(cfg, i, soc, setv)
+    u.update({"lim_dis": lim_dis, "lim_chg": lim_chg, "locked": locked})
+    return u
+
+
+def test_entladegrenze_hebt_mindest_soc_an():
+    cfg = mk_cfg(); cfg["soc"]["min"] = 5
+    a, b = _lim(cfg, 0, 10, lim_dis=10), _lim(cfg, 1, 40, lim_dis=10)
+    d = decide(cfg, mk_snap(cfg, 400, [a, b]))
+    assert a["min"] == 10 and not a["elig_dis"]               # 10 % < 10 + Hysterese 5, bei 10 % gibt der Speicher nichts ab
+    assert a["p"] == 0 and b["p"] > 0                          # der andere Speicher übernimmt alles
+
+
+def test_entladegrenze_laufender_speicher_bleibt_ueber_grenze():
+    cfg = mk_cfg(); cfg["soc"]["min"] = 5
+    a = _lim(cfg, 0, 11, setv=100, lim_dis=10)
+    decide(cfg, mk_snap(cfg, 300, [a, _lim(cfg, 1, 50, lim_dis=10)]))
+    assert a["elig_dis"]                                       # läuft schon und liegt über der Grenze
+
+
+def test_entladegrenze_ohne_entitaet_wie_bisher():
+    cfg = mk_cfg(); cfg["soc"]["min"] = 5
+    a = _lim(cfg, 0, 8)
+    decide(cfg, mk_snap(cfg, 400, [a, _lim(cfg, 1, 40)]))
+    assert a["min"] == 5
+
+
+def test_eigener_mindest_soc_gilt_wenn_hoeher():
+    cfg = mk_cfg(); cfg["soc"]["min"] = 20
+    a = _lim(cfg, 0, 22, lim_dis=10)
+    decide(cfg, mk_snap(cfg, 400, [a, _lim(cfg, 1, 50)]))
+    assert a["min"] == 20
+
+
+def test_ladeobergrenze_gilt_als_voll():
+    cfg = mk_cfg()
+    a, b = _lim(cfg, 0, 90, lim_chg=90), _lim(cfg, 1, 50, lim_chg=90)
+    decide(cfg, mk_snap(cfg, -500, [a, b]))
+    assert a["max"] == 90 and a["full"] and not a["elig_chg"]
+    assert a["p"] == 0 and b["p"] < 0
+
+
+def test_gesperrter_speicher_bekommt_keinen_anteil():
+    cfg = mk_cfg()
+    a, b = _lim(cfg, 0, 60, setv=300, locked=True), _lim(cfg, 1, 60)
+    d = decide(cfg, mk_snap(cfg, 400, [a, b]))
+    assert a["dcap"] == 0 and a["p"] == 0 and b["p"] > 0

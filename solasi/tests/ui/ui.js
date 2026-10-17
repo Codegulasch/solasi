@@ -109,7 +109,7 @@ const w=dom.window,d=w.document;
  ok(t.includes("1 Problem gefunden")&&t.includes("liefert kW statt W")&&t.includes("Einheit umrechnen")&&t.includes("Greift nicht")&&t.includes("300 W Einspeisung"),"Selbsttest zeigt Befunde, Hinweise und Abregelungs-Ergebnis");
  // Statistik
  await go("stats");t=d.getElementById("p-stats").textContent;
- ok(t.includes("61 %")&&t.includes("83 %")&&t.includes("Netzbezug")&&d.querySelectorAll("#p-stats svg rect").length===8,"Statistik: Kennzahlen und Balkendiagramm (2 Tage x 4 Balken)");
+ ok(t.includes("61 %")&&t.includes("83 %")&&t.includes("Netzbezug")&&d.querySelectorAll("#p-stats svg rect").length===10&&t.includes("Aus Speichern"),"Statistik: Kennzahlen und Balkendiagramm (2 Tage x 5 Balken, mit Speicher-Reihe)");
  // Replay
  await go("replay");
  ok(d.querySelectorAll("#p-replay [data-rp]").length>=17,"Replay-Formular mit Einstellungen");
@@ -158,7 +158,7 @@ const w=dom.window,d=w.document;
  d.querySelector('#subnav [data-p="extras"]').click();ok(d.getElementById("p-extras").classList.contains("act")&&d.getElementById("title").textContent==="Sicherheit & Meldungen","Unterseite wechselt, Titel folgt");
  w.showPage("surplus");ok(d.getElementById("pagetools").classList.contains("on")&&d.getElementById("savebar").style.display==="flex","Überschuss: Schalter und Speichern-Leiste sichtbar");
  w.showPage("stats");ok(d.getElementById("savebar").style.display==="none"&&!d.getElementById("pagetools").classList.contains("on"),"Statistik: keine Speichern-Leiste");
- ok(d.querySelectorAll("#tabbar button").length===4&&d.querySelector("#tabbar #moreBtn")!==null,"Untere Leiste am Handy: drei Punkte und Mehr");
+ ok(d.querySelectorAll("#tabbar button").length===5&&d.querySelector("#tabbar #moreBtn")!==null,"Leiste am Handy (oben): vier Punkte und Mehr");
  d.getElementById("moreBtn").click();ok(d.getElementById("side").classList.contains("open"),"Mehr öffnet das Menü von unten");
  d.querySelector('#nav button[data-p="log"]').click();ok(!d.getElementById("side").classList.contains("open")&&d.getElementById("p-log").classList.contains("act"),"Auswahl schließt das Menü");
  w.showPage("look");ok(d.getElementById("look_start")!==null,"Darstellung: Startseite wählbar");

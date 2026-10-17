@@ -91,6 +91,14 @@ Speichertypen ohne Netzladen (Ausgangslimit, Modus ohne Ladezahl) werden bei Üb
 
 **Nur beobachten:** Regelt die Hersteller-App einen Speicher selbst (zum Beispiel Anker Solix mit Smart Meter und Nullexport), schalte bei diesem Speicher „Nur beobachten“ ein. SOLASI liest dann Ladestand und die echten Leistungssensoren, schreibt aber nichts auf den Speicher, setzt keinen Modus und gibt ihn beim Stoppen nicht zurück. Leistung und Richtung müssen nicht eingetragen sein. Den Rest regelt SOLASI mit den anderen Speichern. Sein Beitrag steht trotzdem in Energiefluss, Verlauf und Gesamt-Ladestand.
 
+**Entladegrenze und Ladeobergrenze:** Viele Speicher haben eigene Grenzen (bei Anker in der App einstellbar). Darunter gibt der Speicher nichts ab, darüber lädt er nicht, egal was SOLASI anfordert. Trage bei jedem Speicher die Entitäten „Entladegrenze“ und „Ladeobergrenze“ ein (*Einrichtung*, beide optional). SOLASI nimmt dann als Mindest-Ladestand den höheren Wert aus Entladegrenze und dem eigenen Mindest-Ladestand und sieht den Speicher ab der Ladeobergrenze als voll an. SOLASI **liest** die Werte nur, es ändert sie nicht. Der Selbsttest zeigt den wirksamen Wert je Speicher.
+
+**Speicher, der nichts liefert:** Fordert SOLASI von einem Speicher mehr als 30 W an und kommt etwa 90 Sekunden lang nichts an (unter 10 W), gilt er als „gesperrt“, zum Beispiel wegen einer Grenze im Gerät. Die Anzeige zeigt „Grenze“, die Überschrift nennt es, und der andere Speicher übernimmt. Steigt der Ladestand um 3 Prozentpunkte oder sind 20 Minuten vergangen, fragt SOLASI ihn wieder an. Das gilt nur bei eingeschalteter Regelung ohne Testmodus und nicht für Speicher im Modus „Nur beobachten“. Die Überschrift zeigt immer, was wirklich fließt, nicht den Sollwert.
+
+**Speicher in der Übersicht und Statistik:** Die Kachel „Aus Speichern heute“ (mit der geladenen Menge darunter) erscheint, wenn *Zähler → Solarertrag, Netzbezug und Speicher heute dazu* eingeschaltet ist. Das Diagramm in der Statistik zeigt zusätzlich, wie viel je Tag aus den Speichern kam. Die Werte beginnen mit dem ersten Tag, an dem SOLASI diese Version nutzt.
+
+**Menü am Handy:** Auf kleinen Bildschirmen steht die Schnellleiste mit Übersicht, Speicher, Statistik, Überschuss und „Mehr“ oben, damit sie nicht hinter der Browserleiste verschwindet.
+
 > **Stand:** Die Anker SOLIX ist im Praxiseinsatz entwickelt und getestet. Die anderen Typen sind nach den Beschreibungen der jeweiligen Integrationen umgesetzt und bisher nur in Simulationen geprüft.
 > Beobachte sie bitte zuerst im Testmodus und gib gern Rückmeldung.
 
