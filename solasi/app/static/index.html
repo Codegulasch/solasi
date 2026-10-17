@@ -181,6 +181,9 @@ body.first main{margin:0 auto}
 .ordrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}.ordrow button{padding:2px 10px;margin-left:4px}.ordrow label{display:flex;gap:8px;align-items:center}
 .flchecks{display:flex;flex-wrap:wrap;gap:6px 16px}.flchecks label{display:flex;gap:6px;align-items:center}
 .cols+[data-blk=kpis]{margin-top:14px}
+[data-blk=kpis],[data-blk=modes]{margin-bottom:16px}
+[data-blk=kpis]>.kpis,[data-blk=modes]>.modes{margin-bottom:0}
+[data-blk=banners]:not(:empty){margin-bottom:14px}
 .cols.one{grid-template-columns:minmax(0,1fr)}
 .cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:start}
 .stack{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -1983,13 +1986,14 @@ function layoutBlocks(root,B,order,weights){
 let firstRun=false,wizDismissed=false;
 function renderStatus(s){
   lastStatus=s;renderBadges(s);loadToday();
-  const needSetup=cfg&&!cfg.grid.entity;
+  const needSetup=cfg&&!cfg.grid.entity&&!cfg.demo;
   if(needSetup&&!wizDismissed&&!firstRun){firstRun=true;showPage("setup");}
   if(needSetup){
     rawStatus(`<div class="card"><p class="headline">SOLASI ist noch nicht eingerichtet</p><div class="sub">Der Einrichtungsassistent führt dich in wenigen Schritten durch Zähler und Speicher.</div>
-      <p><button class="primary" onclick="firstRun=false;showPage('setup')">Einrichtung starten</button></p></div>`);
+      <p><button class="primary" onclick="firstRun=false;showPage('setup')">Einrichtung starten</button> <button type="button" class="ghost" data-demo="1">Demo ansehen</button></p></div>`);
     return;}
   let banners="";
+  if(s.demo||(cfg&&cfg.demo))banners+=`<div class="banner"><span>🎬 <b>Demo-Modus</b> – simulierte Werte, nichts wird gesteuert.</span> <button type="button" class="ghost" data-demo="0">Demo beenden</button></div>`;
   if(s.safety&&s.safety.state==="stopped")banners+=`<div class="banner bad">⛔ <span><b>SOLASI ist gestoppt</b> (${esc(s.safety.reason)}${s.safety.since?`, seit ${esc(s.safety.since)}`:""}). Die Speicher wurden an ihren eigenen Modus zurückgegeben und werden nicht mehr gesteuert.
     <button class="primary" style="margin-left:10px" onclick="killOrResume()">Fortsetzen</button></span></div>`;
   if(!s.connected)banners+=`<div class="banner bad">🔌 Keine Verbindung zu Home Assistant.</div>`;
@@ -2181,11 +2185,14 @@ function renderSettings(){
     ["extras","🛡️","Sicherheit & Meldungen","Not-Aus, Rückfall, Wartung, Push",[s.safety&&s.safety.state==="stopped"?"gestoppt":"aktiv",s.safety&&s.safety.state==="stopped"?"warn":"ok"]],
     ["look","🖥️","Darstellung & Karte","Energiefluss, Dashboard-Karte, Farben",["Vorschau live","mut"]],
     ["control","🎚️","Regelung (alle Werte)","Alle Einzelwerte für Profis",["Experte","mut"]],
-    ["accounts","👤","Konten & Zugang","Wer darf was – eigener Port mit Anmeldung",[me.direct?`angemeldet: ${me.name}`:"Home Assistant","mut"]],
+    ["accounts","👤","Konten & Zugang","Wer darf was – eigener Port mit Anmeldung",[me.open?"Port offen":me.direct?`angemeldet: ${me.name}`:"Home Assistant","mut"]],
     ["mqtt","🔌","Verbindungen","Home Assistant, MQTT, Entitäten",[s.connected===false?"nicht verbunden":"verbunden",s.connected===false?"warn":"ok"]]];
   $("#p-settings").innerHTML=`<div class="hub">${T.map(([id,ic,t,d,st])=>`<button type="button" class="cat" data-p="${id}"><div class="ic">${ic}</div><b>${t}</b><p>${d}</p><div class="st ${st[1]}">${st[1]==="ok"?"● ":""}${esc(st[0])}</div></button>`).join("")}</div>
     <div class="card"><h3>Ansicht</h3><label class="tg" style="display:inline-flex"><input type="checkbox" id="set_classic" ${isClassic()?"checked":""}><i></i>Klassische Ansicht</label>
-      <div class="hint sub" style="margin-top:6px">Die alte Menüführung ohne Modi und Einstellungs-Übersicht. Alle Seiten und Werte bleiben gleich; gilt nur für dieses Gerät.</div></div>`;
+      <div class="hint sub" style="margin-top:6px">Die alte Menüführung ohne Modi und Einstellungs-Übersicht. Alle Seiten und Werte bleiben gleich; gilt nur für dieses Gerät.</div>
+      <div style="margin-top:12px"><label class="tg" style="display:inline-flex"><input type="checkbox" id="set_demo" ${cfg&&cfg.demo?"checked":""}><i></i>Demo-Modus</label>
+      <div class="hint sub" style="margin-top:6px">Zeigt simulierte Werte, um SOLASI ohne Geräte auszuprobieren oder vorzuführen. Solange er an ist, steuert SOLASI nichts.</div></div></div>`;
+  $("#set_demo").addEventListener("change",e=>setDemo(e.target.checked));
   $("#set_classic").addEventListener("change",e=>{lookSet("classic",e.target.checked?"1":"0");renderNav();showPage(isClassic()?"control":"settings");if(lastStatus)renderStatus(lastStatus);});}
 
 loadMe();
@@ -2211,7 +2218,7 @@ function palBuild(q){
   if(/\?|^(wann|warum|wieso|was|wie|wer|wo|hat|ist)\b/.test(ql)){
     const words=ql.replace(/[?.,!]/g,"").split(/\s+/).filter(w=>w.length>3&&!["wann","warum","wieso","wurde","wurden","gestern","heute","welche","hatte","wieviel"].includes(w));
     const ev=((lastStatus&&lastStatus.events)||[]).filter(e=>words.some(w=>String(e.msg).toLowerCase().includes(w.slice(0,Math.max(4,w.length-2))))).slice(0,5);
-    for(const e of ev)add("💬",e.msg,new Date(e.ts*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}),()=>showPage("log"));
+    for(const e of ev)add("💬",e.msg,String(e.ts||""),()=>showPage("log"));
     if(!ev.length)add("💬","Dazu steht nichts im Protokoll","Antwort",()=>showPage("log"));
   }
   return out.slice(0,12);
@@ -2291,11 +2298,11 @@ async function loadAccounts(){
 function renderAccounts(){
   const el=$("#p-accounts"),users=(acctData&&acctData.users)||[],roles=(acctData&&acctData.roles)||{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"};
   const ro=sel=>Object.entries(roles).map(([k,l])=>`<option value="${k}"${k===sel?" selected":""}>${l}</option>`).join("");
-  el.innerHTML=`<div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Konten &amp; Zugang</h2>
+  el.innerHTML=`${users.length?"":`<div class="banner">🔓 <span><b>Eigener Port ist offen</b>, solange kein Konto existiert. Wenn du den Port in der Add-on-Konfiguration freigibst, kann jeder im Netzwerk SOLASI bedienen. Lege ein Konto an, um ihn zu schützen.</span></div>`}<div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Konten &amp; Zugang</h2>
   <div class="sub"><b>Besitzer</b> darf alles. <b>Mitbewohner</b> darf Modus wechseln und den Not-Aus bedienen. <b>Nur lesen</b> darf alles ansehen. Über Home Assistant bist du automatisch angemeldet – Konten brauchst du nur für den eigenen Zugang ohne Home Assistant.</div></div>
   <div id="acctlist">${users.map(u=>`<div class="card" style="margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap" data-acct="${esc(u.name)}"><b style="flex:1;min-width:120px">👤 ${esc(u.name)}</b><select data-arole="${esc(u.name)}" aria-label="Rolle von ${esc(u.name)}">${ro(u.role)}</select><button type="button" class="ghost" data-apw="${esc(u.name)}">Passwort ändern</button><button type="button" class="ghost" data-adel="${esc(u.name)}" title="Konto löschen">✕</button></div>`).join("")||`<div class="sub" style="padding:6px 2px">Noch kein Konto. Lege zuerst ein Besitzer-Konto an – erst dann ist der eigene Zugang nutzbar.</div>`}</div>
   <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Neues Konto</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="an_name" placeholder="Name" autocomplete="off" style="flex:1;min-width:120px"><input id="an_pw" type="password" placeholder="Passwort (mind. 8 Zeichen)" autocomplete="new-password" style="flex:1;min-width:160px"><select id="an_role">${ro(users.length?"member":"owner")}</select><button type="button" class="primary" id="an_add">Anlegen</button></div><div id="an_msg" class="sub" style="margin-top:6px"></div></div>
-  <div class="card" style="margin-top:12px"><h3 style="margin:0 0 6px">Eigener Port</h3><div class="sub">Mit einem eigenen Port erreichst du SOLASI direkt, ohne den Umweg über Home Assistant: Öffne in Home Assistant <b>Einstellungen → Add-ons → SOLASI → Konfiguration → Netzwerk</b> und trage bei „8100/tcp“ einen Port ein (z. B. 8100). Danach: <code>http://&lt;Adresse-von-Home-Assistant&gt;:8100</code>. Leer lassen = aus. Der Port verlangt immer eine Anmeldung; ohne Konto lässt er niemanden herein. Nutze ihn nur im Heimnetz, nicht im Internet.</div></div>`;
+  <div class="card" style="margin-top:12px"><h3 style="margin:0 0 6px">Eigener Port</h3><div class="sub">Mit einem eigenen Port erreichst du SOLASI direkt, ohne den Umweg über Home Assistant: Öffne in Home Assistant <b>Einstellungen → Add-ons → SOLASI → Konfiguration → Netzwerk</b> und trage bei „8100/tcp“ einen Port ein (z. B. 8100). Danach: <code>http://&lt;Adresse-von-Home-Assistant&gt;:8100</code>. Leer lassen = aus. <b>Solange es kein Konto gibt, ist der Port offen</b> – jeder im Netzwerk darf alles bedienen (wie bei PrintDock). Sobald du das erste Konto anlegst, verlangt er eine Anmeldung. Nutze ihn nur im Heimnetz, nicht im Internet.</div></div>`;
 }
 async function acctCall(method,url,body){
   const r=await fetch(url,{method,headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
@@ -2312,6 +2319,20 @@ document.addEventListener("click",async e=>{
 document.addEventListener("change",async e=>{
   const r=e.target.closest("[data-arole]");if(r){try{await acctCall("POST","api/accounts",{name:r.dataset.arole,role:r.value});toast("Rolle geändert");}catch(x){toast(x.message);loadAccounts();}}
 });
+
+// ---- Demo-Modus ----
+async function setDemo(on){
+  if(on&&cfg&&cfg.enabled&&!cfg.dry_run&&!confirm("Die Regelung ist eingeschaltet. Im Demo-Modus steuert SOLASI nichts, bis du ihn beendest. Fortfahren?")){const c=$("#set_demo");if(c)c.checked=false;return;}
+  try{
+    const c=await (await fetch("api/config")).json();c.demo=!!on;
+    const r=await (await fetch("api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(c)})).json();
+    if(!r.ok)throw new Error(r.error||"Fehler");
+    cfg=await (await fetch("api/config")).json();baseCfg=JSON.parse(JSON.stringify(cfg));dirty=false;updateSavebar();
+    wizDismissed=!!on;firstRun=false;toast(on?"Demo-Modus an":"Demo-Modus beendet");
+    await poll();showPage(on?"status":curPage==="status"?"status":curPage);
+  }catch(e){toast("Demo konnte nicht umgeschaltet werden: "+e.message);}
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-demo]");if(b)setDemo(b.dataset.demo==="1");});
 </script>
 </body>
 </html>

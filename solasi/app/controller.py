@@ -122,6 +122,7 @@ DEFAULT_CONFIG = {
             "learn_base_load": False, "base_load_margin": 10, "base_load_min": 50, "base_load_max": 600},
     "notify": {"service": "", "delay_min": 2, "cooldown_min": 60, "recovery": True,
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
+    "demo": False,
     "rules": [],
     "reports": {"weekly": False},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
@@ -768,8 +769,8 @@ class Controller:
             if wait > 0:
                 await asyncio.sleep(wait)
             self._last_cycle = time.monotonic()
-            if not self.ha.connected:
-                continue
+            if not self.ha.connected or self.cfg.get("demo"):
+                continue                     # Demo: es wird nichts gesteuert
             try:
                 await self.cycle()
             except Exception:  # noqa: BLE001
@@ -780,7 +781,7 @@ class Controller:
         while True:
             await asyncio.sleep(2)
             if (not self.ha.connected or not self.cfg["surplus"]["enabled"] or self.stopped or self._releasing
-                    or self._shutdown):
+                    or self._shutdown or self.cfg.get("demo")):
                 self._timers.clear()
                 continue
             try:
@@ -1024,6 +1025,8 @@ class Controller:
         if isinstance(data, dict) and isinstance(data.get("modes"), list):
             data = {**data, "modes": [{k: m.get(k) for k in ("id", "name", "icon", "text", *goals.KEYS)}
                                       for m in data["modes"] if isinstance(m, dict) and m.get("id") and m.get("name")]}
+        if isinstance(data, dict) and "demo" in data:
+            data = {**data, "demo": bool(data["demo"])}
         if isinstance(data, dict) and "rules" in data:
             data = {**data, "rules": automation.clean_rules(data["rules"])}
         if isinstance(data, dict) and isinstance(data.get("reports"), dict):

@@ -1,5 +1,11 @@
 # Änderungen
 
+## 2.0.1
+- **Korrektur:** Auf der Übersicht überlappten sich die Kennzahlen-Kacheln mit der Karte darunter (Abstand ging verloren). Abstand ist wieder da.
+- **Eigener Port wie bei PrintDock:** Ohne Konto ist der Port offen (jeder im Netzwerk gilt als Besitzer). Sobald das erste Konto existiert, verlangt er eine Anmeldung. Die Konten-Seite weist darauf hin, solange der Port offen ist.
+- **Demo-Modus:** Unter Einstellungen → Ansicht (und auf der Startseite vor der Einrichtung) lässt sich SOLASI mit simulierten Werten ansehen. Solange Demo an ist, steuert SOLASI nichts.
+- Suche: Antworten aus dem Protokoll zeigen jetzt die Uhrzeit korrekt an.
+
 ## 2.0.0
 - **Neue Oberfläche:** Menü in Betrieb / Auswertung / System, Einstellungen als Übersicht mit Themen, Änderungsleiste mit „Verwerfen“. Energiefluss, Statistik und alle bisherigen Seiten bleiben. Unter Einstellungen → Ansicht gibt es „Klassische Ansicht“ als Weg zurück.
 - **Modi und Ziele:** fünf Modi zur Schnellwahl (Ausgewogen, Autark, Akku schonen, Urlaub, Notfall) plus eigene Modi. Drei Regler (Reserve, Genauigkeit, Akku schonen) berechnen die Einzelwerte; jeder Einzelwert bleibt von Hand änderbar und wird dann als „angepasst“ markiert.

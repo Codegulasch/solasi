@@ -10,6 +10,7 @@ from aiohttp import web
 import copy
 import accounts as acc
 
+import demo
 import discover
 import goals
 import meterhist
@@ -102,11 +103,12 @@ def make_direct_middleware(accounts):
         if path in ("/api/login", "/api/logout"):
             return await handler(request)
         user = accounts.user_for(request.cookies.get("solasi_session"))
+        if user is None and not accounts.has_any():
+            user = {"name": "", "role": "owner"}        # ohne Konten: offener Zugang wie bei PrintDock (jeder im Netz = Besitzer)
         if user is None:
             if path.startswith("/api/") or path.endswith(".js"):
                 return web.json_response({"ok": False, "error": "Bitte anmelden"}, status=401)
-            info = "Melde dich an." if accounts.has_any() else "Noch kein Konto angelegt: Lege in Home Assistant unter SOLASI → Einstellungen → Konten zuerst ein Besitzer-Konto an."
-            return web.Response(text=LOGIN_HTML.replace("__INFO__", info), content_type="text/html", headers={"Cache-Control": "no-store"})
+            return web.Response(text=LOGIN_HTML.replace("__INFO__", "Melde dich an."), content_type="text/html", headers={"Cache-Control": "no-store"})
         if not acc.allowed(user["role"], request.method, path):
             return web.json_response({"ok": False, "error": "Dafür fehlt deiner Rolle die Berechtigung"}, status=403)
         request["user"], request["role"] = user["name"], user["role"]
@@ -137,8 +139,9 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
 
     @routes.get("/api/me")
     async def me(request):
-        return web.json_response({"name": request.get("user") or "Home Assistant", "role": request.get("role") or "owner",
-                                  "direct": direct, "roles": acc.ROLES})
+        return web.json_response({"name": request.get("user") or ("Offener Zugang" if direct else "Home Assistant"),
+                                  "role": request.get("role") or "owner", "direct": direct,
+                                  "open": direct and not accounts.has_any(), "roles": acc.ROLES})
 
     @routes.get("/api/accounts")
     async def accounts_get(_):
@@ -172,6 +175,11 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
 
     @routes.get("/api/status")
     async def status(_):
+        if store.cfg.get("demo"):
+            st = demo.status(store.cfg)
+            st["mode_id"] = goals.active_mode(store.cfg)
+            st["goal_mode"] = st["mode_id"]
+            return web.json_response(st)
         st = dict(ctrl.status)
         st.setdefault("connected", ha.connected)
         st["enabled"] = store.cfg["enabled"]
@@ -343,6 +351,8 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
             days = max(1, min(int(request.query.get("days", 30)), 400))
         except ValueError:
             days = 30
+        if store.cfg.get("demo"):
+            return web.json_response(demo.stats())
         ctrl.stats.save()
         return web.json_response(ctrl.stats.summary(days, store.cfg["prices"]))
 

@@ -66,9 +66,14 @@ async def test_direkter_port_verlangt_anmeldung(tmp_path):
     accts, _ = mk(tmp_path)
     async with TestClient(TestServer(appmain.build_app(ctrl, store, ha, accts, direct=True))) as c:
         r = await c.get("/")
-        assert r.status == 200 and "Noch kein Konto" in await r.text()              # ohne Konto: Hinweis statt Zugang
-        assert (await c.get("/api/config")).status == 401
+        assert r.status == 200 and "SOLASI" in await r.text() and "Melde dich an" not in await r.text()   # ohne Konto: offen
+        assert (await c.get("/api/config")).status == 200
+        j = await (await c.get("/api/me")).json()
+        assert j["open"] is True and j["role"] == "owner" and j["direct"] is True
+        assert (await c.post("/api/config", json=await (await c.get("/api/config")).json())).status == 200
         accts.create("Stefan", "geheim123", "owner"); accts.create("Anna", "langgenug1", "member"); accts.create("Opa", "langgenug2", "viewer")
+        assert (await c.get("/api/config")).status == 401                           # mit Konten: Anmeldung nötig
+        assert "Melde dich an" in await (await c.get("/")).text()
         assert (await c.post("/api/login", json={"name": "Stefan", "password": "falsch"})).status == 401
         assert (await c.post("/api/login", json={"name": "Anna", "password": "langgenug1"})).status == 200
         assert (await c.get("/api/config")).status == 200

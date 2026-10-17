@@ -366,6 +366,8 @@ SOLASI ist ein unabhängiges Projekt und steht in keiner Verbindung zu SolarAssi
 
 **Automatik:** Unter Betrieb → Automatik legst du Regeln an. Meldungen gehen an den Dienst aus Sicherheit & Meldungen. Der Wochenbericht kommt montags um 8 Uhr.
 
-**Konten und eigener Port:** Unter Einstellungen → Konten & Zugang legst du Konten an. Um SOLASI ohne Home Assistant zu öffnen, trägst du in der Add-on-Konfiguration unter Netzwerk bei „8100/tcp“ einen Port ein. Der Zugang verlangt immer eine Anmeldung; nutze ihn nur im Heimnetz.
+**Konten und eigener Port:** Unter Einstellungen → Konten & Zugang legst du Konten an. Um SOLASI ohne Home Assistant zu öffnen, trägst du in der Add-on-Konfiguration unter Netzwerk bei „8100/tcp“ einen Port ein. Ohne Konto ist der Port offen (jeder im Netzwerk darf alles bedienen); sobald du ein Konto anlegst, verlangt er eine Anmeldung. Nutze ihn nur im Heimnetz.
 
 **Klassische Ansicht:** Wer die alte Menüführung möchte, schaltet sie unter Einstellungen → Ansicht ein.
+
+**Demo-Modus:** Einstellungen → Ansicht → „Demo-Modus“ zeigt simulierte Werte, damit du SOLASI ohne Geräte ausprobieren kannst. Solange er an ist, steuert SOLASI nichts.

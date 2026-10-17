@@ -440,6 +440,14 @@ const w=dom.window,d=w.document;
   d.querySelector("#p-auto [data-rdel]").click();
   ok(w.eval("cfg.rules.length")===0,"Automatik: Regel löschen");
   d.getElementById("discard").click();await new Promise(r=>setTimeout(r,60));
+  // Demo-Modus
+  w.showPage("settings");await new Promise(r=>setTimeout(r,60));
+  ok(!!d.getElementById("set_demo")&&!d.getElementById("set_demo").checked,"Demo: Schalter in den Einstellungen, standardmäßig aus");
+  global.DEMO_ON=false;
+  w.eval("cfg.demo=true");w.renderSettings();
+  w.renderStatus({...w.eval("lastStatus"),demo:true});
+  ok(/Demo-Modus/.test(d.getElementById("p-status").textContent)&&!!d.querySelector("[data-demo='0']"),"Demo: Banner mit „Demo beenden“");
+  w.eval("cfg.demo=false");
   // Konten
   global.ACCTS=[{name:"Stefan",role:"owner",role_label:"Besitzer"},{name:"Anna",role:"member",role_label:"Mitbewohner"}];
   w.showPage("accounts");await new Promise(r=>setTimeout(r,150));
