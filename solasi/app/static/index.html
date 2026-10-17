@@ -405,6 +405,7 @@ function unitFields(i,u){
   const L="sens"+i;
   h+=field(p+"soc","Ladestand SOC (%)","text",{list:L});
   h+=field(p+"lim_dis","Entladegrenze des Speichers (optional)","text",{list:"number",hint:"Die Entität „Entladegrenze“ des Speichers (Prozent). Der Speicher gibt darunter nichts ab, auch wenn SOLASI es anfordert. Mit dieser Entität richtet sich SOLASI automatisch danach: Wirksam ist der höhere Wert aus Entladegrenze und dem eigenen Mindest-Ladestand."})+
+     field(p+"lim_res","Notstromreserve des Speichers (optional)","text",{list:"number",hint:"Die Entität „Notstromreserve“ (Prozent). Dieser Anteil bleibt für einen Netzausfall im Speicher. SOLASI entlädt nicht darunter; wirksam ist der höchste Wert aus eigenem Mindest-Ladestand, Entladegrenze und Notstromreserve."})+
      field(p+"lim_chg","Ladeobergrenze des Speichers (optional)","text",{list:"number",hint:"Die Entität „Ladeobergrenze“ (Prozent). Ab diesem Ladestand gilt der Speicher als voll."})+
      field(p+"min_soc","Eigener Mindest-Ladestand (%)","numn",{min:0,max:100,ph:"leer = globaler Wert",hint:"Leer lassen, dann gilt der Wert aus „Akku-Grenzen & Eco“. Nur für diesen Speicher abweichend einstellen."})+
      field(p+"max_soc","Eigener Höchst-Ladestand (%)","numn",{min:0,max:100,ph:"leer = globaler Wert",hint:"Leer lassen, dann gilt der globale Wert."})+
@@ -482,6 +483,7 @@ function renderControl(){
     field(f+"eco","Eco-Modus","bool",{hint:"Drosselt die Entladung bei niedrigem Ladestand, damit der Akku bis zum Morgen reicht."})+
     field(f+"thresholds","Schwellen verwenden","bool",{hint:"Aus = es wird schon bei kleinsten Abweichungen geregelt."})+
     field(f+"ac_charge","Laden aus Fremd-Überschuss erlauben","bool",{hint:"Z. B. von einer anderen PV-Anlage am Zähler."})+
+    field(f+"cross_charge","Überschuss in anderen Speicher umladen","bool",{hint:"Ist ein Speicher voll und ein anderer kann noch laden, wird der volle nicht abgeregelt. Seine Solarleistung geht ins Haus, die Einspeisung lädt den anderen Speicher per AC (Netz-zu-Batterie). Dabei gehen etwa 10–15 % Wandlungsverlust an. Braucht „Laden aus Fremd-Überschuss erlauben“."})+
     field(f+"strict_zero","Strenge Nulleinspeisung bei vollem Speicher","bool",{hint:"Voller Speicher wird auf „Entladen“ gestellt, damit er die PV drosselt (nur bei Speichertypen, die das können)."})+
     field(f+"enforce_mode","Externe Steuerung automatisch einschalten","bool",{hint:"Sobald SOLASI live steuert, stellt es den Betriebsmodus des Speichers auf die Option für externe Steuerung (bei Anker „third_party_control“): beim Start, nach „Fortsetzen“ und wenn der Modus von außen verstellt wird, auch wenn gerade nichts zu regeln ist. Zum Zurückgeben dient der Not-Aus."})+
     field(f+"pv_passthrough","PV direkt ins Haus geben, auch bei leerem Speicher","bool",{hint:"Liegt der Ladestand unter dem Minimum, darf der Speicher trotzdem so viel abgeben, wie seine Module gerade liefern. Die Batterie wird dabei nicht entladen. Braucht den PV-Sensor je Speicher."})+
@@ -853,7 +855,7 @@ function renderLook(){
   $("#cd_ord").addEventListener("click",e=>{const b=e.target.closest("[data-cm]");if(!b)return;
     const o=[...cord],i=o.indexOf(b.dataset.id),j=i+ +b.dataset.cm;if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];setCd("order",o);});
   $("#cd_reset").addEventListener("click",()=>{cfg.card={size:"large",show_headline:true,show_meters:true,meters_layout:"big",show_trend:true,show_batteries:true,show_surplus:true,show_tags:true,show_kill:true,accent:"",gradient:true,order:[]};markDirty();renderLook();});
-  const fl=Object.assign({size:"auto",layout:"total",total:true,solar:true,bat:true,grid:true,house:true,grid_pos:"mid",order:[]},cfg.flow||{});
+  const fl=Object.assign({size:"auto",layout:"total",total:true,solar:true,bat:true,grid:true,house:true,grid_pos:"mid",passthrough:true,order:[]},cfg.flow||{});
   const names=(cfg.units||[]).map(u=>u.name).filter(Boolean),ord=[...fl.order.filter(n=>names.includes(n)),...names.filter(n=>!fl.order.includes(n))];
   const setFl=(k,v)=>{cfg.flow=Object.assign({},fl,{[k]:v});markDirty();renderLook();if(lastStatus)renderStatus(lastStatus);};
   $("#p-look").insertAdjacentHTML("beforeend",`<details class="fsec" open><summary>Energiefluss <span class="sub">gilt für alle Geräte, mit „Speichern“</span></summary><div class="fbody">
@@ -863,6 +865,8 @@ function renderLook(){
       <div class="hint">Gesamt-Solar oben und Paare zeigen bei zwei Anlagen jede einzeln. Kompakt fasst alle Anlagen zu einem Speicher zusammen.</div></div>
     <div class="f"><label>Kacheln</label><div class="flchecks">${[["total","Solar gesamt"],["solar","Solar je Anlage"],["bat","Speicher"],["grid","Netz"],["house","Haus"]].map(([k,l])=>`<label><input type="checkbox" data-fl="${k}" ${fl[k]?"checked":""}> ${l}</label>`).join("")}</div>
       <div class="hint">Ausgeblendete Kacheln nehmen ihre Linien mit. „Solar gesamt“ gibt es nur in der Vorlage „Gesamt-Solar oben“ bei zwei Anlagen.</div></div>
+    <div class="f"><label>Umladen</label><div class="flchecks"><label><input type="checkbox" data-fl="passthrough" ${fl.passthrough?"checked":""}> Umgeladenen Strom als „durchgereicht“ zeigen</label></div>
+      <div class="hint">Lädt ein Speicher per AC den anderen, steht das im gemessenen Hausverbrauch. Mit dieser Option zeigt die Hauskachel den echten Verbrauch und die Linie „durchgereicht“; auch der Tagesverbrauch wird bereinigt.</div></div>
     <div class="f"><label for="fl_gp">Platz des Netzes</label><div><select id="fl_gp">${[["mid","In der Mitte"],["side","Neben dem Haus"]].map(([k,l])=>`<option value="${k}" ${k===fl.grid_pos?"selected":""}>${l}</option>`).join("")}</select></div></div>
     ${ord.length>1?`<div class="f"><label>Reihenfolge der Anlagen</label><div class="ordlist" id="fl_ord">${ord.map((n,i)=>`<div class="ordrow"><span>${esc(n)}</span><span><button type="button" data-fm="-1" data-n="${esc(n)}" aria-label="nach oben" ${i===0?"disabled":""}>↑</button><button type="button" data-fm="1" data-n="${esc(n)}" aria-label="nach unten" ${i===ord.length-1?"disabled":""}>↓</button></span></div>`).join("")}</div>
       <div class="hint">Bei zwei Anlagen steht die erste links, die zweite rechts.</div></div>`:""}
@@ -873,7 +877,7 @@ function renderLook(){
   $("#p-look").querySelectorAll("[data-fl]").forEach(c=>c.addEventListener("change",()=>setFl(c.dataset.fl,c.checked)));
   const fo=$("#fl_ord");if(fo)fo.addEventListener("click",e=>{const b=e.target.closest("[data-fm]");if(!b)return;
     const o=[...ord],i=o.indexOf(b.dataset.n),j=i+ +b.dataset.fm;if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];setFl("order",o);});
-  $("#fl_reset").addEventListener("click",()=>{cfg.flow={size:"auto",layout:"total",total:true,solar:true,bat:true,grid:true,house:true,grid_pos:"mid",order:[]};markDirty();renderLook();if(lastStatus)renderStatus(lastStatus);});
+  $("#fl_reset").addEventListener("click",()=>{cfg.flow={size:"auto",layout:"total",total:true,solar:true,bat:true,grid:true,house:true,grid_pos:"mid",passthrough:true,order:[]};markDirty();renderLook();if(lastStatus)renderStatus(lastStatus);});
   $("#look_dbg").addEventListener("change",e=>dbgSet(e.target.checked));
   $("#look_start").addEventListener("change",e=>{lookSet("start",e.target.value);toast("Startseite gespeichert")});
   $("#look_dens").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;lookSet("density",b.dataset.d);applyDensity();renderLook()});
@@ -1331,7 +1335,7 @@ const SF = (() => {
       }
       const [mx, my] = bez(x.pts, .5), txt = fmt(a) + " W", cw = txt.length * 7.8 + 16;
       chips += `<rect x="${(mx - cw / 2).toFixed(1)}" y="${(my - 11).toFixed(1)}" width="${cw.toFixed(1)}" height="22" rx="11" style="fill:var(--sf-card);stroke:var(${x.col});stroke-opacity:.55"/>
-        <text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" class="sf-c">${txt}</text>`;
+        <text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" class="sf-c">${txt}</text>${x.lab && val < 0 ? `<text x="${mx.toFixed(1)}" y="${(my + 24).toFixed(1)}" text-anchor="middle" class="sf-s">${x.lab}</text>` : ""}`;
     }
     return idle + live + dots + chips;
   }
@@ -1380,6 +1384,8 @@ const SF = (() => {
     const H = bottom + 24;
     const vc = (x1, y1, x2, y2) => { const k = Math.min(18, Math.abs(y2 - y1) / 2); return [[x1, y1], [x1, y1 + k], [x2, y2 - k], [x2, y2]]; };
     const lines = [], tiles = [];
+    // AC-Laden aus dem Haus (Umladen): zählt im gemessenen Verbrauch mit, ist aber nur durchgereicht
+    const pass = !o.passthrough ? 0 : U.reduce((a, u) => { const p = u.paused || u.pv == null ? 0 : Math.max(u.pv, 0), c = u.paused || u.bat == null ? 0 : Math.max(-u.bat, 0); return a + Math.max(c - p, 0); }, 0);
     const known = U.filter(u => u.pv != null);
     const total = known.length ? known.reduce((a, u) => a + Math.max(u.pv, 0), 0) : (d.pv == null ? null : Math.max(d.pv, 0));
     U.forEach((u, i) => {
@@ -1390,12 +1396,16 @@ const SF = (() => {
       const toHouse = pv == null ? null : Math.max(pv - chg, 0);
       const ex = left ? x + w : x;                       // Seite zur Mitte
       const mid = left ? ex + 33 : ex - 33, hin = left ? mx : mx + TW;
-      if (showT && showS) lines.push({ pts: vc(mc, Y.t + th, c, Y.s), col: "--sf-sun", val: pv });
-      if (showS && showB) lines.push({ pts: vc(c, Y.s + th, c, Y.b), col: "--sf-sun", val: pv == null ? null : chg });
-      else if (showT && showB) lines.push({ pts: vc(mc, Y.t + th, c, Y.b), col: "--sf-sun", val: pv == null ? null : chg });
+      // Solar gesamt: die Linien verlassen die Kachel seitlich und laufen von oben in die Anlagen
+      const ty = Y.t + th / 2, sx = left ? mx : mx + TW, sd = (mc - c) * .55;
+      const side = yy => [[sx, ty], [sx - sd, ty], [c, ty + (yy - ty) * .5], [c, yy]];
+      if (showT && showS) lines.push({ pts: side(Y.s), col: "--sf-sun", val: pv });
+      const own = Math.min(chg, pv == null ? 0 : pv), ac = Math.max(chg - (pv == null ? 0 : pv), 0);   // Rest kommt per AC aus dem Haus
+      if (showS && showB) lines.push({ pts: vc(c, Y.s + th, c, Y.b), col: "--sf-sun", val: pv == null ? null : own });
+      else if (showT && showB) lines.push({ pts: side(Y.b), col: "--sf-sun", val: pv == null ? null : own });
       if (showH && showS) lines.push({ pts: [[ex, Y.s + 38], [mid, Y.s + 38], [mid, Y.h + 24], [hin, Y.h + 24]], col: "--sf-sun", val: toHouse });
       else if (showH && showT) { const sx = left ? mx + 35 : mx + TW - 35; lines.push({ pts: [[sx, Y.t + th], [mid, Y.t + th + (Y.h - Y.t - th) * .3], [mid, Y.h + 24], [hin, Y.h + 24]], col: "--sf-sun", val: toHouse }); }
-      if (showB && showH) lines.push({ pts: [[c, Y.b + th], [c, Y.h + 52], [left ? ex + 25 : ex - 25, Y.h + 52], [hin, Y.h + 52]], col: "--sf-bat", val: dis });
+      if (showB && showH) lines.push({ pts: [[c, Y.b + th], [c, Y.h + 52], [left ? ex + 25 : ex - 25, Y.h + 52], [hin, Y.h + 52]], col: "--sf-bat", val: dis > 0 ? dis : -ac, lab: o.passthrough ? "durchgereicht" : "" });
       const soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null;
       const sub = [soc != null ? soc + " %" : "", kwhTxt(u.kwh)].filter(Boolean).join(" · ");
       if (showS) tiles.push(tile("sun", "Solar " + esc(clip(names[i], 9)), pz ? "–" : wl(u.pv), pz ? "Wartung" : u.pv != null && u.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), { x, y: Y.s, w, dim: pz }));
@@ -1411,7 +1421,7 @@ const SF = (() => {
     }
     if (showT) tiles.push(tile("sun", "Solar", wl(total), total != null && total < 5 ? "keine Sonne" : "alle Anlagen", "--sf-sun", ICON.sun("var(--sf-sun)"), { x: mx, y: Y.t, w: TW }));
     if (showG) tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), gridSide ? { x: W - 170, y: Y.h, w: TW } : { x: mx, y: Y[gridRow], w: TW }));
-    if (showH) tiles.push(tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), { x: mx, y: Y.h, w: TW }));
+    if (showH) { const ps = pass >= 10 && d.house != null; tiles.push(tile("home", "Haus", wl(ps ? Math.max(d.house - pass, 0) : d.house), d.house != null ? (ps ? "+" + fmt(pass) + " W Laden" : "Verbrauch") : "", "--sf-home", ICON.home("var(--sf-home)"), { x: mx, y: Y.h, w: TW })); }
     return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}${tiles.join("")}</svg>`;
   }
 
@@ -1461,7 +1471,7 @@ const SF = (() => {
     return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Energiefluss">${CSS}<g transform="translate(${(W - 640) / 2} 0)">${drawLines(lines)}${tiles.join("")}</g></svg>`;
   }
 
-  const FLOW_DEF = { size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", order: [] };
+  const FLOW_DEF = { size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
   /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}],
          fl?:{layout: total|pairs|compact, total, solar, bat, grid, house, grid_pos: mid|side, order:[Namen]}} */
   function flow(d) {
@@ -1506,6 +1516,12 @@ const SF = (() => {
     const f = d.f, s = d.soc != null && d.soc >= 0 ? ` · mittlerer Ladestand ${Math.round(d.soc)} %` + (d.cap ? ` (${nf1(d.kwh)} von ${Number(d.cap).toLocaleString("de-DE", { maximumFractionDigits: 1 })} kWh)` : "") : "";
     const g = d.grid == null ? 0 : d.grid;
     const gs = Math.abs(g) < 30 ? "Netzbezug nahe null" : g > 0 ? `Netzbezug ${fmt(g)} W` : `Einspeisung ${fmt(-g)} W`;
+    // Überschuss einer vollen Anlage lädt eine andere (AC-Laden): Speicher lädt mit mehr, als seine eigenen Module liefern
+    const UU = (d.units || []).filter(u => u && u.name && !u.off && !u.paused), nn = shortNames(UU.map(u => u.name));
+    const from = UU.findIndex(u => u.full && (u.pv || 0) >= 5);
+    const to = UU.findIndex(u => !u.full && u.bat != null && -u.bat >= 5 && -u.bat > (u.pv || 0) + 5);
+    if (from >= 0 && to >= 0 && from !== to)
+      return [`Überschuss von ${nn[from]} lädt ${nn[to]} mit ${fmt(-UU[to].bat - (UU[to].pv || 0))} W`, (d.fl && d.fl.passthrough === false ? "" : "durchgereicht, kein Mehrverbrauch · ") + gs + s];
     if (f && f.bh != null && d.bat != null) {
       const sh = f.sh >= 5, sb = f.sb >= 5, bh = f.bh >= 5, gh = f.gh >= 5;
       if (sh && sb) return ["Solar versorgt dein Haus und lädt den Speicher", gs + s];

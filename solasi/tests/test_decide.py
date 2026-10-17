@@ -210,3 +210,45 @@ def test_gesperrter_speicher_bekommt_keinen_anteil():
     a, b = _lim(cfg, 0, 60, setv=300, locked=True), _lim(cfg, 1, 60)
     d = decide(cfg, mk_snap(cfg, 400, [a, b]))
     assert a["dcap"] == 0 and a["p"] == 0 and b["p"] > 0
+
+
+# ---- Überschuss in anderen Speicher umladen, Notstromreserve ----
+def test_voller_speicher_wird_nicht_abgeregelt_wenn_anderer_laden_kann():
+    _, u, d = run(-400, (100, 40))
+    assert not u[0]["force"]                       # HÜTTE voll, DACH nimmt den Überschuss auf
+    assert u[1]["p"] < 0                           # DACH lädt per AC
+
+
+def test_umladen_nur_wenn_der_andere_laden_kann():
+    _, u, d = run(0, (100, 100))
+    assert all(x["force"] for x in u)              # beide voll: wie bisher abregeln
+    cfg = mk_cfg(); cfg["features"]["ac_charge"] = False
+    _, u, d = run(-400, (100, 40), cfg=cfg)
+    assert u[0]["force"]                           # ohne AC-Laden kann niemand aufnehmen
+    cfg = mk_cfg(); cfg["features"]["cross_charge"] = False
+    _, u, d = run(-400, (100, 40), cfg=cfg)
+    assert u[0]["force"]                           # Funktion abgeschaltet
+
+
+def test_umladen_beruecksichtigt_beobachtete_und_gesperrte_speicher():
+    cfg = mk_cfg()
+    a, b = mk_unit(cfg, 0, 100), mk_unit(cfg, 1, 40)
+    for x in (a, b):
+        x.update({"lim_dis": None, "lim_chg": None, "locked": False})
+    b["obs"] = True                                # DACH wird von jemand anderem geregelt: nimmt nichts von SOLASI an
+    decide(cfg, mk_snap(cfg, -400, [a, b]))
+    assert a["force"]
+
+
+def test_notstromreserve_hebt_mindest_soc_an():
+    cfg = mk_cfg(); cfg["soc"]["min"] = 15
+    a, b = _lim(cfg, 0, 22), _lim(cfg, 1, 50)
+    a["lim_res"] = 25
+    decide(cfg, mk_snap(cfg, 400, [a, b]))
+    assert a["min"] == 25 and not a["elig_dis"]    # unter der Notstromreserve gibt der Speicher nichts ab
+    assert b["min"] == 15
+
+
+def test_umladen_auch_in_umgekehrter_richtung():
+    _, u, d = run(-500, (40, 100))                 # DACH voll mit Überschuss, HÜTTE kann laden (eigene Solarleistung lädt zuerst, DC)
+    assert not u[1]["force"] and u[0]["p"] < 0

@@ -537,3 +537,13 @@ def test_karten_einstellungen_werden_bereinigt(tmp_path):
     ctrl = mk_ctrl(tmp_path)
     asyncio.run(ctrl.save_config({**ctrl.cfg, "card": {"show_trend": False}}))
     assert ctrl.cfg["card"]["show_trend"] is False and ctrl.cfg["card"]["show_headline"] is True
+
+
+def test_durchgereichter_strom_und_flow_option():
+    from app.controller import Controller, clean_flow
+    u = [{"bat": 0, "pv": 340}, {"bat": -340, "pv": 0}]
+    assert Controller.passthrough_w(u) == 340                      # DACH lädt 340 W aus dem Haus
+    assert Controller.passthrough_w([{"bat": -300, "pv": 200}]) == 100   # eigene Solarleistung lädt zuerst
+    assert Controller.passthrough_w([{"bat": -300, "pv": 295}]) == 0     # unter 10 W: Rauschen
+    assert Controller.passthrough_w([{"bat": -300, "pv": 0, "paused": True}]) == 0
+    assert clean_flow({})["passthrough"] is True and clean_flow({"passthrough": 0})["passthrough"] is False

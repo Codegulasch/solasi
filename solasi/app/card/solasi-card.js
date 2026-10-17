@@ -17,6 +17,7 @@
  *   flow_hide: [grid]               # Kacheln ausblenden: total, solar, bat, grid, house
  *   flow_size: auto                 # Größe des Energieflusses: auto, compact oder large
  *   flow_grid_pos: auto             # Netz: auto, mid (Mitte) oder side (neben dem Haus)
+ *   flow_passthrough: true          # umgeladenen Strom als „durchgereicht“ zeigen (Hauskachel ohne Ladeleistung)
  *   flow_order: ["Name 1", "Name 2"] # Reihenfolge der Anlagen im Energiefluss (leer = wie im Add-on)
  *   meters_compare: auto            # Vergleich mit gestern: auto (wie im Add-on), same (gleiche Uhrzeit), full (ganzer Tag), off
  *   meters_order: [day, "m:sensor.wasser", pv, imp]   # Reihenfolge der Zählerkacheln (leer = wie im Add-on)
@@ -260,7 +261,7 @@ const SF = (() => {
       }
       const [mx, my] = bez(x.pts, .5), txt = fmt(a) + " W", cw = txt.length * 7.8 + 16;
       chips += `<rect x="${(mx - cw / 2).toFixed(1)}" y="${(my - 11).toFixed(1)}" width="${cw.toFixed(1)}" height="22" rx="11" style="fill:var(--sf-card);stroke:var(${x.col});stroke-opacity:.55"/>
-        <text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" class="sf-c">${txt}</text>`;
+        <text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" class="sf-c">${txt}</text>${x.lab && val < 0 ? `<text x="${mx.toFixed(1)}" y="${(my + 24).toFixed(1)}" text-anchor="middle" class="sf-s">${x.lab}</text>` : ""}`;
     }
     return idle + live + dots + chips;
   }
@@ -309,6 +310,8 @@ const SF = (() => {
     const H = bottom + 24;
     const vc = (x1, y1, x2, y2) => { const k = Math.min(18, Math.abs(y2 - y1) / 2); return [[x1, y1], [x1, y1 + k], [x2, y2 - k], [x2, y2]]; };
     const lines = [], tiles = [];
+    // AC-Laden aus dem Haus (Umladen): zählt im gemessenen Verbrauch mit, ist aber nur durchgereicht
+    const pass = !o.passthrough ? 0 : U.reduce((a, u) => { const p = u.paused || u.pv == null ? 0 : Math.max(u.pv, 0), c = u.paused || u.bat == null ? 0 : Math.max(-u.bat, 0); return a + Math.max(c - p, 0); }, 0);
     const known = U.filter(u => u.pv != null);
     const total = known.length ? known.reduce((a, u) => a + Math.max(u.pv, 0), 0) : (d.pv == null ? null : Math.max(d.pv, 0));
     U.forEach((u, i) => {
@@ -319,12 +322,16 @@ const SF = (() => {
       const toHouse = pv == null ? null : Math.max(pv - chg, 0);
       const ex = left ? x + w : x;                       // Seite zur Mitte
       const mid = left ? ex + 33 : ex - 33, hin = left ? mx : mx + TW;
-      if (showT && showS) lines.push({ pts: vc(mc, Y.t + th, c, Y.s), col: "--sf-sun", val: pv });
-      if (showS && showB) lines.push({ pts: vc(c, Y.s + th, c, Y.b), col: "--sf-sun", val: pv == null ? null : chg });
-      else if (showT && showB) lines.push({ pts: vc(mc, Y.t + th, c, Y.b), col: "--sf-sun", val: pv == null ? null : chg });
+      // Solar gesamt: die Linien verlassen die Kachel seitlich und laufen von oben in die Anlagen
+      const ty = Y.t + th / 2, sx = left ? mx : mx + TW, sd = (mc - c) * .55;
+      const side = yy => [[sx, ty], [sx - sd, ty], [c, ty + (yy - ty) * .5], [c, yy]];
+      if (showT && showS) lines.push({ pts: side(Y.s), col: "--sf-sun", val: pv });
+      const own = Math.min(chg, pv == null ? 0 : pv), ac = Math.max(chg - (pv == null ? 0 : pv), 0);   // Rest kommt per AC aus dem Haus
+      if (showS && showB) lines.push({ pts: vc(c, Y.s + th, c, Y.b), col: "--sf-sun", val: pv == null ? null : own });
+      else if (showT && showB) lines.push({ pts: side(Y.b), col: "--sf-sun", val: pv == null ? null : own });
       if (showH && showS) lines.push({ pts: [[ex, Y.s + 38], [mid, Y.s + 38], [mid, Y.h + 24], [hin, Y.h + 24]], col: "--sf-sun", val: toHouse });
       else if (showH && showT) { const sx = left ? mx + 35 : mx + TW - 35; lines.push({ pts: [[sx, Y.t + th], [mid, Y.t + th + (Y.h - Y.t - th) * .3], [mid, Y.h + 24], [hin, Y.h + 24]], col: "--sf-sun", val: toHouse }); }
-      if (showB && showH) lines.push({ pts: [[c, Y.b + th], [c, Y.h + 52], [left ? ex + 25 : ex - 25, Y.h + 52], [hin, Y.h + 52]], col: "--sf-bat", val: dis });
+      if (showB && showH) lines.push({ pts: [[c, Y.b + th], [c, Y.h + 52], [left ? ex + 25 : ex - 25, Y.h + 52], [hin, Y.h + 52]], col: "--sf-bat", val: dis > 0 ? dis : -ac, lab: o.passthrough ? "durchgereicht" : "" });
       const soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null;
       const sub = [soc != null ? soc + " %" : "", kwhTxt(u.kwh)].filter(Boolean).join(" · ");
       if (showS) tiles.push(tile("sun", "Solar " + esc(clip(names[i], 9)), pz ? "–" : wl(u.pv), pz ? "Wartung" : u.pv != null && u.pv < 5 ? "keine Sonne" : "", "--sf-sun", ICON.sun("var(--sf-sun)"), { x, y: Y.s, w, dim: pz }));
@@ -340,7 +347,7 @@ const SF = (() => {
     }
     if (showT) tiles.push(tile("sun", "Solar", wl(total), total != null && total < 5 ? "keine Sonne" : "alle Anlagen", "--sf-sun", ICON.sun("var(--sf-sun)"), { x: mx, y: Y.t, w: TW }));
     if (showG) tiles.push(tile("grid", "Netz", wl(Math.abs(grid)), grid >= 5 ? "Bezug" : grid <= -5 ? "Einspeisung" : "ausgeglichen", "--sf-grid", ICON.grid("var(--sf-grid)"), gridSide ? { x: W - 170, y: Y.h, w: TW } : { x: mx, y: Y[gridRow], w: TW }));
-    if (showH) tiles.push(tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), { x: mx, y: Y.h, w: TW }));
+    if (showH) { const ps = pass >= 10 && d.house != null; tiles.push(tile("home", "Haus", wl(ps ? Math.max(d.house - pass, 0) : d.house), d.house != null ? (ps ? "+" + fmt(pass) + " W Laden" : "Verbrauch") : "", "--sf-home", ICON.home("var(--sf-home)"), { x: mx, y: Y.h, w: TW })); }
     return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Energiefluss">${CSS}${drawLines(lines)}${tiles.join("")}</svg>`;
   }
 
@@ -390,7 +397,7 @@ const SF = (() => {
     return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Energiefluss">${CSS}<g transform="translate(${(W - 640) / 2} 0)">${drawLines(lines)}${tiles.join("")}</g></svg>`;
   }
 
-  const FLOW_DEF = { size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", order: [] };
+  const FLOW_DEF = { size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
   /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}],
          fl?:{layout: total|pairs|compact, total, solar, bat, grid, house, grid_pos: mid|side, order:[Namen]}} */
   function flow(d) {
@@ -435,6 +442,12 @@ const SF = (() => {
     const f = d.f, s = d.soc != null && d.soc >= 0 ? ` · mittlerer Ladestand ${Math.round(d.soc)} %` + (d.cap ? ` (${nf1(d.kwh)} von ${Number(d.cap).toLocaleString("de-DE", { maximumFractionDigits: 1 })} kWh)` : "") : "";
     const g = d.grid == null ? 0 : d.grid;
     const gs = Math.abs(g) < 30 ? "Netzbezug nahe null" : g > 0 ? `Netzbezug ${fmt(g)} W` : `Einspeisung ${fmt(-g)} W`;
+    // Überschuss einer vollen Anlage lädt eine andere (AC-Laden): Speicher lädt mit mehr, als seine eigenen Module liefern
+    const UU = (d.units || []).filter(u => u && u.name && !u.off && !u.paused), nn = shortNames(UU.map(u => u.name));
+    const from = UU.findIndex(u => u.full && (u.pv || 0) >= 5);
+    const to = UU.findIndex(u => !u.full && u.bat != null && -u.bat >= 5 && -u.bat > (u.pv || 0) + 5);
+    if (from >= 0 && to >= 0 && from !== to)
+      return [`Überschuss von ${nn[from]} lädt ${nn[to]} mit ${fmt(-UU[to].bat - (UU[to].pv || 0))} W`, (d.fl && d.fl.passthrough === false ? "" : "durchgereicht, kein Mehrverbrauch · ") + gs + s];
     if (f && f.bh != null && d.bat != null) {
       const sh = f.sh >= 5, sb = f.sb >= 5, bh = f.bh >= 5, gh = f.gh >= 5;
       if (sh && sb) return ["Solar versorgt dein Haus und lädt den Speicher", gs + s];
@@ -643,6 +656,7 @@ const SF = (() => {
     if (["mid", "side"].includes(c.flow_grid_pos)) fl.grid_pos = c.flow_grid_pos;
     if (Array.isArray(c.flow_hide)) c.flow_hide.forEach(k => { if (["total", "solar", "bat", "grid", "house"].includes(k)) fl[k] = false; });
     if (["auto", "compact", "large"].includes(c.flow_size)) fl.size = c.flow_size;
+    if (typeof c.flow_passthrough === "boolean") fl.passthrough = c.flow_passthrough;
     if (Array.isArray(c.flow_order) && c.flow_order.length) fl.order = c.flow_order;
     return fl;
   }
@@ -912,7 +926,7 @@ const SF = (() => {
         this._form = document.createElement("ha-form");
         this._form.computeLabel = s => ({ entity: "Entität", title: "Titel", size: "Größe", show_headline: "Überschrift zeigen",
           show_trend: "Tagesverlauf zeigen", show_meters: "Zählerreihe zeigen", meters_layout: "Anordnung der Zähler", show_batteries: "Speicher zeigen", show_surplus: "Überschuss zeigen", show_tags: "Hinweise zeigen",
-          show_kill: "Not-Aus-Knopf zeigen", tap_open: "Antippen öffnet SOLASI", accent: "Akzentfarbe (z. B. #3F5BD8)", gradient: "Farbverlauf im Hintergrund", meters_compare: "Vergleich mit gestern", flow_layout: "Energiefluss: Vorlage", flow_size: "Energiefluss: Größe", flow_hide: "Energiefluss: ausblenden", flow_grid_pos: "Energiefluss: Platz des Netzes" }[s.name] || s.name);
+          show_kill: "Not-Aus-Knopf zeigen", tap_open: "Antippen öffnet SOLASI", accent: "Akzentfarbe (z. B. #3F5BD8)", gradient: "Farbverlauf im Hintergrund", meters_compare: "Vergleich mit gestern", flow_layout: "Energiefluss: Vorlage", flow_size: "Energiefluss: Größe", flow_hide: "Energiefluss: ausblenden", flow_grid_pos: "Energiefluss: Platz des Netzes", flow_passthrough: "Umgeladenen Strom als durchgereicht zeigen" }[s.name] || s.name);
         this._form.schema = [
           { name: "entity", selector: { entity: { domain: "sensor" } } },
           { name: "title", selector: { text: {} } },
@@ -932,7 +946,8 @@ const SF = (() => {
           { name: "flow_layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Wie im Add-on" }, { value: "total", label: "Gesamt-Solar oben" }, { value: "pairs", label: "Paare" }, { value: "compact", label: "Kompakt" }] } } },
           { name: "flow_size", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Wie im Add-on" }, { value: "compact", label: "Kompakt" }, { value: "large", label: "Groß" }] } } },
           { name: "flow_hide", selector: { select: { multiple: true, mode: "list", options: [{ value: "total", label: "Solar gesamt" }, { value: "solar", label: "Solar je Anlage" }, { value: "bat", label: "Speicher" }, { value: "grid", label: "Netz" }, { value: "house", label: "Haus" }] } } },
-          { name: "flow_grid_pos", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Wie im Add-on" }, { value: "mid", label: "In der Mitte" }, { value: "side", label: "Neben dem Haus" }] } } }];
+          { name: "flow_grid_pos", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Wie im Add-on" }, { value: "mid", label: "In der Mitte" }, { value: "side", label: "Neben dem Haus" }] } } },
+          { name: "flow_passthrough", selector: { boolean: {} } }];
         this._form.addEventListener("value-changed", ev => {
           const def = this._defaults || {}, before = this._cfg || {}, merged = { ...before, ...(ev.detail.value || {}) };
           const next = {};
@@ -968,7 +983,7 @@ const SF = (() => {
       this._drawOrder();
       this._form.hass = this._hass;
       this._defaults = { entity: "sensor.solasi", title: "SOLASI", size: "large", show_headline: true, show_meters: true, meters_layout: "big", show_trend: true, show_batteries: true,
-        show_surplus: true, show_tags: true, show_kill: true, tap_open: true, accent: "", gradient: true, meters_compare: "auto", flow_layout: "auto", flow_hide: [], flow_size: "auto", flow_grid_pos: "auto" };
+        show_surplus: true, show_tags: true, show_kill: true, tap_open: true, accent: "", gradient: true, meters_compare: "auto", flow_layout: "auto", flow_hide: [], flow_size: "auto", flow_grid_pos: "auto", flow_passthrough: true };
       this._form.data = { ...this._defaults, ...this._cfg };
     }
   }

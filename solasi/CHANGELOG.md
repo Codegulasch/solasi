@@ -1,5 +1,14 @@
 # Änderungen
 
+## 1.7.2
+- **Umladen als „durchgereicht“:** Lädt ein Speicher per AC den anderen, steht diese Leistung im gemessenen Hausverbrauch. Jetzt zeigt die Hauskachel den echten Verbrauch („+340 W Laden“), die Linie zum ladenden Speicher trägt „durchgereicht“, und die Überschrift sagt „durchgereicht, kein Mehrverbrauch“. Auch Tagesverbrauch, Vergleich mit gestern, Autarkie und die Grundlast-Lernfunktion rechnen die durchgereichte Leistung heraus (ab diesem Update). Unter 10 W wird nichts angezeigt. Abschaltbar unter *Darstellung → Energiefluss*, in der Karte mit `flow_passthrough: false`.
+- **Solar gesamt im Energiefluss:** Die Linien verlassen die Kachel „Solar gesamt“ jetzt seitlich nach links und rechts und laufen von oben in die Anlagen. Das gibt ein runderes Gesamtbild.
+
+## 1.7.1
+- **Überschuss in anderen Speicher umladen:** Ist ein Speicher voll und kann ein anderer per AC laden (Schalter „Laden aus dem Netz“ an, Leistungsfluss-Option „Netz-zu-Batterie-Ladeleistung“), regelt SOLASI den vollen nicht mehr ab. Seine Solarleistung geht ins Haus, der Rest als Einspeisung ins Netz, und der andere Speicher lädt diesen Überschuss, sobald er über der Einschaltschwelle liegt. Die Überschrift lautet dann „Überschuss von HÜTTE lädt DACH mit 340 W“, im Energiefluss läuft die Linie vom Haus zum ladenden Speicher. Sind alle Speicher voll, wird wie bisher abgeregelt. Abschaltbar unter *Funktionen → Überschuss in anderen Speicher umladen*. Hinweis: Beim Umladen über Wechselrichter und Netzanschluss gehen etwa 10–15 % verloren.
+- **Notstromreserve:** Neue optionale Entität je Speicher (nur lesen). SOLASI behandelt sie wie die Entladegrenze: Mindest-Ladestand ist der höchste Wert aus eigenem Minimum, Entladegrenze und Notstromreserve. Der Selbsttest zeigt sie an.
+- **Leistungsgrenzen automatisch:** Hat die Leistungssteuerung die Attribute `max_charge_power` und `max_discharge_power` (Anker), liest SOLASI die Grenzen daraus, wenn keine eigene Entität eingetragen ist.
+
 ## 1.7.0
 - **Speicher aktiv, in Wartung oder deaktiviert:** Neu je Speicher (*Einrichtung → Betrieb*) und als Home-Assistant-Entität „… Betrieb“ (Aktiv, Wartung, Deaktiviert). **Wartung** graut den Speicher im Energiefluss aus, SOLASI steuert, liest und prüft ihn nicht und meldet keine Fehler. **Deaktiviert** blendet ihn aus, als gäbe es ihn nicht. Beim Wechsel gibt SOLASI den Speicher an sein eigenes Regelverhalten zurück (Rückfall-Modus), beim Zurückschalten übernimmt es ihn sofort wieder. Der Selbsttest überspringt solche Speicher.
 - **Automatische Wartung:** Antwortet der Ladestand eines Speichers 2 Minuten lang nicht (Entität weg, umbenannt, nicht erreichbar), geht er von selbst in Wartung, statt Fehler zu erzeugen. Kommt er zurück, läuft er nach 30 Sekunden wieder mit. Abschaltbar unter *Sicherheit*.

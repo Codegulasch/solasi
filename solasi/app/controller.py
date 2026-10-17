@@ -42,6 +42,7 @@ def default_unit(name):
         "observe": False,    # nur beobachten: Werte lesen und anzeigen, aber nichts schreiben (z. B. wenn die Hersteller-App regelt)
         "power_basis": "",   # "" = automatisch, "ac" oder "battery" (siehe drivers.basis)
         "lim_dis": "",       # optional: Entität „Entladegrenze“ (% , vom Speicher). Wirksamer Mindest-Ladestand = der höhere Wert
+        "lim_res": "",       # optional: Entität „Notstromreserve“ (%): bis dahin gibt der Speicher im Normalbetrieb ab
         "lim_chg": "",       # optional: Entität „Ladeobergrenze“ (%). Darüber gilt der Speicher als voll
         "min_soc": None,     # eigener Mindest-Ladestand dieses Speichers (None = globaler Wert aus „Akku-Grenzen“)
         "max_soc": None,     # eigener Höchst-Ladestand dieses Speichers (None = globaler Wert)
@@ -109,7 +110,7 @@ DEFAULT_CONFIG = {
     "grid": {"entity": "", "invert": False, "max_age": 60},
     "units": [default_unit("Speicher A"), default_unit("Speicher B")],
     "features": {"eco": True, "thresholds": True, "ac_charge": True,
-                 "strict_zero": True, "failsafe": True, "pv_passthrough": True,
+                 "strict_zero": True, "failsafe": True, "pv_passthrough": True, "cross_charge": True,
                  "enforce_mode": True},
     "control": {"min_gap": 5, "heartbeat": 10, "split": "soc",
                 "total_max_dis": 800, "total_max_chg": 2000,
@@ -128,7 +129,7 @@ DEFAULT_CONFIG = {
     # Anordnung der Blöcke in Übersicht und Statistik (leer = Standardreihenfolge, gilt für alle Geräte)
     # Energiefluss: Vorlage (total, pairs, compact), einzelne Kacheln, Platz des Netzes, Reihenfolge der Anlagen (Namen)
     "flow": {"size": "auto", "layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
-             "grid_pos": "mid", "order": []},
+             "grid_pos": "mid", "passthrough": True, "order": []},
     "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
     "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
     "safety": {"kill_entity": "", "release_on_stop": True, "release_on_disable": True,
@@ -168,7 +169,7 @@ def clean_flow(raw):
            "layout": raw.get("layout") if raw.get("layout") in ("total", "pairs", "compact") else d["layout"],
            "grid_pos": raw.get("grid_pos") if raw.get("grid_pos") in ("mid", "side") else d["grid_pos"],
            "order": clean_order(raw.get("order"))}
-    for k in ("total", "solar", "bat", "grid", "house"):
+    for k in ("total", "solar", "bat", "grid", "house", "passthrough"):
         out[k] = bool(raw.get(k, d[k]))
     return out
 
@@ -271,12 +272,16 @@ def cap_kwh(u):
     return v if v > 0 else 5.0
 
 
-def _ent_max(ha, eid):
-    """Maximalwert einer number-Entität (Attribut „max“) oder None."""
+def _ent_max(ha, eid, attr=None):
+    """Maximalwert einer number-Entität oder None. attr nennt ein genaueres Attribut (z. B. max_discharge_power bei Anker),
+    sonst gilt „max“."""
     if not eid:
         return None
-    m = ha.attr(eid, "max")
-    return float(m) if isinstance(m, (int, float)) and not isinstance(m, bool) and m > 0 else None
+    for name in ((attr,) if attr else ()) + ("max",):
+        m = ha.attr(eid, name)
+        if isinstance(m, (int, float)) and not isinstance(m, bool) and m > 0:
+            return float(m)
+    return None
 
 
 def _split(total, caps, weights):
@@ -347,7 +352,7 @@ def decide(cfg, snap):
         soc, st = u["soc"], u["set"]
         ok = soc >= 0   # Verfügbarkeit der Leistungs-Entität ist hier egal: der Modus-Wächter macht sie verfügbar
         # Wirksame Grenzen: Die Grenzen im Speicher (Entladegrenze, Ladeobergrenze) kann SOLASI nicht überschreiben.
-        lo = u.get("lim_dis")
+        lo = max([x for x in (u.get("lim_dis"), u.get("lim_res")) if x is not None], default=None)   # Entladegrenze und Notstromreserve
         hi = u.get("lim_chg")
         own_lo, own_hi = own_pct(u["cfg"], "min_soc"), own_pct(u["cfg"], "max_soc")
         base_lo = own_lo if own_lo is not None else so["min"]
@@ -431,8 +436,12 @@ def decide(cfg, snap):
     for i, u in enumerate(units):
         p = _round_step(plan[i], c["step"]) if meter_ok else 0
         u["p"] = p
+        # Ein voller Speicher wird nicht abgeregelt, solange ein anderer den Überschuss per AC aufnehmen kann:
+        # seine Solarleistung geht ins Haus, die Einspeisung lädt den anderen Speicher.
+        absorb = bool(f.get("cross_charge", True)) and any(
+            o is not u and not o.get("obs") and o["elig_chg"] and o["ccap"] > 0 for o in units)
         u["force"] = (bool(f["strict_zero"]) and drivers.curtail_enabled(u["cfg"])
-                      and u["soc"] >= u["max"] and u["soc"] >= 0 and p == 0)
+                      and u["soc"] >= u["max"] and u["soc"] >= 0 and p == 0 and not absorb)
 
     surplus_w = surplus_value(cfg, snap) if sp_on else None
     return {
@@ -610,7 +619,7 @@ class Controller:
                 units.append({"cfg": u, "k": u["name"], "has": False, "obs": True, "paused": True, "cap": cap_kwh(u),
                               "soc": num(soc_m, -1) if is_num(soc_m) else -1, "set": 0.0, "real": 0.0, "pv": None, "ac": None,
                               "bat": None, "dir": None, "num_state": None, "mode": None, "nmax_dis": None, "nmax_chg": None,
-                              "lim_dis": None, "lim_chg": None, "locked": False})
+                              "lim_dis": None, "lim_chg": None, "lim_res": None, "locked": False})
                 continue
             obs = bool(u.get("observe"))
             fl = drivers.flows(ha, u) if (drivers.configured(u) or u.get("pv") or obs) else None
@@ -644,8 +653,10 @@ class Controller:
                 "set": r["set"], "real": abs(fl["ac"]) if fl["ac"] is not None else 0.0,
                 "pv": fl["pv"], "ac": fl["ac"], "bat": fl["bat"],
                 "dir": r["dir"], "num_state": r["num_state"], "mode": r["mode"],
-                "nmax_dis": _ent_max(ha, u["num"]), "nmax_chg": _ent_max(ha, u.get("num_chg") or u["num"]),
-                "lim_dis": _pct(ha, u.get("lim_dis")), "lim_chg": _pct(ha, u.get("lim_chg")), "locked": False,
+                "nmax_dis": _ent_max(ha, u["num"], "max_discharge_power"),
+                "nmax_chg": _ent_max(ha, u.get("num_chg") or u["num"], "max_charge_power" if not u.get("num_chg") else None),
+                "lim_dis": _pct(ha, u.get("lim_dis")), "lim_chg": _pct(ha, u.get("lim_chg")), "lim_res": _pct(ha, u.get("lim_res")),
+                "locked": False,
             })
         self._update_locks(units)
         has_pv = pv_cfg and pv_known
@@ -1131,9 +1142,22 @@ class Controller:
             return min(max(v * (1 + so["base_load_margin"] / 100.0), so["base_load_min"]), so["base_load_max"])
         return so["base_load"]
 
+    @staticmethod
+    def passthrough_w(units):
+        """Leistung, die ein Speicher per AC aus dem Haus lädt (Laden über die eigene Solarleistung hinaus).
+        Sie steckt im gemessenen Hausverbrauch, ist aber nur durchgereicht."""
+        tot = 0.0
+        for u in units or []:
+            if u.get("paused") or u.get("bat") is None:
+                continue
+            tot += max(max(-u["bat"], 0.0) - max(u.get("pv") or 0.0, 0.0), 0.0)
+        return tot if tot >= 10 else 0.0
+
     def _after_cycle(self, snap, d):
         now_m = time.monotonic()
         house = snap["house_gross"]
+        if house is not None and self.cfg.get("flow", {}).get("passthrough", True):
+            house = max(house - self.passthrough_w(snap.get("units")), 0.0)    # Umladen ist kein Verbrauch
         pv = (snap["pv_w"] + snap["extra_pv"]) if (snap["has_pv"] or snap["extra_pv"]) else None
         bat = snap.get("bat_w")
         self.stats.update(now_m, pv, house, snap["grid_w"], bat)
@@ -1371,7 +1395,7 @@ class Controller:
                 "cap": u["cap"], "kwh": None if u["soc"] < 0 else round(max(0.0, min(100.0, u["soc"])) / 100 * u["cap"], 2),
                 "ac": None if u.get("ac") is None else round(u["ac"]), "bat": None if u.get("bat") is None else round(u["bat"]),
                 "locked": bool(u.get("locked")), "full": bool(u.get("full")),
-                "min": u.get("min"), "max": u.get("max"), "lim_dis": u.get("lim_dis"), "lim_chg": u.get("lim_chg"),
+                "min": u.get("min"), "max": u.get("max"), "lim_dis": u.get("lim_dis"), "lim_chg": u.get("lim_chg"), "lim_res": u.get("lim_res"),
             } for u in snap["units"]],
             "limited": any(u.get("locked") for u in snap["units"]),
             "kwh": round(d["kwh"], 2), "cap_kwh": round(d["cap_kwh"], 2),

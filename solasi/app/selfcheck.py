@@ -142,12 +142,15 @@ def run(cfg, ha, ctrl=None):
             add(area, "Rückfall-Modus", "warn", "kein Betriebsmodus gewählt",
                 "Ohne Betriebsmodus kann SOLASI den Speicher beim Stoppen nicht auf Eigenverbrauch zurückstellen.")
         for key, label, hint in (("lim_dis", "Entladegrenze", "SOLASI entlädt nicht unter diesen Wert (mindestens aber der eigene Mindest-Ladestand)."),
-                                 ("lim_chg", "Ladeobergrenze", "Darüber gilt der Speicher als voll.")):
+                                 ("lim_chg", "Ladeobergrenze", "Darüber gilt der Speicher als voll."),
+                                 ("lim_res", "Notstromreserve", "Bis zu diesem Ladestand gibt der Speicher im Normalbetrieb ab, der Rest bleibt für einen Netzausfall.")):
             if u.get(key):
                 if check_entity(area, label, u[key], None, numeric=True):
                     v = ha.state(u[key])
                     if is_num(v) and not (0 <= float(v) <= 100):
                         add(area, label, "warn", f"{v} liegt nicht zwischen 0 und 100", "Die Entität muss einen Prozentwert liefern.")
+                    elif is_num(v) and key == "lim_res":
+                        add(area, "Notstromreserve", "info", f"{float(v):.0f} % bleiben für einen Netzausfall, SOLASI entlädt nicht darunter")
                     elif is_num(v) and key == "lim_dis":
                         eff = max(float(v), cfg["soc"]["min"])
                         add(area, "Wirksamer Mindest-Ladestand", "info", f"{eff:.0f} % (Entladegrenze {float(v):.0f} %, eigener Wert {cfg['soc']['min']} %)")

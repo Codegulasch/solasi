@@ -302,7 +302,7 @@ const w=dom.window,d=w.document;
   ok(d.querySelectorAll("#p-look .ordlist[data-k]").length===2&&d.querySelectorAll('#p-look .ordlist[data-k="status"] .ordrow').length===7,"Darstellung: Anordnungslisten für Übersicht und Statistik");
   { // Energiefluss konfigurieren
     const fsel=d.querySelector("#fl_layout");
-    ok(!!fsel&&d.querySelectorAll("#p-look [data-fl]").length===5&&!!d.querySelector("#fl_gp"),"Energiefluss: Vorlage, fünf Kachel-Schalter, Platz des Netzes");
+    ok(!!fsel&&d.querySelectorAll("#p-look [data-fl]").length===6&&!!d.querySelector("#fl_gp"),"Energiefluss: Vorlage, fünf Kachel-Schalter plus Durchgereicht, Platz des Netzes");
     fsel.value="pairs";fsel.dispatchEvent(new w.Event("change"));
     ok(cfg.flow.layout==="pairs","Vorlage wird in die Einstellungen übernommen");
     d.querySelector('#p-look [data-fl="grid"]').click();

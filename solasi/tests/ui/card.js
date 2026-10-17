@@ -254,5 +254,21 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  e=mk({flow_grid_pos:"side"},st("Entladen",a2));
  ok(/viewBox="0 0 640 454"/.test(e.shadowRoot.innerHTML)||labels(e).length===7,"Netz neben dem Haus bleibt vollständig");
 }
+{ // Überschuss eines vollen Speichers lädt den anderen per AC
+ const cc={meters:[],today:{},pv_w:340,house_w:300,battery_w:-340,grid_w:0,avg_soc:70,kwh:10.5,cap_kwh:15,target_w:0,
+  flows:{solar_house:300,solar_battery:0,battery_house:0,grid_house:0},
+  units:[{name:"Anker Solix 4 HÜTTE",pv:340,soc:100,kwh:5,cap:5,bat:0,full:true,available:true},{name:"Anker Solix 4 DACH",pv:0,soc:40,kwh:4,cap:10,bat:-340,available:true}]};
+ const e=mk({},st("Laden",cc)),h=e.shadowRoot.querySelector(".headline").textContent;
+ ok(h.startsWith("Überschuss von HÜTTE lädt DACH mit 340 W"),"Überschrift: voller Speicher lädt den anderen "+h);
+}
+{ // durchgereicht: Hauskachel ohne Ladeleistung, Linie beschriftet, abschaltbar
+ const cc={meters:[],today:{},pv_w:340,house_w:640,battery_w:-340,grid_w:0,avg_soc:70,kwh:10.5,cap_kwh:15,target_w:0,
+  flows:{solar_house:300,solar_battery:0,battery_house:0,grid_house:0},flow_cfg:{layout:"pairs"},
+  units:[{name:"Anker Solix 4 HÜTTE",pv:340,soc:100,kwh:5,cap:5,bat:0,full:true,available:true},{name:"Anker Solix 4 DACH",pv:0,soc:40,kwh:4,cap:10,bat:-340,available:true}]};
+ let e=mk({},st("Laden",cc)),sv=e.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent;
+ ok(sv.includes("300 W")&&sv.includes("340 W Laden")&&sv.includes("durchgereicht"),"Haus zeigt echten Verbrauch, Linie 'durchgereicht'");
+ e=mk({flow_passthrough:false},st("Laden",cc));sv=e.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent;
+ ok(sv.includes("640 W")&&!sv.includes("durchgereicht"),"flow_passthrough: false zeigt den Rohwert");
+}
 ok(w.__kwScrollGuard===true,"Scroll-Wächter ist aktiv");
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));
