@@ -1,5 +1,16 @@
 # Änderungen
 
+## 2.0.0
+- **Neue Oberfläche:** Menü in Betrieb / Auswertung / System, Einstellungen als Übersicht mit Themen, Änderungsleiste mit „Verwerfen“. Energiefluss, Statistik und alle bisherigen Seiten bleiben. Unter Einstellungen → Ansicht gibt es „Klassische Ansicht“ als Weg zurück.
+- **Modi und Ziele:** fünf Modi zur Schnellwahl (Ausgewogen, Autark, Akku schonen, Urlaub, Notfall) plus eigene Modi. Drei Regler (Reserve, Genauigkeit, Akku schonen) berechnen die Einzelwerte; jeder Einzelwert bleibt von Hand änderbar und wird dann als „angepasst“ markiert.
+- **Speicher:** Liste links, Einstellungen je Speicher in Reitern (Verbindung, Grenzen, Leistung, Umladen, Erweitert), Aktiv/Wartung/Aus. Bis zu vier Speicher; die Aufteilung funktioniert jetzt auch mit mehr als zwei.
+- **Geräte-Erkennung:** „Speicher hinzufügen“ sucht in Home Assistant nach passenden Geräten und füllt die Felder vor (oder von Hand).
+- **Gesundheit:** To-do-Liste mit „Beheben“-Knöpfen, die direkt zur richtigen Einstellung springen.
+- **Suche (Strg+K):** Seiten, Modi, Befehle („Reserve auf 40 %“) und Fragen, die aus dem Protokoll beantwortet werden.
+- **Automatik:** Zeitpläne und Wenn-dann-Regeln (Uhrzeit, Ladestand, Netzbezug, Solarleistung → Modus wechseln oder Meldung senden) und ein Wochenbericht per Meldung.
+- **Konten und eigener Port:** Konten mit Rollen (Besitzer, Mitbewohner, Nur lesen), Passwörter mit scrypt gespeichert, Sperre nach Fehlversuchen. Der direkte Zugang auf Port 8100 ist standardmäßig aus (im Add-on unter Netzwerk einen Port eintragen) und verlangt immer eine Anmeldung.
+- Umladen zwischen Speichern wird im Protokoll vermerkt („A gibt ab – B lädt … W“).
+
 ## 1.7.2
 - **Umladen als „durchgereicht“:** Lädt ein Speicher per AC den anderen, steht diese Leistung im gemessenen Hausverbrauch. Jetzt zeigt die Hauskachel den echten Verbrauch („+340 W Laden“), die Linie zum ladenden Speicher trägt „durchgereicht“, und die Überschrift sagt „durchgereicht, kein Mehrverbrauch“. Auch Tagesverbrauch, Vergleich mit gestern, Autarkie und die Grundlast-Lernfunktion rechnen die durchgereichte Leistung heraus (ab diesem Update). Unter 10 W wird nichts angezeigt. Abschaltbar unter *Darstellung → Energiefluss*, in der Karte mit `flow_passthrough: false`.
 - **Solar gesamt im Energiefluss:** Die Linien verlassen die Kachel „Solar gesamt“ jetzt seitlich nach links und rechts und laufen von oben in die Anlagen. Das gibt ein runderes Gesamtbild.

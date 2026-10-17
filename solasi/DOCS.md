@@ -356,3 +356,16 @@ SOLASI ist ein unabhängiges Projekt und steht in keiner Verbindung zu SolarAssi
 
 **Dashboard-Karte im Add-on einstellen:** *Einstellungen → Darstellung → Dashboard-Karte* gilt für alle Karten. Optionen in der Karte selbst (YAML) gehen vor. Der Energiefluss hat dort eine eigene Gruppe mit Größe (`flow_size`), Vorlage, Kacheln und Reihenfolge. Auf breiten Anzeigen wächst der Energiefluss mit und rückt die Kacheln auseinander.
 
+
+
+## Neu in 2.0
+
+**Modi:** Oben auf der Übersicht wechselst du mit einem Tipp zwischen Ausgewogen, Autark, Akku schonen, Urlaub und Notfall. Unter Einstellungen → Ziele stellst du eigene Regler ein; die berechneten Werte siehst du dort in einer Tabelle und kannst jeden von Hand ändern.
+
+**Suche:** Strg+K (oder „Suchen“ oben) öffnet die Suche. Du kannst Seiten finden, Modi wechseln, „Reserve auf 40 %“ eintippen oder fragen, z. B. „Wann wurde umgeladen?“ – die Antwort kommt aus dem Protokoll.
+
+**Automatik:** Unter Betrieb → Automatik legst du Regeln an. Meldungen gehen an den Dienst aus Sicherheit & Meldungen. Der Wochenbericht kommt montags um 8 Uhr.
+
+**Konten und eigener Port:** Unter Einstellungen → Konten & Zugang legst du Konten an. Um SOLASI ohne Home Assistant zu öffnen, trägst du in der Add-on-Konfiguration unter Netzwerk bei „8100/tcp“ einen Port ein. Der Zugang verlangt immer eine Anmeldung; nutze ihn nur im Heimnetz.
+
+**Klassische Ansicht:** Wer die alte Menüführung möchte, schaltet sie unter Einstellungen → Ansicht ein.

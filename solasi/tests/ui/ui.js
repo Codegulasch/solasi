@@ -9,6 +9,9 @@ const status={flows:{solar_house:520,solar_battery:260,battery_house:0,grid_hous
 {const now=Math.floor(Date.now()/1000),n=120,t=[],pv=[],house=[];for(let i=0;i<n;i++){t.push(now-(n-1-i)*300);pv.push(Math.round(Math.max(0,Math.sin(i/n*Math.PI)*1600)));house.push(300+(i%7)*20)}status.trend={t,pv,house}
 status.meter_view={items:[{entity:"sensor.wh",name:"Wasserzähler Haus",value:552.62,dec:2,unit:"m³",icon:"wasser",color:"water",day:0.18},{entity:"sensor.st",name:"Zählerstand Strom",value:13141.74,dec:2,unit:"kWh",icon:"zaehler",color:"zaehl",day:null}],today:{house:8.4,pv:6.4,imp:1.2,autarky:.88},show_day:true,extra:false};;}
 const ents=[{id:"sensor.grid",name:"Netz",domain:"sensor"},{id:"sensor.extra_a",name:"Irgendein Sensor A",domain:"sensor"},{id:"sensor.extra_b",name:"Irgendein Sensor B",domain:"sensor"},{id:"number.a",name:"A",domain:"number"},{id:"switch.wb",name:"WB",domain:"switch"},{id:"select.m",name:"M",domain:"select"}];
+const goalsSnap={goals:{reserve:50,precision:70,care:30},derived:{"soc.min":27,"soc.max":94,"soc.hyst":4,"soc.eco_threshold":47,"control.min_gap":5,"control.offset_discharge":9},mode:null,
+ modes:[{id:"balanced",name:"Ausgewogen",icon:"⚖️",text:"Nulleinspeisung",reserve:50,precision:70,care:30},{id:"autarky",name:"Max. Autarkie",icon:"🌱",text:"Netz meiden",reserve:10,precision:90,care:10}],
+ table:[{path:"soc.min",label:"Mindest-Ladestand",unit:"%",current:15,derived:27,custom:true},{path:"soc.max",label:"Höchst-Ladestand",unit:"%",current:99,derived:94,custom:true}]};
 const errors=[];
 const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"http://localhost/",
  beforeParse(w){
@@ -24,6 +27,15 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
       "api/stats":()=>({days:[{date:"2026-10-03",pv:10,house:12,imp:4,exp:2,bat_dis:3,bat_chg:4,autarky:.66,selfcons:.8},{date:"2026-10-04",pv:8,house:11,imp:5,exp:1,bat_dis:2,bat_chg:3,autarky:.55,selfcons:.9}],
         total:{pv:18,house:23,imp:9,exp:3,bat_dis:5,bat_chg:7,autarky:.61,selfcons:.83,saved_eur:4.9,battery_eur:1.75,feedin_eur:.24}}),
       "api/meter_history":()=>({ok:true,entity:"sensor.wh",unit:"m³",name:"Wasserzähler Haus",source:"statistik",days:[{date:"2026-10-14",value:0.2},{date:"2026-10-15",value:0.15},{date:"2026-10-16",value:null},{date:"2026-10-17",value:0.18}]}),
+      "api/goals/preview":()=>({goals:JSON.parse(o.body),derived:{"soc.min":40,"soc.max":93,"soc.hyst":4,"soc.eco_threshold":60,"control.min_gap":4,"control.offset_discharge":6}}),
+      "api/goals/mode":()=>{const id=JSON.parse(o.body).id;calls.push("mode:"+id);status.mode_id=id;goalsSnap.mode=id;return {ok:true,mode:id,...goalsSnap}},
+      "api/goals/custom":()=>{if(o.method==="DELETE"){goalsSnap.modes=goalsSnap.modes.filter(m=>!m.custom);return {ok:true,...goalsSnap}}const b=JSON.parse(o.body);calls.push("custom:"+b.name);goalsSnap.modes.push({id:"mein",name:b.name,icon:"⭐",text:"Eigener Modus",custom:true,reserve:50,precision:70,care:30});return {ok:true,id:"mein",...goalsSnap}},
+      "api/goals":()=>goalsSnap,
+      "api/me":()=>({name:"Home Assistant",role:"owner",direct:false,roles:{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"}}),
+      "api/accounts":()=>({users:global.ACCTS||[],roles:{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"}}),
+      "api/report":()=>({title:"SOLASI Wochenbericht",text:"Verbrauch 70 kWh.",weekly:false}),
+      "api/discover":()=>({units:global.DISC||[],grid:[]}),
+      "api/defaults":()=>({unit:{name:"Speicher",driver:"anker",state:"active",num:"",dir:"",soc:"",mode:"",capacity_kwh:5,max_dis:800,max_chg:800,can_charge:true,curtail:true}}),
       "api/kill":()=>{calls.push("kill");status.safety={state:"stopped",reason:"Von Hand gestoppt",since:"04.10. 12:00:00"};return {ok:true}},
       "api/resume":()=>{calls.push("resume");status.safety={state:"active",reason:"",since:null};return {ok:true}},
       "api/entity_options":()=>({options:["third_party_control","self_consumption"]}),
@@ -149,11 +161,11 @@ const w=dom.window,d=w.document;
  // --- Aufgeräumte Navigation ---
  w.showPage("status");
  const navItems=[...d.querySelectorAll("#nav button")].map(b=>b.textContent.trim());
- ok(["Übersicht","Speicher","Überschuss","Statistik","Replay","Selbsttest","Protokoll","Dashboard-Karte","Entitäten (MQTT)","Einrichtung","Einstellungen"].every(x=>navItems.includes(x)),"Seitenleiste mit allen Bereichen");
+ ok(["Übersicht","Speicher","Überschuss","Statistik","Was-wäre-wenn","Gesundheit","Protokoll","Dashboard-Karte","Entitäten (MQTT)","Einrichtung","Einstellungen"].every(x=>navItems.includes(x)),"Seitenleiste mit allen Bereichen");
  ok([...d.querySelectorAll("#nav .sec")].map(x=>x.textContent).join()==="Betrieb,Auswertung,System","Seitenleiste in drei Abschnitte gegliedert");
  ok(d.getElementById("subnav").children.length===0,"Übersicht hat keine Unternavigation");
  w.showPage("units");ok(d.getElementById("p-units").classList.contains("act")&&d.getElementById("savebar").style.display==="flex"&&d.querySelector("#nav button[aria-current=page]").textContent.includes("Speicher"),"Speicher: Seite aktiv, Speichern-Leiste sichtbar");
- w.showPage("control");ok(d.querySelectorAll("#subnav button").length===3&&d.querySelector("#nav button[aria-current=page]").textContent.includes("Einstellungen"),"Einstellungen: Regelung, Sicherheit & Meldungen, Darstellung");
+ w.showPage("control");ok(d.querySelectorAll("#subnav button").length===5&&d.querySelector("#nav button[aria-current=page]").textContent.includes("Einstellungen"),"Einstellungen: Regelung, Sicherheit & Meldungen, Darstellung");
  ok([...d.querySelectorAll("#subnav button")].some(b=>b.textContent==="Sicherheit & Meldungen"),"Unterseite heißt Sicherheit & Meldungen");
  d.querySelector('#subnav [data-p="extras"]').click();ok(d.getElementById("p-extras").classList.contains("act")&&d.getElementById("title").textContent==="Sicherheit & Meldungen","Unterseite wechselt, Titel folgt");
  w.showPage("surplus");ok(d.getElementById("pagetools").classList.contains("on")&&d.getElementById("savebar").style.display==="flex","Überschuss: Schalter und Speichern-Leiste sichtbar");
@@ -212,25 +224,29 @@ const w=dom.window,d=w.document;
  // Rückfall-Modus je Speicher
  cfg.units[0].mode="select.mode_a";w.renderUnits();
  w.showPage("units");await new Promise(r=>setTimeout(r,300));
+ const utab=async t=>{d.querySelector(`[data-utab="${t}"]`).click();await new Promise(r=>setTimeout(r,60));};
+ await utab("adv");
  ok(d.getElementById("f_units_0_fallback_mode")!==null,"Rückfall-Modus beim Anker-Speicher");
+ await utab("lim");
  { const mn=d.getElementById("f_units_0_min_soc"),wl=d.getElementById("f_units_0_write_limits");
    ok(!!mn&&!!d.getElementById("f_units_0_max_soc")&&!!wl,"Speicher: eigener Mindest-/Höchst-Ladestand und Schalter „Grenzen schreiben“");
    mn.value="25";mn.dispatchEvent(new w.Event("input"));ok(cfg.units[0].min_soc===25,"Eigener Mindest-Ladestand wird gespeichert");
    mn.value="";mn.dispatchEvent(new w.Event("input"));ok(cfg.units[0].min_soc===null,"Leeres Feld bedeutet globaler Wert (null)");
-   const stt=d.getElementById("f_units_0_state");
-   ok(!!stt&&[...stt.options].map(o=>o.value).join()==="active,maint,off","Speicher: Betrieb Aktiv, Wartung, Deaktiviert");
-   stt.value="maint";stt.dispatchEvent(new w.Event("change"));ok(cfg.units[0].state==="maint","Betrieb Wartung wird gespeichert");
-   stt.value="active";stt.dispatchEvent(new w.Event("change"));
+   const sb=[...d.querySelectorAll("[data-ustate]")];
+   ok(sb.map(b=>b.dataset.ustate).join()==="active,maint,off"&&sb[0].classList.contains("a"),"Speicher: Betrieb Aktiv, Wartung, Aus als Schalter im Kopf");
+   d.querySelector('[data-ustate="maint"]').click();ok(cfg.units[0].state==="maint","Betrieb Wartung wird gespeichert");
+   d.querySelector('[data-ustate="active"]').click();await new Promise(r=>setTimeout(r,60));
    wl.checked=true;wl.dispatchEvent(new w.Event("change"));ok(cfg.units[0].write_limits===true,"Schalter „Grenzen schreiben“ wird gespeichert"); }
  ok(d.querySelectorAll("#dl-fb0 option").length===2&&d.querySelector("#dl-fb0 option").value==="third_party_control","Vorschläge aus den Optionen des Betriebsmodus");
  // --- Speichertypen ---
  ex.checked=false;ex.dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,100));
  w.showPage("units");await new Promise(r=>setTimeout(r,50));
  const sec=[...d.querySelectorAll("#p-units details.fsec")];
- ok(sec.length===3&&sec[0].open&&sec[1].open===true,"Zähler und Speicher A sind offen");
+ ok(sec.length===1&&sec[0].open&&d.querySelectorAll("#p-units .udev").length>=2&&d.querySelector("#p-units .udev.sel"),"Zähler offen, Speicherliste mit gewähltem Speicher");
  // --- Energiefluss-Korrektur: Messart, Gerätesensoren, PV-Durchleitung ---
  ok(d.querySelector("#p-status").textContent.includes("Solar 540 W")&&d.querySelector("#p-status").textContent.includes("540 W"),"Speicher-Karte zeigt die Solarleistung des Speichers");
  cfg.units[0].num="number.dev_geraet_1_leistung";w.renderUnits();await new Promise(r=>setTimeout(r,300));
+ await utab("pow");
  const pb=d.getElementById("f_units_0_power_basis");
  ok(pb&&[...pb.options].map(o=>o.value).join()===",ac,battery","Messart-Auswahl: Automatisch, AC, Batterie");
  ok(d.getElementById("f_units_0_pv")&&d.getElementById("f_units_0_pv").getAttribute("list")==="dl-sens0","PV-Feld nutzt die Geräte-Vorschläge");
@@ -244,6 +260,7 @@ const w=dom.window,d=w.document;
  ok(d.getElementById("f_features_pv_passthrough")!==null,"Schalter PV-Durchleitung vorhanden");
  ok(d.getElementById("f_features_enforce_mode")!==null&&d.getElementById("f_features_enforce_mode").checked===true,"Schalter „Externe Steuerung automatisch einschalten“ vorhanden und standardmäßig an");
  w.showPage("units");await new Promise(r=>setTimeout(r,50));
+ await utab("conn");
  const drvSel=d.getElementById("f_units_0_driver");
  ok(drvSel&&[...drvSel.options].map(o=>o.value).join()==="anker,signed,modal,limit,script","Speichertyp-Auswahl mit fünf Treibern");
  ok(d.querySelector("#p-units .drvdesc").textContent.includes("Richtung"),"Beschreibung zum Speichertyp");
@@ -251,24 +268,28 @@ const w=dom.window,d=w.document;
  drvSel.value="modal";drvSel.dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,100));
  ok(d.getElementById("f_units_0_num_chg")!==null&&d.getElementById("f_units_0_enable")!==null&&d.getElementById("f_units_0_power")!==null,"Modus + Leistungen: Ladezahl, Fernsteuerung, Leistungssensor mit Vorzeichen");
  const drvSel2=d.getElementById("f_units_0_driver");drvSel2.value="limit";drvSel2.dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,100));
- ok(d.getElementById("f_units_0_max_chg")===null&&d.getElementById("f_units_0_num")!==null,"Ausgangslimit: kein Laden, nur eine Zahl");
- ok(d.getElementById("f_units_0_fallback_value")!==null&&d.getElementById("f_units_0_fallback_mode")===null,"Ausgangslimit: Rückfall-Limit statt Rückfall-Modus");
+ ok(d.getElementById("f_units_0_num")!==null,"Ausgangslimit: nur eine Zahl");
+ await utab("pow");ok(d.getElementById("f_units_0_max_chg")===null,"Ausgangslimit: kein Laden");
+ await utab("adv");ok(d.getElementById("f_units_0_fallback_value")!==null&&d.getElementById("f_units_0_fallback_mode")===null,"Ausgangslimit: Rückfall-Limit statt Rückfall-Modus");
+ await utab("conn");
  ok(cfg.units[0].driver==="limit"&&cfg.units[0].can_charge===false&&cfg.units[0].curtail===false,"Typwechsel setzt passende Voreinstellungen");
  const drvSel3=d.getElementById("f_units_0_driver");drvSel3.value="script";drvSel3.dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,100));
  ok(d.getElementById("f_units_0_script")!==null&&d.querySelector("#p-units .drvdesc").textContent.includes("power_w"),"Skript: Skriptfeld und Hinweis auf power_w");
  // --- Vorschlagslisten beim ersten Einrichten (Fehlerbild: ab "Beim Stoppen" kamen keine Entitäten) ---
  cfg.units[1].driver="anker";cfg.units[1].num="";cfg.units[1].dir="";cfg.units[1].mode="";cfg.units[1].script="";
- w.renderUnits();await new Promise(r=>setTimeout(r,60));      // frisches, leeres Formular: noch keine Entität bekannt (kurz warten, bis alle Eingabefelder bereit sind)
+ w.renderUnits();d.querySelector('[data-usel="1"]').click();await utab("conn");      // frisches, leeres Formular: noch keine Entität bekannt (kurz warten, bis alle Eingabefelder bereit sind)
  const nSens=ents.filter(e=>e.domain==="sensor").length;
  ok(d.querySelectorAll("#dl-sens1 option").length===nSens&&nSens>=3,"Leeres Formular: sofort alle Sensoren als Vorschlag ("+nSens+")");
- ok(d.getElementById("f_units_1_soc").getAttribute("list")==="dl-sens1"&&d.getElementById("f_units_1_pv").getAttribute("list")==="dl-sens1","Ladestand und PV nutzen diese Liste");
+ const socOk=d.getElementById("f_units_1_soc").getAttribute("list")==="dl-sens1";await utab("pow");
+ ok(socOk&&d.getElementById("f_units_1_pv").getAttribute("list")==="dl-sens1","Ladestand und PV nutzen diese Liste");
  ok(d.getElementById("devsens1").textContent.includes("Erst Leistung"),"Hinweis, solange noch keine Leistung gewählt ist");
+ await utab("conn");
  ok(d.querySelectorAll("#dl-fb1 option").length===0,"Rückfall-Vorschläge leer, solange kein Betriebsmodus gewählt ist");
  // Nutzer tippt die Leistungs-Entität ein -> Gerätesensoren erscheinen ohne Neuladen
  const numIn=d.getElementById("f_units_1_num");numIn.value="number.dev_geraet_2_leistung";numIn.dispatchEvent(new w.Event("input"));
  await new Promise(r=>setTimeout(r,900));
  ok(d.querySelector("#dl-sens1 option").value==="sensor.dev_charge"&&d.querySelectorAll("#dl-sens1 option").length===nSens+2,"Nach dem Eintippen: Gerätesensoren zuerst, übrige danach");
- ok(d.getElementById("devsens1").textContent.includes("2 Sensoren gefunden"),"Sensorliste des Geräts erscheint ohne Neuladen");
+ await utab("pow");ok(d.getElementById("devsens1").textContent.includes("2 Sensoren gefunden"),"Sensorliste des Geräts erscheint ohne Neuladen");await utab("conn");
  // Nutzer wählt den Betriebsmodus -> Rückfall-Optionen erscheinen
  const modeIn=d.getElementById("f_units_1_mode");modeIn.value="select.mode_b";modeIn.dispatchEvent(new w.Event("input"));
  await new Promise(r=>setTimeout(r,900));
@@ -276,7 +297,7 @@ const w=dom.window,d=w.document;
  // Abfrage schlägt fehl -> trotzdem alle Sensoren wählbar
  failDevice=true;cfg.units[1].num="number.dev_geraet_2_leistung";w.renderUnits();await new Promise(r=>setTimeout(r,400));
  ok(d.querySelectorAll("#dl-sens1 option").length===nSens,"Abfrage schlägt fehl: weiterhin alle Sensoren als Vorschlag");
- ok(d.getElementById("devsens1").textContent.includes("nicht verfügbar"),"Hinweis, dass die Geräteliste fehlt");
+ await utab("pow");ok(d.getElementById("devsens1").textContent.includes("nicht verfügbar"),"Hinweis, dass die Geräteliste fehlt");
  failDevice=false;
 
  // ---- Anordnung Übersicht/Statistik, ruhiges Aktualisieren ----
@@ -299,7 +320,7 @@ const w=dom.window,d=w.document;
   ok(ids.indexOf("log")<ids.indexOf("meters"),"Log steht vor den übrigen Blöcken");
   cfg.ui={status_order:[],status_hidden:[],stats_order:[],stats_hidden:[]};w.renderStatus(status);
   w.showPage("look");await new Promise(r=>setTimeout(r,100));
-  ok(d.querySelectorAll("#p-look .ordlist[data-k]").length===2&&d.querySelectorAll('#p-look .ordlist[data-k="status"] .ordrow').length===7,"Darstellung: Anordnungslisten für Übersicht und Statistik");
+  ok(d.querySelectorAll("#p-look .ordlist[data-k]").length===2&&d.querySelectorAll('#p-look .ordlist[data-k="status"] .ordrow').length===8,"Darstellung: Anordnungslisten für Übersicht und Statistik");
   { // Energiefluss konfigurieren
     const fsel=d.querySelector("#fl_layout");
     ok(!!fsel&&d.querySelectorAll("#p-look [data-fl]").length===6&&!!d.querySelector("#fl_gp"),"Energiefluss: Vorlage, fünf Kachel-Schalter plus Durchgereicht, Platz des Netzes");
@@ -322,7 +343,7 @@ const w=dom.window,d=w.document;
     ok(cfg.flow.layout==="total"&&cfg.flow.grid===true&&cfg.flow.order.length===0,"Standard wiederherstellen setzt den Energiefluss zurück");
   }
   d.querySelector('#p-look [data-k="status"] button[data-mv="1"][data-id="kpis"]').click();
-  ok(cfg.ui.status_order[0]==="meters"&&cfg.ui.status_order[1]==="kpis","Pfeil nach unten ändert die Reihenfolge");
+  ok(cfg.ui.status_order[1]==="meters"&&cfg.ui.status_order[2]==="kpis","Pfeil nach unten ändert die Reihenfolge");
   d.querySelector('#p-look [data-k="status"] input[data-show="log"]').click();
   ok(cfg.ui.status_hidden.includes("log"),"Haken blendet Block aus");
   d.querySelector('#p-look [data-reset="status"]').click();
@@ -366,6 +387,87 @@ const w=dom.window,d=w.document;
   const cb=d.getElementById("look_dbg");cb.checked=true;cb.dispatchEvent(new w.Event("change"));
   ok(w.eval("dbg.on")&&w.localStorage.getItem("solasi_debug")==="1","Sprung-Diagnose lässt sich einschalten");
   cb.checked=false;cb.dispatchEvent(new w.Event("change"));ok(!w.eval("dbg.on"),"Sprung-Diagnose lässt sich ausschalten");
+  w.showPage("status");}
+ // ---- 2.0: Modi, Einstellungs-Übersicht, Ziele, Änderungsleiste, Speicher hinzufügen ----
+ {w.showPage("status");await new Promise(r=>setTimeout(r,300));w.renderStatus(status);
+  const ps=d.getElementById("p-status");
+  ok(ps.querySelectorAll(".mode[data-mode]").length===2&&ps.querySelector(".mode.add")&&ps.querySelector('[data-blk="modes"]'),"Übersicht: Modi als Schnellwahl samt „Eigener Modus“");
+  ps.querySelector('[data-mode="autarky"]').click();await new Promise(r=>setTimeout(r,200));
+  ok(calls.includes("mode:autarky")&&d.querySelector('#p-status .mode.on[data-mode="autarky"]'),"Tipp auf einen Modus aktiviert ihn und markiert ihn");
+  w.prompt=()=>"Wochenende";d.querySelector("#p-status .mode.add").click();await new Promise(r=>setTimeout(r,200));
+  ok(calls.includes("custom:Wochenende")&&d.querySelectorAll("#p-status .mode [data-modedel]").length===1,"Eigener Modus wird angelegt und lässt sich löschen");
+  w.showPage("settings");
+  ok(d.querySelectorAll("#p-settings .cat").length===9&&d.querySelector("#nav button[aria-current=page]").textContent.includes("Einstellungen"),"Einstellungen-Übersicht mit neun Themen");
+  d.querySelector('#p-settings .cat[data-p="goals"]').click();await new Promise(r=>setTimeout(r,100));
+  ok(d.getElementById("p-goals").classList.contains("act")&&d.querySelectorAll("#p-goals input[type=range]").length===3,"Ziele: drei Regler");
+  const rs=d.getElementById("g_reserve");rs.value="80";rs.dispatchEvent(new w.Event("input"));await new Promise(r=>setTimeout(r,400));
+  ok(cfg.soc.min===40&&cfg.goals&&cfg.goals.reserve===80&&cfg.goals.mode==="","Regler schreibt berechnete Werte in die Einstellungen");
+  ok(d.getElementById("gv_reserve").textContent.includes("40 %"),"Regler zeigt die Wirkung als Klartext");
+  const tr=d.querySelector('#g_table [data-gpath="soc.min"]');
+  ok(tr&&d.querySelector("#g_table .tag.ok"),"Tabelle: berechnete Werte als „wie berechnet“");
+  tr.value="33";tr.dispatchEvent(new w.Event("input"));
+  ok(cfg.soc.min===33&&tr.closest("tr").querySelector(".tag").textContent==="angepasst","Von Hand geänderter Wert wird als „angepasst“ markiert");
+  ok(/Änderung/.test(d.getElementById("savemsg").textContent)&&d.getElementById("savemsg").textContent.includes("Mindest-Ladestand")&&d.getElementById("discard").style.display==="","Änderungsleiste nennt die Änderungen und bietet „Verwerfen“");
+  d.getElementById("discard").click();await new Promise(r=>setTimeout(r,60));
+  ok(w.eval("cfg.soc.min")!==33&&d.getElementById("discard").style.display==="none","Verwerfen stellt den gespeicherten Stand wieder her");
+  w.showPage("units");await new Promise(r=>setTimeout(r,60));
+  const n0=w.eval("cfg.units.length");d.getElementById("addunit").click();await new Promise(r=>setTimeout(r,200));
+  ok(w.eval("cfg.units.length")===n0+1&&w.eval("cfg.units[cfg.units.length-1].name")==="Speicher "+(n0+1)&&d.querySelectorAll("#p-units .udev").length>=n0+1,"Speicher hinzufügen legt einen weiteren Speicher an");
+  w.eval("cfg.units.pop()");w.renderUnits();
+  global.DISC=[{name:"Garage Akku",driver:"anker",num:"number.g_ls",dir:"select.g_lf",mode:"",soc:"sensor.g_soc",pv:"",lim_res:"number.g_np",lim_dis:"",lim_chg:"",configured:false},{name:"Schon da",num:"number.x",configured:true}];
+  d.getElementById("addunit").click();await new Promise(r=>setTimeout(r,200));
+  ok(d.querySelectorAll("#addwiz [data-pickunit]").length===1&&/Garage Akku/.test(d.getElementById("addwiz").textContent)&&w.eval("cfg.units.length")===n0,"Assistent: zeigt nur gefundene, noch nicht eingerichtete Speicher");
+  d.querySelector("#addwiz [data-pickunit]").click();await new Promise(r=>setTimeout(r,200));
+  ok(!d.getElementById("addwiz")&&w.eval("cfg.units[cfg.units.length-1].num")==="number.g_ls"&&w.eval("cfg.units[cfg.units.length-1].name")==="Garage Akku"&&w.eval("cfg.units[cfg.units.length-1].lim_res")==="number.g_np","Assistent: übernimmt Name und Entitäten in den neuen Speicher");
+  w.eval("cfg.units.pop()");w.renderUnits();
+  d.getElementById("addunit").click();await new Promise(r=>setTimeout(r,200));
+  d.getElementById("addmanual").click();await new Promise(r=>setTimeout(r,200));
+  ok(w.eval("cfg.units.length")===n0+1&&w.eval("cfg.units[cfg.units.length-1].num")===""&&!d.getElementById("addwiz"),"Assistent: „Von Hand“ legt einen leeren Speicher an");
+  w.eval("cfg.units.pop()");w.renderUnits();global.DISC=[];
+  // Automatik
+  w.showPage("auto");await new Promise(r=>setTimeout(r,120));
+  ok(d.getElementById("p-auto").classList.contains("act")&&d.querySelectorAll("#p-auto .rule").length===0&&/Wochenbericht/.test(d.getElementById("p-auto").textContent),"Automatik: leere Liste und Wochenbericht");
+  d.getElementById("addrule").click();
+  ok(d.querySelectorAll("#p-auto .rule").length===1&&w.eval("cfg.rules.length")===1&&d.getElementById("discard").style.display==="","Automatik: Regel hinzufügen markiert Änderung");
+  const rk=d.querySelector("#p-auto [data-rf='when.kind']");rk.value="soc_below";rk.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.rules[0].when.kind")==="soc_below"&&!!d.querySelector("#p-auto [data-rf='when.value']"),"Automatik: Bedingung wechseln zeigt passende Felder");
+  const rv=d.querySelector("#p-auto [data-rf='when.value']");rv.value="25";rv.dispatchEvent(new w.Event("change",{bubbles:true}));
+  const rt=d.querySelector("#p-auto [data-rf='then.kind']");rt.value="notify";rt.dispatchEvent(new w.Event("change",{bubbles:true}));
+  const tx=d.querySelector("#p-auto [data-rf='then.text']");tx.value="Akku fast leer";tx.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.rules[0].when.value")===25&&w.eval("cfg.rules[0].then.text")==="Akku fast leer"&&w.eval("cfg.rules[0].then.kind")==="notify","Automatik: Werte und Aktion werden übernommen");
+  d.getElementById("rep_weekly").checked=true;d.getElementById("rep_weekly").dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.reports.weekly")===true,"Automatik: Wochenbericht einschalten");
+  d.querySelector("#p-auto [data-rdel]").click();
+  ok(w.eval("cfg.rules.length")===0,"Automatik: Regel löschen");
+  d.getElementById("discard").click();await new Promise(r=>setTimeout(r,60));
+  // Konten
+  global.ACCTS=[{name:"Stefan",role:"owner",role_label:"Besitzer"},{name:"Anna",role:"member",role_label:"Mitbewohner"}];
+  w.showPage("accounts");await new Promise(r=>setTimeout(r,150));
+  ok(d.querySelectorAll("#p-accounts [data-acct]").length===2&&d.querySelector("[data-arole='Anna']").value==="member"&&/8100/.test(d.getElementById("p-accounts").textContent),"Konten: Liste mit Rollen und Hinweis zum eigenen Port");
+  d.getElementById("an_name").value="Opa";d.getElementById("an_pw").value="kurz";
+  d.getElementById("an_add").click();await new Promise(r=>setTimeout(r,100));
+  ok(d.getElementById("p-accounts")!==null&&d.querySelectorAll("#p-accounts [data-acct]").length===2,"Konten: ungültige Eingabe legt nichts an");
+  global.ACCTS=[];
+  // Suche (Strg+K)
+  d.getElementById("palbtn").click();
+  const pq=d.getElementById("palq");pq.value="reserve auf 40";pq.dispatchEvent(new w.Event("input"));
+  ok(d.getElementById("pal").classList.contains("on")&&/Reserve auf 40 % stellen/.test(d.getElementById("pallist").textContent),"Suche: Befehl „Reserve auf 40 %“ wird erkannt");
+  pq.value="statis";pq.dispatchEvent(new w.Event("input"));
+  ok(/Statistik/.test(d.getElementById("pallist").textContent)&&!/Reserve auf/.test(d.getElementById("pallist").textContent),"Suche: findet Seiten");
+  d.querySelector("#pallist [data-pal]").click();await new Promise(r=>setTimeout(r,60));
+  ok(!d.getElementById("pal").classList.contains("on")&&d.getElementById("p-stats").classList.contains("act"),"Suche: Auswahl öffnet die Seite und schließt die Suche");
+  d.dispatchEvent(new w.KeyboardEvent("keydown",{key:"k",ctrlKey:true,bubbles:true}));
+  ok(d.getElementById("pal").classList.contains("on"),"Suche: Strg+K öffnet");
+  pq.value="Wann wurde umgeladen?";pq.dispatchEvent(new w.Event("input"));
+  ok(/💬/.test(d.getElementById("pallist").textContent),"Suche: Fragen werden aus dem Protokoll beantwortet");
+  d.dispatchEvent(new w.KeyboardEvent("keydown",{key:"Escape",bubbles:true}));
+  ok(!d.getElementById("pal").classList.contains("on"),"Suche: Esc schließt");
+  // klassische Ansicht
+  w.showPage("settings");d.getElementById("set_classic").checked=true;d.getElementById("set_classic").dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,200));
+  ok(d.querySelectorAll("#p-status .mode").length===0&&[...d.querySelectorAll("#nav button")].some(b=>b.textContent.trim()==="Einstellungen")&&d.getElementById("p-control").classList.contains("act")&&d.querySelectorAll("#subnav button").length===3,"Klassische Ansicht: alte Menüs, keine Modi");
+  w.renderUnits();ok(d.querySelectorAll("#p-units details.fsec").length===3,"Klassische Ansicht: Speicher als einklappbare Gruppen");
+  w.localStorage.setItem("solasi_classic","0");w.renderNav();w.showPage("status");
+  ok(d.querySelectorAll("#nav button").length>=10,"Zurück zur neuen Ansicht");
   w.showPage("status");}
  process.exit(process.exitCode||0);
 })();

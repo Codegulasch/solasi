@@ -113,3 +113,14 @@ async def test_meter_history(tmp_path):
         assert any(d["value"] for d in r["days"]) and calls == ["recorder/statistics_during_period"]
         bad = await c.get("/api/meter_history?entity=sensor.fremd")
         assert bad.status == 400
+
+
+@pytest.mark.asyncio
+async def test_discover_endpunkt(tmp_path):
+    store = ConfigStore(str(tmp_path / "d.json"))
+    ctrl = Controller(None, store); ha = HA("ws://x", "t"); ctrl.ha = ha
+    ha.states = {"number.a_ls": {"entity_id": "number.a_ls", "state": "0", "attributes": {"friendly_name": "Akku Eins Leistungssteuerung"}},
+                 "select.a_lf": {"entity_id": "select.a_lf", "state": "idle", "attributes": {"friendly_name": "Akku Eins Leistungsfluss"}}}
+    async with TestClient(TestServer(appmain.build_app(ctrl, store, ha))) as c:
+        j = await (await c.get("/api/discover")).json()
+        assert j["units"][0]["name"] == "Akku Eins" and j["units"][0]["driver"] == "anker" and j["grid"] == []

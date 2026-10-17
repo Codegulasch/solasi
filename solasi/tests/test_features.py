@@ -547,3 +547,20 @@ def test_durchgereichter_strom_und_flow_option():
     assert Controller.passthrough_w([{"bat": -300, "pv": 295}]) == 0     # unter 10 W: Rauschen
     assert Controller.passthrough_w([{"bat": -300, "pv": 0, "paused": True}]) == 0
     assert clean_flow({})["passthrough"] is True and clean_flow({"passthrough": 0})["passthrough"] is False
+
+
+def test_umladen_wird_erkannt_und_protokolliert():
+    from controller import Controller
+    U = lambda k, bat, pv=0: {"k": k, "bat": bat, "pv": pv}
+    assert Controller.crosscharge_state([U("A", 400), U("B", -450, 50)]) == ("A", "B", 400)
+    assert Controller.crosscharge_state([U("A", 400), U("B", -300, 300)]) is None      # B lädt nur aus eigenem Solar
+    assert Controller.crosscharge_state([U("A", -300), U("B", -300)]) is None
+    assert Controller.crosscharge_state([]) is None
+    c = Controller.__new__(Controller)
+    ev = []
+    c.event = lambda lvl, msg: ev.append(msg)
+    c._log_crosscharge([U("A", 400), U("B", -450)], 1000.0)
+    c._log_crosscharge([U("A", 410), U("B", -460)], 1010.0)
+    assert len(ev) == 1 and "A gibt ab" in ev[0] and "B lädt" in ev[0]
+    c._log_crosscharge([U("A", 0), U("B", 0)], 1100.0)
+    assert len(ev) == 2 and "beendet" in ev[1]

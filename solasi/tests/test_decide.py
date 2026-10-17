@@ -252,3 +252,16 @@ def test_notstromreserve_hebt_mindest_soc_an():
 def test_umladen_auch_in_umgekehrter_richtung():
     _, u, d = run(-500, (40, 100))                 # DACH voll mit Überschuss, HÜTTE kann laden (eigene Solarleistung lädt zuerst, DC)
     assert not u[1]["force"] and u[0]["p"] < 0
+
+
+def test_drei_speicher_nacheinander_und_nach_soc():
+    from controller import default_unit
+    cfg = mk_cfg(split="sequential")
+    cfg["units"].append(default_unit("Dritter"))
+    for u in cfg["units"]:
+        u["max_dis"] = 300
+    _, u, d = run(700, (50, 30, 90), sets=(0, 0, 0), cfg=cfg)
+    assert u[2]["p"] == 300 and u[0]["p"] == 300 and u[1]["p"] > 0 and abs(u[0]["p"] + u[1]["p"] + u[2]["p"] - d["t_target"]) <= 10      # vollster zuerst, dann der nächste
+    cfg2 = mk_cfg(split="soc"); cfg2["units"].append(default_unit("Dritter"))
+    _, u2, _ = run(300, (50, 30, 90), sets=(0, 0, 0), cfg=cfg2)
+    assert len(u2) == 3 and u2[2]["p"] > u2[0]["p"] > u2[1]["p"] >= 0

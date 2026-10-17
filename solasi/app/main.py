@@ -7,11 +7,17 @@ from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 
+import copy
+import accounts as acc
+
+import discover
+import goals
 import meterhist
 import replay
 import selfcheck
 from controller import Controller, ConfigStore
 from ha import HA
+from util import data_path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("solasi")
@@ -21,6 +27,7 @@ HA_URL = os.environ.get("HA_WS_URL", "ws://supervisor/core/websocket")
 TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 CONFIG_PATH = os.environ.get("SOLASI_CONFIG", "/data/settings.json")
 PORT = int(os.environ.get("PORT", "8099"))
+DIRECT_PORT = int(os.environ.get("SOLASI_DIRECT_PORT", "8100"))
 HA_API_URL = os.environ.get("HA_API_URL", "http://supervisor/core/api")
 
 
@@ -82,8 +89,81 @@ def install_card(dirs=None, src=CARD_SRC):
     return None, False
 
 
-def build_app(ctrl, store, ha):
+LOGIN_HTML = """<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SOLASI – Anmelden</title>
+<style>body{font-family:system-ui,sans-serif;background:#f4f6f8;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}form{background:#fff;padding:28px;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.12);width:min(340px,92vw)}h1{margin:0 0 4px}p{color:#667;margin:0 0 16px;font-size:.9rem}input,button{width:100%;box-sizing:border-box;padding:12px;margin-top:10px;font-size:1rem;border-radius:10px;border:1px solid #ccd}button{background:#1b7f5c;color:#fff;border:0;font-weight:700;cursor:pointer}#e{color:#b00020;min-height:1.2em;margin-top:10px;font-size:.9rem}</style>
+<form id="f"><h1>☀️ SOLASI</h1><p>__INFO__</p><input id="n" placeholder="Name" autocomplete="username" autofocus><input id="p" type="password" placeholder="Passwort" autocomplete="current-password"><button>Anmelden</button><div id="e"></div></form>
+<script>f.onsubmit=async e=>{e.preventDefault();const r=await fetch("api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n.value,password:p.value})});const j=await r.json();if(j.ok)location.reload();else e_.textContent=j.error};const e_=document.getElementById("e");</script></html>"""
+
+
+def make_direct_middleware(accounts):
+    @web.middleware
+    async def direct_auth(request, handler):
+        path = request.path
+        if path in ("/api/login", "/api/logout"):
+            return await handler(request)
+        user = accounts.user_for(request.cookies.get("solasi_session"))
+        if user is None:
+            if path.startswith("/api/") or path.endswith(".js"):
+                return web.json_response({"ok": False, "error": "Bitte anmelden"}, status=401)
+            info = "Melde dich an." if accounts.has_any() else "Noch kein Konto angelegt: Lege in Home Assistant unter SOLASI → Einstellungen → Konten zuerst ein Besitzer-Konto an."
+            return web.Response(text=LOGIN_HTML.replace("__INFO__", info), content_type="text/html", headers={"Cache-Control": "no-store"})
+        if not acc.allowed(user["role"], request.method, path):
+            return web.json_response({"ok": False, "error": "Dafür fehlt deiner Rolle die Berechtigung"}, status=403)
+        request["user"], request["role"] = user["name"], user["role"]
+        return await handler(request)
+    return direct_auth
+
+
+def build_app(ctrl, store, ha, accounts=None, direct=False):
     routes = web.RouteTableDef()
+    accounts = accounts if accounts is not None else acc.AccountStore(data_path("accounts.json"))
+
+    @routes.post("/api/login")
+    async def login(request):
+        body = await request.json()
+        tok, err = accounts.login(body.get("name"), body.get("password"), request.remote or "")
+        if not tok:
+            return web.json_response({"ok": False, "error": err}, status=429 if err and "Zu viele" in err else 401)
+        r = web.json_response({"ok": True})
+        r.set_cookie("solasi_session", tok, max_age=acc.SESSION_S, httponly=True, samesite="Lax")
+        return r
+
+    @routes.post("/api/logout")
+    async def logout(request):
+        accounts.logout(request.cookies.get("solasi_session"))
+        r = web.json_response({"ok": True})
+        r.del_cookie("solasi_session")
+        return r
+
+    @routes.get("/api/me")
+    async def me(request):
+        return web.json_response({"name": request.get("user") or "Home Assistant", "role": request.get("role") or "owner",
+                                  "direct": direct, "roles": acc.ROLES})
+
+    @routes.get("/api/accounts")
+    async def accounts_get(_):
+        return web.json_response({"users": accounts.list(), "roles": acc.ROLES})
+
+    @routes.post("/api/accounts")
+    async def accounts_post(request):
+        b = await request.json()
+        name = str(b.get("name") or "")
+        err = accounts.create(name, b.get("password"), b.get("role")) if b.get("create") else \
+            (accounts.set_password(name, b["password"]) if b.get("password") else None) or \
+            (accounts.set_role(name, b["role"]) if b.get("role") else None)
+        if err:
+            return web.json_response({"ok": False, "error": err}, status=400)
+        ctrl.event("info", f"Konto „{name}“ " + ("angelegt" if b.get("create") else "geändert"))
+        return web.json_response({"ok": True, "users": accounts.list()})
+
+    @routes.delete("/api/accounts/{name}")
+    async def accounts_del(request):
+        name = request.match_info["name"]
+        err = accounts.delete(name)
+        if err:
+            return web.json_response({"ok": False, "error": err}, status=400)
+        ctrl.event("info", f"Konto „{name}“ gelöscht")
+        return web.json_response({"ok": True, "users": accounts.list()})
 
     @routes.get("/")
     async def index(_):
@@ -98,7 +178,72 @@ def build_app(ctrl, store, ha):
         st["dry_run"] = store.cfg["dry_run"]
         st["safety"] = dict(ctrl.safety)
         st["events"] = list(ctrl.events)[:80]
+        st["mode_id"] = goals.active_mode(store.cfg)
         return web.json_response(st)
+
+    @routes.get("/api/defaults")
+    async def defaults_get(_):
+        """Vorlagen für neu angelegte Elemente (z. B. weiterer Speicher)."""
+        from controller import default_unit
+        return web.json_response({"unit": default_unit("Speicher")})
+
+    @routes.get("/api/discover")
+    async def discover_get(_):
+        """Erkennt Speicher und Netz-Sensoren in Home Assistant (Einrichtungs-Assistent)."""
+        return web.json_response(discover.discover(ha.states or {}, store.cfg))
+
+    @routes.get("/api/report")
+    async def report_get(_):
+        """Wochenbericht als Vorschau (so, wie er gesendet würde)."""
+        import automation
+        title, text = automation.weekly_report(ctrl.stats.summary(7, store.cfg.get("prices")))
+        return web.json_response({"title": title, "text": text, "weekly": bool((store.cfg.get("reports") or {}).get("weekly"))})
+
+    @routes.get("/api/goals")
+    async def goals_get(_):
+        return web.json_response(goals.snapshot(store.cfg))
+
+    @routes.post("/api/goals/preview")
+    async def goals_preview(request):
+        """Berechnete Einzelwerte für Reglerstände, ohne zu speichern."""
+        body = await request.json()
+        g = goals.clean(body)
+        cfg = copy.deepcopy(store.cfg)
+        goals.apply(cfg, g)
+        return web.json_response({"goals": g, "derived": goals.derive(g), "table": goals.table(cfg)})
+
+    @routes.post("/api/goals/set")
+    async def goals_set(request):
+        """Einzelne Regler setzen (z. B. aus der Suche: „Reserve auf 40 %“); die übrigen bleiben wie sie sind."""
+        body = await request.json()
+        g = dict(goals.effective(store.cfg))
+        for k in ("reserve", "precision", "care"):
+            if k in body:
+                g[k] = body[k]
+        g = goals.clean(g)
+        await ctrl.set_goals(g, who=request.get("user") or str(body.get("who") or ""))
+        return web.json_response({"ok": True, **goals.snapshot(store.cfg)})
+
+    @routes.post("/api/goals/mode")
+    async def goals_mode(request):
+        body = await request.json()
+        m = await ctrl.activate_mode(str(body.get("id") or ""), who=request.get("user") or str(body.get("who") or ""))
+        if not m:
+            return web.json_response({"ok": False, "error": "Unbekannter Modus"}, status=404)
+        return web.json_response({"ok": True, "mode": m["id"], **goals.snapshot(store.cfg)})
+
+    @routes.post("/api/goals/custom")
+    async def goals_custom(request):
+        body = await request.json()
+        mid = await ctrl.save_custom_mode(body.get("name"), body.get("icon"), body.get("goals") or goals.effective(store.cfg))
+        if not mid:
+            return web.json_response({"ok": False, "error": "Name fehlt"}, status=400)
+        return web.json_response({"ok": True, "id": mid, **goals.snapshot(store.cfg)})
+
+    @routes.delete("/api/goals/custom/{mid}")
+    async def goals_custom_del(request):
+        await ctrl.delete_custom_mode(request.match_info["mid"])
+        return web.json_response({"ok": True, **goals.snapshot(store.cfg)})
 
     @routes.get("/api/config")
     async def get_config(_):
@@ -260,7 +405,7 @@ def build_app(ctrl, store, ha):
     async def entities(_):
         return web.json_response(ha.entities())
 
-    app = web.Application(middlewares=[guard])
+    app = web.Application(middlewares=[make_direct_middleware(accounts)] if direct else [guard])
     app.add_routes(routes)
     return app
 
@@ -298,10 +443,16 @@ async def main():
             ctrl.event("info", "Der Ordner www wurde neu angelegt: Home Assistant einmal neu starten, damit /local erreichbar ist")
     else:
         ctrl.event("info", "Dashboard-Karte konnte nicht automatisch installiert werden (siehe System → Dashboard-Karte)")
-    runner = web.AppRunner(build_app(ctrl, store, ha))
+    accounts = acc.AccountStore(data_path("accounts.json"))
+    runner = web.AppRunner(build_app(ctrl, store, ha, accounts))
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()
     log.info("Oberfläche läuft auf Port %d", PORT)
+    # Eigener Port mit Anmeldung: im Container immer bereit, von außen nur erreichbar, wenn in den Add-on-Einstellungen ein Port vergeben wird
+    runner2 = web.AppRunner(build_app(ctrl, store, ha, accounts, direct=True))
+    await runner2.setup()
+    await web.TCPSite(runner2, "0.0.0.0", DIRECT_PORT).start()
+    log.info("Direkter Zugang (mit Anmeldung) auf Port %d", DIRECT_PORT)
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):

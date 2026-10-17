@@ -17,6 +17,8 @@ import drivers
 import energy
 import watchdog
 from ha import is_num, num
+import automation
+import goals
 from learn import BaseLoadLearner, is_night
 from meters import Meters
 from mqtt import MqttBridge
@@ -120,6 +122,8 @@ DEFAULT_CONFIG = {
             "learn_base_load": False, "base_load_margin": 10, "base_load_min": 50, "base_load_max": 600},
     "notify": {"service": "", "delay_min": 2, "cooldown_min": 60, "recovery": True,
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
+    "rules": [],
+    "reports": {"weekly": False},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
     "meters": {"show_day": True, "extra": False, "items": [], "order": [], "compare": "same"},
     # Aussehen der Dashboard-Karte (gilt für alle Karten; Optionen in der Karte selbst gehen vor)
@@ -131,6 +135,9 @@ DEFAULT_CONFIG = {
     "flow": {"size": "auto", "layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
              "grid_pos": "mid", "passthrough": True, "order": []},
     "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
+    # Ziele und Modi (siehe goals.py): Regler in Alltagssprache, aus denen die Einzelwerte berechnet werden
+    "goals": {"mode": "", "reserve": None, "precision": None, "care": None},
+    "modes": [],          # eigene Modi: {id, name, icon, text, reserve, precision, care}
     "mqtt": {"enabled": True, "host": "", "port": 1883, "user": "", "password": "", "ssl": False, "prefix": "solasi"},
     "safety": {"kill_entity": "", "release_on_stop": True, "release_on_disable": True,
                "auto_meter_min": 5, "auto_errors": True, "resume_auto": False,
@@ -285,9 +292,32 @@ def _ent_max(ha, eid, attr=None):
 
 
 def _split(total, caps, weights):
-    """Verteilt total (>0) auf höchstens zwei Geräte unter Beachtung der Limits."""
+    """Verteilt total (>0) auf die Geräte unter Beachtung der Limits."""
     if len(caps) == 1:
         return [min(total, caps[0])]
+    if len(caps) > 2:                       # mehrere Geräte: nach Gewicht verteilen, Überhang der gedeckelten auf die übrigen
+        out = [0.0] * len(caps)
+        left, open_ = float(total), [i for i in range(len(caps)) if weights[i] > 0 and caps[i] > 0]
+        while left > 1e-9 and open_:
+            wsum = sum(weights[i] for i in open_)
+            capped = [i for i in open_ if out[i] + left * weights[i] / wsum >= caps[i]]
+            if not capped:
+                for i in open_:
+                    out[i] += left * weights[i] / wsum
+                left = 0.0
+                break
+            for i in capped:
+                left -= caps[i] - out[i]
+                out[i] = caps[i]
+            open_ = [i for i in open_ if i not in capped]
+        order = sorted(range(len(caps)), key=lambda i: -weights[i])         # Rest („nacheinander“): in Reihenfolge auffüllen
+        for i in order:
+            if left <= 1e-9:
+                break
+            add = min(left, max(caps[i] - out[i], 0.0))
+            out[i] += add
+            left -= add
+        return out
     wa, wb = weights
     w = wa + wb
     pa0 = total * wa / w if w > 0 else 0
@@ -410,10 +440,8 @@ def decide(cfg, snap):
     if t > 0:
         caps = [u["dcap"] for u in units]
         if mode == "sequential":
-            a_first = units[0]["soc"] >= (units[1]["soc"] if len(units) > 1 else -1)
-            w = [(1 if a_first else 0) if caps[0] > 0 else 0]
-            if len(units) > 1:
-                w.append((0 if a_first else 1) if caps[1] > 0 else 0)
+            first = min(range(len(units)), key=lambda i: -units[i]["soc"])       # bei Gleichstand der erste
+            w = [(1 if i == first else 0) if caps[i] > 0 else 0 for i in range(len(units))]
         elif mode == "soc":
             w = [(max(u["soc"] - u["min"], 0) + 1) if caps[i] > 0 else 0 for i, u in enumerate(units)]
         else:
@@ -423,10 +451,8 @@ def decide(cfg, snap):
         total = -t
         caps = [u["ccap"] for u in units]
         if mode == "sequential":
-            a_first = units[0]["soc"] <= (units[1]["soc"] if len(units) > 1 else 101)
-            w = [(1 if a_first else 0) if caps[0] > 0 else 0]
-            if len(units) > 1:
-                w.append((0 if a_first else 1) if caps[1] > 0 else 0)
+            first = min(range(len(units)), key=lambda i: units[i]["soc"])
+            w = [(1 if i == first else 0) if caps[i] > 0 else 0 for i in range(len(units))]
         elif mode == "soc":
             w = [(max(u["max"] - u["soc"], 0) + 1) if caps[i] > 0 else 0 for i, u in enumerate(units)]
         else:
@@ -789,6 +815,34 @@ class Controller:
         self._publish(snap, d)
         await self.publish_entities()
         await self.notifier.check(self._problems(snap, d))
+        await self._run_rules(snap)
+
+    async def _run_rules(self, snap):
+        """Zeitpläne und Wenn-dann-Regeln ausführen; Wochenbericht senden."""
+        try:
+            now = now_local()
+            socs = [u["soc"] for u in snap.get("units") or [] if u.get("soc", -1) >= 0 and not u.get("paused")]
+            pv = (snap["pv_w"] + snap["extra_pv"]) if (snap.get("has_pv") or snap.get("extra_pv")) else None
+            ctx = {"minute": now.hour * 60 + now.minute, "weekday": now.weekday(), "date": now.strftime("%Y-%m-%d"),
+                   "soc": (sum(socs) / len(socs)) if socs else None, "grid_w": snap.get("grid_w"), "pv_w": pv, "now": time.monotonic()}
+            st = self.__dict__.setdefault("_rule_state", {})
+            for r in automation.evaluate(self.cfg.get("rules"), ctx, st):
+                t = r["then"]
+                if t["kind"] == "mode":
+                    m = await self.activate_mode(t.get("mode"), who=f"Regel „{r['name']}“")
+                    if not m:
+                        self.event("warn", f"Regel „{r['name']}“: Modus „{t.get('mode')}“ gibt es nicht")
+                else:
+                    self.event("info", f"Regel „{r['name']}“: {t.get('text')}")
+                    await self.notifier.send(f"SOLASI: {r['name']}", t.get("text") or r["name"], tag="rule_" + r["id"])
+            if self.cfg.get("reports", {}).get("weekly") and now.weekday() == 0 and 480 <= ctx["minute"] < 490 \
+                    and st.get("weekly") != ctx["date"]:
+                st["weekly"] = ctx["date"]
+                title, text = automation.weekly_report(self.stats.summary(7, self.cfg.get("prices")))
+                self.event("info", "Wochenbericht erstellt")
+                await self.notifier.send(title, text, tag="weekly")
+        except Exception as e:  # noqa: BLE001
+            log.error("Fehler in der Automatik: %r", e)
 
     limit_retry_s = 300       # so oft wird eine abweichende Grenze im Speicher höchstens zurückgesetzt
 
@@ -963,6 +1017,17 @@ class Controller:
             data = {**data, "card": clean_card(data["card"])}
         if isinstance(data, dict) and "flow" in data:
             data = {**data, "flow": clean_flow(data["flow"])}
+        if isinstance(data, dict) and isinstance(data.get("goals"), dict):
+            g = data["goals"]
+            data = {**data, "goals": {"mode": str(g.get("mode") or "")[:40],
+                                      **{k: (None if g.get(k) is None else goals.clean(g)[k]) for k in goals.KEYS}}}
+        if isinstance(data, dict) and isinstance(data.get("modes"), list):
+            data = {**data, "modes": [{k: m.get(k) for k in ("id", "name", "icon", "text", *goals.KEYS)}
+                                      for m in data["modes"] if isinstance(m, dict) and m.get("id") and m.get("name")]}
+        if isinstance(data, dict) and "rules" in data:
+            data = {**data, "rules": automation.clean_rules(data["rules"])}
+        if isinstance(data, dict) and isinstance(data.get("reports"), dict):
+            data = {**data, "reports": {"weekly": bool(data["reports"].get("weekly"))}}
         if isinstance(data, dict) and isinstance(data.get("meters"), dict):
             data = {**data, "meters": {**data["meters"], "order": clean_order(data["meters"].get("order"))}}
         self.store.save(data)
@@ -979,6 +1044,49 @@ class Controller:
         if self.status:
             self.status["enabled"], self.status["dry_run"] = self.cfg["enabled"], self.cfg["dry_run"]
         await self.publish_entities()
+
+    # ---------- Ziele und Modi ----------
+    async def set_goals(self, g, mode="", who=""):
+        """Regler setzen: berechnete Einzelwerte in die Konfiguration schreiben und speichern."""
+        cfg = copy.deepcopy(self.cfg)
+        changes = goals.apply(cfg, g, mode)
+        await self.save_config(cfg)
+        if mode:
+            m = goals.mode_by_id(cfg, mode)
+            self.event("info", f"Modus „{m['name'] if m else mode}“ aktiviert" + (f" von {who}" if who else ""))
+        elif changes:
+            self.event("info", "Ziele geändert: " + ", ".join(f"{p} {o} → {n}" for p, o, n in changes[:4]))
+        return changes
+
+    async def activate_mode(self, mid, who=""):
+        m = goals.mode_by_id(self.cfg, mid)
+        if not m:
+            return None
+        await self.set_goals(m, mode=m["id"], who=who)
+        return m
+
+    async def save_custom_mode(self, name, icon, g):
+        name = str(name or "").strip()[:30]
+        if not name:
+            return None
+        base = "".join(ch for ch in name.lower() if ch.isalnum())[:20] or "modus"
+        ids = {m["id"] for m in goals.all_modes(self.cfg)}
+        mid, n = base, 2
+        while mid in ids:
+            mid, n = f"{base}{n}", n + 1
+        cfg = copy.deepcopy(self.cfg)
+        cfg.setdefault("modes", []).append({"id": mid, "name": name, "icon": (icon or "⭐")[:4], "text": "Eigener Modus", **goals.clean(g)})
+        await self.save_config(cfg)
+        self.event("info", f"Eigener Modus „{name}“ angelegt")
+        return mid
+
+    async def delete_custom_mode(self, mid):
+        cfg = copy.deepcopy(self.cfg)
+        cfg["modes"] = [m for m in cfg.get("modes", []) if m.get("id") != mid]
+        if (cfg.get("goals") or {}).get("mode") == mid:
+            cfg["goals"]["mode"] = ""
+        await self.save_config(cfg)
+        return True
 
     # ---------- Kill-Switch / Sicherheit ----------
     @property
@@ -1153,8 +1261,42 @@ class Controller:
             tot += max(max(-u["bat"], 0.0) - max(u.get("pv") or 0.0, 0.0), 0.0)
         return tot if tot >= 10 else 0.0
 
+    @staticmethod
+    def crosscharge_state(units):
+        """Umladen erkennen: ein Speicher gibt ab, ein anderer lädt über seine eigene Solarleistung hinaus.
+        -> (Quelle, Ziel, Watt) oder None."""
+        src = dst = None
+        w = 0.0
+        for u in units or []:
+            if u.get("paused") or u.get("bat") is None:
+                continue
+            if u["bat"] > 50 and (src is None or u["bat"] > src["bat"]):
+                src = u
+            ac = max(-u["bat"], 0.0) - max(u.get("pv") or 0.0, 0.0)
+            if ac >= 50 and ac > w:
+                dst, w = u, ac
+        if src is None or dst is None or src is dst:
+            return None
+        return src["k"], dst["k"], round(w)
+
+    def _log_crosscharge(self, units, now_m):
+        cur = self.crosscharge_state(units)
+        prev = getattr(self, "_cc", None)
+        last = getattr(self, "_cc_at", -1e9)
+        if cur and not prev and now_m - last > 300:
+            self.event("info", f"{cur[0]} gibt ab – {cur[1]} lädt {cur[2]} W aus dem Überschuss (Umladen, kein Mehrverbrauch)")
+            self._cc_at = now_m
+        elif prev and not cur and now_m - last > 60:
+            self.event("info", f"Umladen von {prev[0]} nach {prev[1]} beendet")
+            self._cc_at = now_m
+        if bool(cur) != bool(prev) and (cur or now_m - last > 60):
+            self._cc = cur
+        elif cur:
+            self._cc = cur
+
     def _after_cycle(self, snap, d):
         now_m = time.monotonic()
+        self._log_crosscharge(snap.get("units"), now_m)
         house = snap["house_gross"]
         if house is not None and self.cfg.get("flow", {}).get("passthrough", True):
             house = max(house - self.passthrough_w(snap.get("units")), 0.0)    # Umladen ist kein Verbrauch

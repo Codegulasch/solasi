@@ -257,8 +257,62 @@ button.sec2{border:1px solid var(--line);background:var(--chip);border-radius:12
   .vsteps .skip{display:none}
   #toast{bottom:24px}
 }
+
+/* ---- 2.0: Modi, Einstellungs-Übersicht, Speicher-Detail ---- */
+.modes{display:flex;gap:10px;overflow-x:auto;margin-bottom:14px;padding-bottom:3px}
+.mode{flex:1 0 148px;background:var(--card);border:1.5px solid var(--line);border-radius:15px;padding:9px 13px;display:flex;gap:10px;align-items:center;cursor:pointer;font:inherit;color:var(--fg);text-align:left;box-shadow:var(--shadow);position:relative;transition:border-color .15s,transform .1s}
+.mode:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}.mode:active{transform:scale(.98)}
+.mode b{display:block;font-size:13.5px}.mode small{color:var(--muted);font-size:11.5px;display:block;line-height:1.3}.mode .e{font-size:22px}
+.mode.on{border-color:var(--accent);background:linear-gradient(160deg,var(--accent-soft),var(--card))}
+.mode.add{flex:0 0 auto;border-style:dashed;color:var(--muted);justify-content:center;font-weight:700;box-shadow:none}
+.mode .x{position:absolute;top:2px;right:6px;color:var(--muted);font-size:13px;cursor:pointer;padding:2px}
+.hub{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));margin-bottom:14px}
+.cat{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;text-align:left;font:inherit;color:var(--fg);display:block;width:100%;transition:border-color .15s,transform .1s}
+.cat:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}.cat:active{transform:scale(.99)}
+.cat .ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:20px;margin-bottom:9px;background:var(--chip)}
+.cat b{font-size:15.5px;display:block}.cat p{margin:3px 0 9px;color:var(--muted);font-size:13px}.cat .st{font-size:12.5px;font-weight:700}
+.st.ok{color:var(--ok)}.st.warn{color:var(--warn)}.st.mut{color:var(--muted)}
+.ulist{display:grid;grid-template-columns:minmax(210px,290px) minmax(0,1fr);gap:16px;align-items:start;margin-top:14px}
+.udev{display:flex;gap:12px;align-items:center;border:1.5px solid var(--line);border-radius:15px;padding:11px 13px;background:var(--card);margin-bottom:9px;cursor:pointer;width:100%;font:inherit;color:var(--fg);text-align:left}
+.udev.sel{border-color:var(--accent);background:linear-gradient(160deg,var(--accent-soft),var(--card))}
+.udev .ic{width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,var(--bat) 18%,transparent);display:grid;place-items:center;flex:none}
+.udev b{display:block;font-size:14px}.udev small{color:var(--muted);font-size:12.5px}
+.udev.add{border-style:dashed;background:transparent;color:var(--muted);justify-content:center;font-weight:700}
+.udetail{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
+.udetail .uh{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.udetail .uh h2{margin:0;font-size:20px;letter-spacing:-.01em}
+.seg2{display:inline-flex;background:var(--chip);border-radius:11px;padding:3px;margin-left:auto}
+.seg2 button{border:0;background:none;padding:5px 13px;border-radius:9px;font:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg2 button.a{background:var(--accent);color:#2b1c00}
+.tabs2{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 6px;overflow-x:auto}
+.tabs2 button{border:0;background:none;padding:9px 14px;font:inherit;font-weight:600;color:var(--muted);border-bottom:2.5px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+.tabs2 button.on{color:var(--accent-d);border-color:var(--accent)}
+.tabnote{background:var(--accent-soft);border-radius:12px;padding:9px 13px;font-size:13px;margin:10px 0}
+@media(max-width:820px){.ulist{grid-template-columns:minmax(0,1fr)}}
+.rngrow{padding:12px 0;border-bottom:1px solid var(--line)}.rngrow:last-child{border:0}
+.rngrow b{font-size:15px}.rngrow .sub{display:block;margin:1px 0 8px}
+.rngrow input[type=range]{width:100%;accent-color:var(--accent);height:26px}
+.rnglab{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.rngval{display:inline-block;background:var(--accent-soft);border-radius:9px;padding:2px 10px;font-size:12.5px;margin-top:6px}
+.vtab{width:100%;border-collapse:collapse}.vtab td,.vtab th{padding:7px 8px;text-align:left;border-top:1px solid var(--line);font-size:13.5px}.vtab th{color:var(--muted);font-weight:600;font-size:12px;border-top:0}
+.vtab input[type=number]{width:96px;padding:5px 9px}
+button.ghost{background:var(--chip);color:var(--fg);border:0;border-radius:11px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
 body.dens-compact{font-size:13.5px}
 body.dens-large{font-size:16.5px}
+#pal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;padding:12vh 12px 0}
+body[data-role="viewer"] #savebar,body[data-role="member"] #savebar{display:none!important}
+body[data-role="viewer"] .modes .mode,body[data-role="viewer"] #killbtn,body[data-role="viewer"] .bar .tg{pointer-events:none;opacity:.5}
+body[data-role="viewer"] #main input,body[data-role="viewer"] #main select,body[data-role="member"] #p-units input,body[data-role="member"] #p-control input,body[data-role="member"] #p-extras input{pointer-events:none}
+#pal.on{display:flex}
+#p-auto select,#p-accounts select,#p-auto input:not([type=checkbox]):not([data-rf=name]):not([data-rf='then.text']),#p-accounts input{width:auto}
+#p-auto .rule input[type=time]{padding:6px}
+#p-auto,#p-accounts{padding-bottom:90px}
+#pal .box{background:var(--card,#fff);color:var(--text,#222);border-radius:14px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
+#pal input{width:100%;border:0;border-bottom:1px solid var(--line,#ddd);padding:16px;font-size:1.05rem;background:transparent;color:inherit;outline:0}
+#pal ul{list-style:none;margin:0;padding:6px;max-height:50vh;overflow:auto}
+#pal li{padding:10px 12px;border-radius:9px;cursor:pointer;display:flex;gap:10px;align-items:baseline}
+#pal li small{opacity:.65;margin-left:auto;white-space:normal;text-align:right}
+#pal li.on{background:var(--accent-l,#e8f0fe)}
+#pal .hint{padding:8px 16px 12px;font-size:.8rem;opacity:.65}
 </style>
 </head>
 <body>
@@ -282,6 +336,7 @@ body.dens-large{font-size:16.5px}
   <div class="content">
     <div class="bar">
       <h1 id="title">Übersicht</h1>
+      <button type="button" class="ghost" id="palbtn" title="Suchen und Fragen (Strg+K)" aria-label="Suchen">🔍 Suchen <kbd style="font-size:.7em;opacity:.7">Strg K</kbd></button>
       <span class="pill" id="modepill"><i></i><span id="modetext">–</span></span>
       <label class="tg"><input type="checkbox" id="q_enabled"><i></i>Regelung</label>
       <label class="tg test"><input type="checkbox" id="q_dry"><i></i>Testmodus</label>
@@ -296,6 +351,10 @@ body.dens-large{font-size:16.5px}
       <section class="page act" id="p-status"></section>
       <section class="page" id="p-setup"></section>
       <section class="page" id="p-units"></section>
+      <section class="page" id="p-settings"></section>
+      <section class="page" id="p-goals"></section>
+      <section class="page" id="p-auto"></section>
+      <section class="page" id="p-accounts"></section>
       <section class="page" id="p-control"></section>
       <section class="page" id="p-surplus"></section>
       <section class="page" id="p-meters"></section>
@@ -309,6 +368,7 @@ body.dens-large{font-size:16.5px}
       <section class="page" id="p-mqtt"></section>
       <section class="page" id="p-log"><div class="card"><div class="log" id="log"></div></div></section>
       <div class="savebar" id="savebar"><span class="msg" id="savemsg">Änderungen gelten erst nach „Speichern“.</span>
+        <button class="ghost" id="discard" type="button" style="display:none">Verwerfen</button>
         <button class="primary" id="save">Speichern</button></div>
     </main>
   </div>
@@ -318,7 +378,7 @@ body.dens-large{font-size:16.5px}
 <datalist id="dl-script"></datalist><datalist id="dl-fb0"></datalist><datalist id="dl-fb1"></datalist><datalist id="dl-sens0"></datalist><datalist id="dl-sens1"></datalist><datalist id="dl-notify"></datalist><datalist id="dl-switchy"></datalist><datalist id="dl-all"></datalist>
 
 <script>
-let cfg = null, dirty = false, lastStatus = null;
+let cfg = null, baseCfg = null, dirty = false, lastStatus = null;
 const $ = s => document.querySelector(s);
 const SW = ["switch","input_boolean","light","fan","climate","script","automation"];
 let allSensors=[];
@@ -326,7 +386,7 @@ let allSensors=[];
 // ---------- Hilfen ----------
 function get(path){return path.split(".").reduce((o,k)=>o==null?o:o[k],cfg)}
 function set(path,v){const ks=path.split(".");let o=cfg;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks.at(-1)]=v;markDirty()}
-function markDirty(){dirty=true;$("#savemsg").textContent="Du hast ungespeicherte Änderungen";}
+function markDirty(){dirty=true;updateSavebar();}
 function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),2200)}
 
@@ -428,16 +488,47 @@ function unitFields(i,u){
      field(p+"capacity_kwh","Nutzbare Kapazität (kWh)","num",{min:0.5,step:0.1,hint:"Wird für den Gesamt-Ladestand (nach Kapazität gewichtet), die kWh-Anzeige und den Replay gebraucht. Beispiel: 5 oder 10 bei zwei gekoppelten Akkus."});
   return h;
 }
+let selUnit=0,unitTab="conn";
+const UTABS=[["conn","Verbindung",["name","driver","observe","num","dir","mode","num_chg","enable","script","sign","mode_option","soc","real_dis","real_chg","power","power_sign","dir_dis","dir_chg","dir_stop"]],
+  ["lim","Grenzen",["lim_dis","lim_res","lim_chg","min_soc","max_soc","write_limits"]],
+  ["pow","Leistung",["max_dis","max_chg","capacity_kwh","pv","power_basis","devsens"]],
+  ["x","Umladen & Abregeln",["can_charge","curtail"]],
+  ["adv","Erweitert",[]]];
+function unitPanels(i,u){
+  const tmp=document.createElement("div");tmp.innerHTML=unitFields(i,u).replace(/\u0001/g,"");
+  const out={conn:"",lim:"",pow:"",x:"",adv:""};
+  [...tmp.children].forEach(el=>{
+    let key="";
+    if(el.classList.contains("drvdesc"))key="driver";
+    else{const inp=el.querySelector('[id^="f_units_"]'),m=inp&&inp.id.match(/^f_units_\d+_(.+)$/);key=m?m[1]:(el.querySelector('[id^="devsens"]')?"devsens":"");}
+    if(key==="state")return;                                  // steht oben als Schalter
+    const t=UTABS.find(x=>x[2].includes(key));
+    out[t?t[0]:"adv"]+=el.outerHTML;});
+  return out;}
 function renderUnits(){
   advHidden=0;
   let h=fs("⚡ Stromzähler",
     field("grid.entity","Netzleistung (W)","text",{list:"sensor",hint:"Positiv = Bezug, negativ = Einspeisung. Am besten der rohe oder kurz geglättete Wert (z. B. Bitshake)."})+
     field("grid.invert","Vorzeichen umkehren","bool",{hint:"Nur nötig, wenn dein Zähler Einspeisung positiv meldet."})+
     field("grid.max_age","Ausfall erkennen nach (Sekunden)","num",{min:0,adv:true,hint:"Meldet der Zähler so lange nichts, gehen die Speicher auf 0 W. 0 = nur bei „nicht verfügbar“."}));
-  cfg.units.forEach((u,i)=>{
-    const conf=isConf(u);
-    h+=fs(`🔋 ${esc(u.name||("Speicher "+(i+1)))}${i?" (optional)":""}`,unitFields(i,u).replace("\u0001",""),{closed:!conf&&i>0,sub:conf?(DRV[u.driver||"anker"]||DRV.anker).label:"nicht eingerichtet"});
-  });
+  if(isClassic()){
+    cfg.units.forEach((u,i)=>{
+      const conf=isConf(u);
+      h+=fs(`🔋 ${esc(u.name||("Speicher "+(i+1)))}${i?" (optional)":""}`,unitFields(i,u).replace("\u0001",""),{closed:!conf&&i>0,sub:conf?(DRV[u.driver||"anker"]||DRV.anker).label:"nicht eingerichtet"});
+    });
+  }else{
+    if(selUnit>=cfg.units.length)selUnit=0;
+    const i=selUnit,u=cfg.units[i],pn=unitPanels(i,u),su=(lastStatus&&lastStatus.units||[])[i];
+    const stl={active:"Aktiv",maint:"Wartung",off:"Aus"};
+    const list=cfg.units.map((x,j)=>`<button type="button" class="udev${j===i?" sel":""}" data-usel="${j}"><span class="ic">🔋</span><span><b>${esc(x.name||"Speicher "+(j+1))}</b><small>${isConf(x)?`${x.capacity_kwh||5} kWh · ${stl[x.state||"active"]}`+(su&&j===i&&su.soc>=0?` · ${su.soc} %`:""):"nicht eingerichtet"}</small></span></button>`).join("")+
+      (cfg.units.length<4?`<button type="button" class="udev add" id="addunit">＋ Speicher hinzufügen</button>`:"");
+    const tabs=UTABS.filter(t=>t[0]!=="adv"||pn.adv).map(([id,l])=>`<button type="button" data-utab="${id}" class="${id===unitTab?"on":""}">${l}</button>`).join("");
+    const tab=pn[unitTab]!==undefined&&UTABS.some(t=>t[0]===unitTab&&(t[0]!=="adv"||pn.adv))?unitTab:"conn";
+    const note=tab==="x"?`<div class="tabnote">Ob ein voller Speicher den Überschuss in einen anderen umlädt, stellst du für alle Speicher gemeinsam unter <a href="#" data-p="control" style="color:var(--accent-d);font-weight:700">Regelung → Funktionen</a> ein.</div>`:"";
+    h+=`<div class="ulist"><div>${list}</div><div class="udetail"><div class="uh"><h2>${esc(u.name||"Speicher "+(i+1))}</h2>
+      <span class="seg2" role="group" aria-label="Betrieb">${[["active","Aktiv"],["maint","Wartung"],["off","Aus"]].map(([k,l])=>`<button type="button" data-ustate="${k}" class="${(u.state||"active")===k?"a":""}" aria-pressed="${(u.state||"active")===k}">${l}</button>`).join("")}</span></div>
+      <div class="tabs2" role="tablist">${tabs.replace(new RegExp(`data-utab="${tab}" class="[^"]*"`),`data-utab="${tab}" class="on"`)}</div>${note}<div id="upanel">${pn[tab]||`<div class="sub" style="padding:10px 0">Hier gibt es nichts einzustellen.</div>`}</div></div></div>`;
+  }
   $("#p-units").innerHTML=h.replace(/\u0001/g,"")+advNote();
   cfg.units.forEach((u,i)=>{
     setSensorList(i,[]);                 // sofort: alle Sensoren vorschlagen, auch beim ersten Einrichten
@@ -445,6 +536,35 @@ function renderUnits(){
     for(const k of ["num","dir","script"]){const e=document.getElementById(`f_units_${i}_${k}`);if(e)e.addEventListener("input",()=>later("dev"+i,()=>refreshDevice(i)));}
     const m=document.getElementById(`f_units_${i}_mode`);if(m)m.addEventListener("input",()=>later("mode"+i,()=>refreshModeOptions(i)));
   });
+}
+document.addEventListener("click",async e=>{
+  const sel=e.target.closest("[data-usel]");if(sel){selUnit=+sel.dataset.usel;renderUnits();return;}
+  const tb=e.target.closest("[data-utab]");if(tb){unitTab=tb.dataset.utab;renderUnits();return;}
+  const st=e.target.closest("[data-ustate]");if(st){set(`units.${selUnit}.state`,st.dataset.ustate);renderUnits();return;}
+  if(e.target.closest("#addunit")){
+    let found=[];try{const j=await (await fetch("api/discover")).json();if(j&&Array.isArray(j.units))found=j.units.filter(x=>!x.configured);}catch(x){}
+    if(found.length){showAddWizard(found);return;}
+    await addUnit(null);return;}
+  const pk=e.target.closest("[data-pickunit]");if(pk){const f=addFound[+pk.dataset.pickunit];closeAddWizard();await addUnit(f);return;}
+  if(e.target.closest("#addmanual")){closeAddWizard();await addUnit(null);return;}
+  if(e.target.closest("#addcancel")){closeAddWizard();return;}
+});
+let addFound=[];
+function closeAddWizard(){const o=document.getElementById("addwiz");if(o)o.remove();}
+function showAddWizard(found){
+  addFound=found;closeAddWizard();
+  const lab={soc:"Ladestand",pv:"Solar",mode:"Modus",lim_res:"Notstrom",lim_dis:"Entladegrenze",lim_chg:"Ladegrenze"};
+  const cards=found.map((f,i)=>`<button type="button" class="udev" data-pickunit="${i}"><span class="ic">🔋</span><span><b>${esc(f.name)}</b><small>${["soc","pv","mode","lim_res","lim_dis","lim_chg"].filter(k=>f[k]).map(k=>lab[k]).join(" · ")||"Leistung steuerbar"}</small></span></button>`).join("");
+  const o=document.createElement("div");o.id="addwiz";o.className="ulist";o.style.cssText="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px";
+  o.innerHTML=`<div class="udetail" style="max-width:460px;width:100%;max-height:90vh;overflow:auto"><h2>Speicher gefunden</h2><div class="sub" style="margin-bottom:10px">Diese Geräte hat SOLASI in Home Assistant entdeckt. Tippe eines an – die Felder werden vorausgefüllt und du kannst sie danach prüfen.</div>${cards}<button type="button" class="udev add" id="addmanual">Von Hand einrichten</button><button type="button" class="ghost" id="addcancel" style="margin-top:8px">Abbrechen</button></div>`;
+  document.body.appendChild(o);
+}
+async function addUnit(f){
+  let d=null;try{const j=await (await fetch("api/defaults")).json();if(j&&j.unit)d=j.unit;}catch(x){}
+  if(!d){d=JSON.parse(JSON.stringify(cfg.units[cfg.units.length-1]));for(const k of Object.keys(d)){if(typeof d[k]==="string"&&!["driver","state","sign","power_sign","power_basis"].includes(k))d[k]="";}}
+  d.name="Speicher "+(cfg.units.length+1);d.state="active";
+  if(f){d.name=f.name;if(f.driver)d.driver=f.driver;for(const k of ["num","dir","mode","soc","pv","lim_res","lim_dis","lim_chg"])if(f[k])d[k]=f[k];}
+  cfg.units.push(d);selUnit=cfg.units.length-1;unitTab="conn";markDirty();renderUnits();
 }
 // ---- Vorschlagslisten je Speicher: erst alle Sensoren, dann (wenn möglich) die des Geräts zuerst ----
 const timers={};
@@ -678,12 +798,12 @@ async function save(){
     const r=await fetch("api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
     const j=await r.json();
     if(!j.ok)throw new Error(j.error);
-    dirty=false;$("#savemsg").textContent="Gespeichert um "+new Date().toLocaleTimeString("de-DE");toast("Gespeichert ✓");
+    dirty=false;baseCfg=JSON.parse(JSON.stringify(cfg));updateSavebar();$("#savemsg").textContent="Gespeichert um "+new Date().toLocaleTimeString("de-DE");toast("Gespeichert ✓");loadGoals().then(()=>{if(lastStatus)renderStatus(lastStatus)});
   }catch(e){$("#savemsg").textContent="Fehler: "+e.message;toast("Fehler beim Speichern")}
   b.disabled=false;
 }
 async function loadAll(){
-  cfg=await (await fetch("api/config")).json();
+  cfg=await (await fetch("api/config")).json();baseCfg=JSON.parse(JSON.stringify(cfg));
   const ents=await (await fetch("api/entities")).json();
   const fill=(id,list)=>$("#"+id).innerHTML=list.map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("");
   allSensors=ents.filter(e=>e.domain==="sensor");
@@ -696,6 +816,7 @@ async function loadAll(){
   try{const sv=await (await fetch("api/notify/services")).json();
     $("#dl-notify").innerHTML=sv.map(x=>`<option value="${esc(x)}"></option>`).join("");}catch(e){}
   renderForms();
+  loadGoals().then(()=>{if(lastStatus)renderStatus(lastStatus);if(curPage==="goals")renderGoals();});
 }
 [["q_enabled","enabled"],["q_dry","dry_run"],["q_sp","surplus.enabled"],["q_spdry","surplus.dry_run"]].forEach(([id,path])=>{
   $("#"+id).addEventListener("change",async e=>{
@@ -716,6 +837,8 @@ async function killOrResume(){
 }
 $("#killbtn").addEventListener("click",killOrResume);
 const IC={
+  auto:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  accounts:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
   status:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   units:'<rect x="2" y="8" width="18" height="9" rx="2"/><path d="M22 11v3M6 11v3M10 11v3"/>',
   surplus:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
@@ -728,35 +851,38 @@ const IC={
   mqtt:'<path d="M3 11 12 3l9 8v9H3z"/>',
   setup:'<path d="m5 12 4 4 10-10"/>',
   control:'<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-.9c.6.5 1.3.9 2 1.2l.4 2.6h4l.4-2.6c.7-.3 1.4-.7 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'};
 const svgi=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]||""}</svg>`;
-const NAVS=[["Betrieb",[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"],["meters","Zähler"]]],
-  ["Auswertung",[["stats","Statistik"],["replay","Replay"]]],
-  ["System",[["selftest","Selbsttest"],["log","Protokoll"],["card","Dashboard-Karte"],["mqtt","Entitäten (MQTT)"]]]];
-const NAV_FOOT=[["setup","Einrichtung"],["control","Einstellungen"]];
-const TITLES={tile:"Kachel-Statistik",status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",stats:"Statistik",replay:"Replay",selftest:"Selbsttest",log:"Protokoll",
-  card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung"};
-const SET_SUB=[["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]];
-const SETTINGS_PAGES=["units","control","surplus","extras","meters","look"];
-const SET_GROUP=SET_SUB.map(x=>x[0]);
+const isClassic=()=>lookGet("classic","0")==="1";
+const NAVS=[["Betrieb",[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"],["meters","Zähler"],["auto","Automatik"]]],
+  ["Auswertung",[["stats","Statistik"],["replay","Was-wäre-wenn"]]],
+  ["System",[["selftest","Gesundheit"],["log","Protokoll"],["card","Dashboard-Karte"],["mqtt","Entitäten (MQTT)"]]]];
+const NAV_FOOT_NEW=[["settings","Einstellungen"],["setup","Einrichtung"]],NAV_FOOT_OLD=[["setup","Einrichtung"],["control","Einstellungen"]];
+const TITLES={tile:"Kachel-Statistik",status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",stats:"Statistik",replay:"Was-wäre-wenn",selftest:"Gesundheit",log:"Protokoll",
+  card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung",settings:"Einstellungen",goals:"Ziele & Verhalten",auto:"Automatik",accounts:"Konten & Zugang"};
+const SET_SUB_NEW=[["settings","Übersicht"],["goals","Ziele"],["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]],
+  SET_SUB_OLD=[["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]];
+const SETTINGS_PAGES=["units","goals","auto","control","surplus","extras","meters","look"];
+const setSub=()=>isClassic()?SET_SUB_OLD:SET_SUB_NEW,setGroup=()=>setSub().map(x=>x[0]),navFoot=()=>isClassic()?NAV_FOOT_OLD:NAV_FOOT_NEW;
 const TAB_ITEMS=[["status","Übersicht"],["units","Speicher"],["stats","Statistik"],["surplus","Überschuss"]];
 let curPage="status";
 function renderNav(){
   let h="";
   NAVS.forEach(([sec,items])=>{h+=`<div class="sec">${sec}</div>`+items.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")});
-  h+=`<div class="sep"></div>`+NAV_FOOT.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("");
+  h+=`<div class="sep"></div>`+navFoot().map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("");
   $("#nav").innerHTML=h;
   $("#tabbar").innerHTML=TAB_ITEMS.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")+`<button type="button" id="moreBtn">${svgi("more")}Mehr</button>`;
 }
-function navActive(p){return SET_GROUP.includes(p)?"control":p==="tile"?"status":p}
+function navActive(p){return setGroup().includes(p)?(isClassic()?"control":"settings"):p==="tile"?"status":p}
 function showPage(p){
   if(!document.getElementById("p-"+p))p="status";
   curPage=p;
   const na=navActive(p);
   document.querySelectorAll("#nav button,#tabbar button[data-p]").forEach(x=>{if(x.dataset.p===na)x.setAttribute("aria-current","page");else x.removeAttribute("aria-current")});
-  const isSet=SET_GROUP.includes(p);
+  const isSet=setGroup().includes(p);
   $("#main").classList.toggle("hasset",isSet);
-  $("#subnav").innerHTML=isSet?SET_SUB.map(([id,l])=>`<button type="button" data-p="${id}" class="${id===p?"act":""}">${l}</button>`).join(""):"";
+  $("#subnav").innerHTML=isSet?setSub().map(([id,l])=>`<button type="button" data-p="${id}" class="${id===p?"act":""}">${l}</button>`).join(""):"";
   document.querySelectorAll(".page").forEach(x=>x.classList.toggle("act",x.id==="p-"+p));
   $("#pagetools").classList.toggle("on",p==="surplus");
   $("#savebar").style.display=SETTINGS_PAGES.includes(p)?"flex":"none";
@@ -771,11 +897,16 @@ function showPage(p){
   if(p==="replay")renderReplayForm();
   if(p==="setup")renderSetup();
   if(p==="look")renderLook();
+  if(p==="settings")renderSettings();
+  if(p==="goals")renderGoals();
+  if(p==="auto")renderAuto();
+  if(p==="accounts")loadAccounts();
+  updateSavebar();
 }
 function closeSheet(){$("#side").classList.remove("open");$("#scrim").classList.remove("on")}
 document.addEventListener("click",e=>{
   if(e.target.closest("#moreBtn")){$("#side").classList.add("open");$("#scrim").classList.add("on");return}
-  const b=e.target.closest("#nav button[data-p],#tabbar button[data-p],#subnav button[data-p]");
+  const b=e.target.closest("#nav button[data-p],#tabbar button[data-p],#subnav button[data-p],.cat[data-p]");
   if(b)showPage(b.dataset.p);
 });
 $("#scrim").addEventListener("click",closeSheet);
@@ -923,18 +1054,42 @@ async function loadSelfcheck(){
   const areas={};r.items.forEach(i=>(areas[i.area]=areas[i.area]||[]).push(i));
   const cu=r.curtail||{};
   const cuTxt={ok:["ok","Bestätigt"],fehlgeschlagen:["bad","Greift nicht"],unbekannt:["","Noch nicht beurteilt"]}[cu.state]||["",""];
+  const todo=r.items.filter(i=>i.status==="error"||i.status==="warn");
+  const todoHtml=todo.length?`<div class="card" style="margin-bottom:14px"><h3>Das solltest du prüfen</h3>${todo.slice(0,8).map(i=>{const f=fixTarget(i);
+    return `<div class="row"><span>${icon[i.status]} <b>${esc(i.area)}</b> · ${esc(i.item)}<div class="sub">${esc(i.text)}${i.hint?` → ${esc(i.hint)}`:""}</div></span>${f?`<button type="button" class="ghost" data-fix='${esc(JSON.stringify(f))}'>Beheben</button>`:""}</div>`;}).join("")}</div>`:"";
   let h=`<div class="hero"><div class="headline">${sm.error?`${sm.error} Problem${sm.error>1?"e":""} gefunden`:sm.warn?"Fast alles in Ordnung":"Alles in Ordnung"}</div>
     <div class="sub">${sm.ok} in Ordnung · ${sm.warn} Hinweise · ${sm.error} Fehler</div>
     <div style="margin-top:10px"><button class="primary" id="recheck">Erneut prüfen</button></div></div>
-    <div class="card" style="margin-bottom:14px"><h3>Abregelung bei vollem Speicher</h3>
+    ${todoHtml}<div class="card" style="margin-bottom:14px"><h3>Abregelung bei vollem Speicher</h3>
       <div class="row"><span>Ergebnis der Beobachtung</span><span class="tag ${cuTxt[0]}">${cuTxt[1]}</span></div>
       <div class="sub" style="margin-top:6px">${esc(cu.note||"")}${cu.since?` (seit ${esc(cu.since)})`:""}${cu.export_w!=null?` · aktuell ${cu.export_w} W Einspeisung`:""}</div>
       <div class="sub" style="margin-top:6px">SOLASI beobachtet bei vollen Speichern und Sonne, ob trotzdem eingespeist wird. Greift die Abregelung nicht, dürfen Verbraucher früher laufen und du bekommst eine Meldung.</div></div>`;
+  h+=`<details class="fsec" ${todo.length?"":"open"}><summary>Alle Prüfpunkte <span class="sub">${r.items.length} Einträge</span></summary><div class="fbody" style="padding-top:12px">`;
   Object.entries(areas).forEach(([a,items])=>{
     h+=`<div class="card" style="margin-bottom:12px"><h3>${esc(a)}</h3>`+items.map(i=>`<div class="row"><span>${icon[i.status]||""} ${esc(i.item)}</span><span style="text-align:right"><span class="sub">${esc(i.text)}</span>${i.hint?`<div class="sub" style="color:var(--warn)">→ ${esc(i.hint)}</div>`:""}</span></div>`).join("")+`</div>`;});
+  h+=`</div></details>`;
   $("#p-selftest").innerHTML=h;
   document.getElementById("recheck").addEventListener("click",loadSelfcheck);
 }
+
+/* Wohin führt „Beheben“? Aus Bereich und Prüfpunkt wird die passende Einstellung. */
+function fixTarget(i){
+  const a=String(i.area||""),t=String(i.item||"").toLowerCase();
+  const ui=(cfg&&cfg.units||[]).findIndex(u=>u.name===a);
+  if(ui>=0){
+    const tab=/grenze|reserve|mindest|höchst|schreiben/.test(t)?"lim":/leistung|messart|pv|plausib|kapazit/.test(t)?"pow":/umlad|abregel/.test(t)?"x":/rückfall/.test(t)?"adv":"conn";
+    return {page:"units",unit:ui,tab};}
+  if(/^zähler/i.test(a))return {page:"meters"};
+  if(/^überschuss/i.test(a))return {page:"surplus"};
+  if(/^sicherheit|benachrichtigung/i.test(a))return {page:"extras"};
+  if(/^verbindung/i.test(a))return t.includes("mqtt")?{page:"mqtt"}:null;
+  if(/^dashboard/i.test(a))return {page:"card"};
+  if(/^energiebilanz|lernen/i.test(a))return {page:"units",unit:0,tab:"pow"};
+  if(/^speicher/i.test(a))return {page:"units",unit:0,tab:"conn"};
+  return null;}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-fix]");if(!b)return;
+  try{const f=JSON.parse(b.dataset.fix);if(f.unit!=null)selUnit=f.unit;if(f.tab)unitTab=f.tab;showPage(f.page);if(f.page==="units")renderUnits();}catch(x){}});
 
 // ---------- Statistik ----------
 let statsDays=30;
@@ -1772,7 +1927,7 @@ function kpiHtml(s){
 }
 
 // ---------- Anordnung und ruhiges Aktualisieren ----------
-const STATUS_BLOCKS=[["kpis","Kennzahlen (Solar, Haus, Speicher, Netz)"],["meters","Heute und Zähler"],["hero","Energiefluss"],["trend","Verlauf der letzten 24 Stunden"],["units","Speicher"],["surplus","Überschuss"],["log","Protokoll"]];
+const STATUS_BLOCKS=[["modes","Modi (Schnellwahl)"],["kpis","Kennzahlen (Solar, Haus, Speicher, Netz)"],["meters","Heute und Zähler"],["hero","Energiefluss"],["trend","Verlauf der letzten 24 Stunden"],["units","Speicher"],["surplus","Überschuss"],["log","Protokoll"]];
 const STATS_BLOCKS=[["period","Zeitraum"],["tiles","Kennzahlen"],["chart","Diagramm je Tag"]];
 function uiBlocks(kind,blocks){
   const ui=(cfg&&cfg.ui)||{},all=blocks.map(b=>b[0]);
@@ -1809,7 +1964,7 @@ function layoutBlocks(root,B,order,weights){
   const shown=order.filter(id=>B[id]);
   const segs=[];let cur=null;
   shown.forEach(id=>{
-    if(id==="kpis"){cur=null;segs.push({full:id});}
+    if(id==="kpis"||id==="modes"){cur=null;segs.push({full:id});}
     else{if(!cur){cur={ids:[]};segs.push(cur);}cur.ids.push(id);}});
   segs.forEach(sg=>{
     if(!sg.ids)return;
@@ -1846,6 +2001,7 @@ function renderStatus(s){
   const [hl,sub]=headline(s);
   const mv=s.meter_view,mh=mv?SF.meters({items:mv.items,today:mv.today,show_day:mv.show_day,extra:mv.extra,compare:mv.compare,order:mv.order}):"";
   const B={banners};
+  B.modes=isClassic()?"":modesHtml(s);
   B.kpis=kpiHtml(s);
   B.meters=mh?`<div class="card"><h2>Heute und Zähler <a onclick="showPage('meters')">Verwalten</a></h2>${mh}</div>`:"";
   B.hero=`<div class="hero" style="margin:0"><div class="headline">${esc(hl)}</div><div class="sub">${esc(sub)}</div>
@@ -1886,9 +2042,276 @@ async function poll(){
   try{const s=await (await fetch("api/status")).json();if(scrolling()){lastStatus=s;return;}renderStatus(s);renderLog(s.events);}
   catch(e){$("#connpill").className="pill";$("#conntext").textContent="Getrennt";}
 }
+
+// ---------- 2.0: Änderungen, Modi, Ziele, Einstellungs-Übersicht ----------
+const CH_LABEL={"soc.min":"Mindest-Ladestand","soc.max":"Höchst-Ladestand","soc.hyst":"Hysterese","soc.eco_threshold":"Eco-Schwelle","soc.base_load":"Grundlast",
+  "control.min_gap":"Mindestabstand","control.offset_discharge":"Sicherheitsabstand","control.threshold_on":"Einschaltschwelle","control.threshold_off":"Ausschaltschwelle",
+  "enabled":"Regelung","dry_run":"Testmodus","grid.entity":"Netzzähler","features.cross_charge":"Umladen","features.strict_zero":"Abregelung","features.ac_charge":"Laden aus dem Netz",
+  "goals.reserve":"Regler Reserve","goals.precision":"Regler Genauigkeit","goals.care":"Regler Akku schonen","goals.mode":"Modus",
+  "state":"Betrieb","lim_res":"Notstromreserve","lim_dis":"Entladegrenze","lim_chg":"Ladeobergrenze","min_soc":"Eigener Mindest-Ladestand","max_soc":"Eigener Höchst-Ladestand",
+  "write_limits":"Grenzen schreiben","num":"Leistung","dir":"Richtung","soc":"Ladestand","pv":"PV-Leistung","driver":"Speichertyp","name":"Name","capacity_kwh":"Kapazität",
+  "max_dis":"Max. Entladeleistung","max_chg":"Max. Ladeleistung","can_charge":"Laden aus dem Netz","curtail":"Abregeln","observe":"Nur beobachten"};
+function flatCfg(o,p,out){out=out||{};p=p||"";
+  if(Array.isArray(o)){o.forEach((v,i)=>flatCfg(v,p?p+"."+i:String(i),out));if(!o.length)out[p]="[]";}
+  else if(o&&typeof o==="object"){for(const k of Object.keys(o))flatCfg(o[k],p?p+"."+k:k,out);}
+  else out[p]=o;return out;}
+function changeList(){
+  if(!cfg||!baseCfg)return [];
+  const a=flatCfg(baseCfg),b=flatCfg(cfg);
+  return [...new Set([...Object.keys(a),...Object.keys(b)])].filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k]));}
+function changeLabel(path){
+  const m=path.match(/^units\.(\d+)\.(.+)$/);
+  if(m){const u=cfg.units[+m[1]]||{};return `${u.name||"Speicher "+(+m[1]+1)}: ${CH_LABEL[m[2]]||m[2]}`;}
+  const rm=path.match(/^rules\.(\d+)\./);
+  if(rm){const r=(cfg.rules||[])[+rm[1]]||{};return `Regel „${r.name||"neu"}“`;}
+  if(path.startsWith("reports."))return "Wochenbericht";
+  if(path==="rules")return "Regeln";
+  return CH_LABEL[path]||path.split(".").slice(-1)[0];}
+function updateSavebar(){
+  const n=changeList(),msg=$("#savemsg"),dc=$("#discard");
+  if(!msg)return;
+  if(!dirty&&!n.length){if(dc)dc.style.display="none";return;}
+  const names=[...new Set(n.map(changeLabel))];
+  msg.textContent=n.length?`${names.length} Änderung${names.length===1?"":"en"}: ${names.slice(0,3).join(", ")}${names.length>3?" …":""}`:"Du hast ungespeicherte Änderungen";
+  if(dc)dc.style.display=dirty?"":"none";}
+$("#discard").addEventListener("click",()=>{
+  if(!dirty||!baseCfg)return;
+  cfg=JSON.parse(JSON.stringify(baseCfg));dirty=false;goalState=null;goalDerived=null;renderForms();
+  if(curPage==="goals")renderGoals();if(curPage==="settings")renderSettings();if(curPage==="look")renderLook();
+  $("#savemsg").textContent="Änderungen verworfen";$("#discard").style.display="none";toast("Änderungen verworfen");});
+
+// ---- Modi ----
+let goalsData=null;
+async function loadGoals(){try{const j=await (await fetch("api/goals")).json();if(j&&Array.isArray(j.modes)){goalsData=j;goalState=null;goalDerived=null;}}catch(e){}}
+function modeId(s){return (s&&s.mode_id!==undefined?s.mode_id:goalsData&&goalsData.mode)||null;}
+function modesHtml(s){
+  if(!goalsData)return "";
+  const on=modeId(s);
+  return `<div class="modes" role="group" aria-label="Modus">${goalsData.modes.map(m=>
+    `<button type="button" class="mode${m.id===on?" on":""}" data-mode="${esc(m.id)}" aria-pressed="${m.id===on}" title="${esc(m.text||"")}"><span class="e">${esc(m.icon||"")}</span><span><b>${esc(m.name)}</b><small>${m.id===on?"aktiv":esc(m.text||"")}</small></span>${m.custom?`<span class="x" data-modedel="${esc(m.id)}" title="Modus löschen">✕</span>`:""}</button>`).join("")}
+    <button type="button" class="mode add" data-modeadd="1">＋ Eigener Modus</button></div>`;}
+async function activateMode(id){
+  if(dirty&&!confirm("Du hast ungespeicherte Änderungen. Sie gehen beim Wechsel des Modus verloren. Fortfahren?"))return;
+  try{
+    const r=await (await fetch("api/goals/mode",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})).json();
+    if(!r.ok)throw new Error(r.error||"Fehler");
+    cfg=await (await fetch("api/config")).json();baseCfg=JSON.parse(JSON.stringify(cfg));dirty=false;updateSavebar();
+    goalsData=r;renderForms();
+    const m=(r.modes||[]).find(x=>x.id===id);toast(`Modus „${m?m.name:id}“ aktiv`);
+    if(lastStatus){lastStatus.mode_id=id;renderStatus(lastStatus);}
+    if(curPage==="goals")renderGoals();
+  }catch(e){toast("Modus konnte nicht gesetzt werden: "+e.message);}}
+async function addMode(){
+  const name=(prompt("Name für den neuen Modus (er übernimmt die aktuellen Regler):","")||"").trim();
+  if(!name)return;
+  const g=goalsData?goalsData.goals:undefined;
+  try{
+    const r=await (await fetch("api/goals/custom",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,goals:g})})).json();
+    if(!r.ok)throw new Error(r.error||"Fehler");
+    goalsData=r;toast(`Modus „${name}“ angelegt`);if(lastStatus)renderStatus(lastStatus);
+  }catch(e){toast("Modus konnte nicht angelegt werden: "+e.message);}}
+document.addEventListener("click",async e=>{
+  const del=e.target.closest("[data-modedel]");
+  if(del){e.stopPropagation();if(!confirm("Diesen eigenen Modus löschen?"))return;
+    try{const r=await (await fetch("api/goals/custom/"+encodeURIComponent(del.dataset.modedel),{method:"DELETE"})).json();goalsData=r;if(lastStatus)renderStatus(lastStatus);toast("Modus gelöscht");}catch(x){toast("Löschen fehlgeschlagen");}return;}
+  const b=e.target.closest("[data-mode]");if(b){activateMode(b.dataset.mode);return;}
+  if(e.target.closest("[data-modeadd]"))addMode();});
+
+// ---- Ziele & Verhalten ----
+let goalState=null,goalDerived=null,goalTimer=null;
+const GOAL_DEF=[
+  ["reserve","Reserve für den Abend","Wie viel Akku soll tagsüber für die Nacht übrig bleiben?",["wenig","ausgewogen","viel"],d=>d?`≈ ${d["soc.min"]} % Mindestladung`:""],
+  ["precision","Netzbezug vermeiden","Wie genau soll SOLASI auf Null regeln?",["entspannt","genau","sehr genau"],d=>d?`Mindestabstand ${d["control.min_gap"]} s · Sicherheitsabstand ${d["control.offset_discharge"]} W`:""],
+  ["care","Akku schonen","Weniger tief entladen und nicht immer ganz voll laden.",["Leistung","ausgewogen","Lebensdauer"],d=>d?`Höchstens ${d["soc.max"]} % laden`:""]];
+function goalCur(path){return get(path);}
+function goalRows(){
+  const rows=(goalsData&&goalsData.table)||[],want=goalDerived||{};
+  return rows.map(r=>{const cur=goalCur(r.path),dv=want[r.path]!==undefined?want[r.path]:r.derived;return {...r,current:cur,derived:dv,custom:String(cur)!==String(dv)};});}
+function goalsTable(){
+  return `<table class="vtab"><tr><th>Wert</th><th>Aktuell</th><th>Vom Regler berechnet</th><th></th></tr>${goalRows().map(r=>
+    `<tr><td>${esc(r.label)}</td><td><input type="number" id="g_t_${esc(r.path.replace(/\./g,"_"))}" data-gpath="${esc(r.path)}" value="${esc(r.current==null?"":r.current)}"> ${esc(r.unit)}</td><td class="sub">${esc(r.derived)} ${esc(r.unit)}</td>
+    <td><span class="tag ${r.custom?"warn":"ok"}">${r.custom?"angepasst":"wie berechnet"}</span></td></tr>`).join("")}</table>`;}
+function renderGoals(){
+  const box=$("#p-goals");
+  if(!goalsData){box.innerHTML=`<div class="card">Lade …</div>`;loadGoals().then(()=>{if(curPage==="goals")renderGoals();});return;}
+  if(!goalState)goalState={...goalsData.goals};
+  const modes=goalsData.modes,on=modeId(lastStatus);
+  box.innerHTML=`<div class="card"><h2 style="margin:0 0 4px;font-size:17px">Was ist dir wichtig?</h2><div class="sub" style="margin-bottom:6px">SOLASI rechnet aus den Reglern die Feineinstellungen. Gespeichert wird erst mit „Speichern“. Einen kompletten Modus wählst du in der Übersicht.</div>
+    <div class="sub">Aktueller Modus: <b>${on?esc((modes.find(m=>m.id===on)||{}).name||on):"Eigene Einstellung"}</b></div>
+    ${GOAL_DEF.map(([k,t,d,labs,txt])=>`<div class="rngrow"><b>${t}</b><span class="sub">${d}</span>
+      <input type="range" min="0" max="100" step="1" id="g_${k}" value="${goalState[k]}" aria-label="${t}">
+      <div class="rnglab"><span>${labs[0]}</span><span>${labs[1]}</span><span>${labs[2]}</span></div>
+      <span class="rngval" id="gv_${k}">${txt(goalDerived||goalsData.derived)}</span></div>`).join("")}</div>
+    <details class="fsec" style="margin-top:14px" ${expert?"open":""}><summary>Alle Werte einzeln <span class="sub">Profi: jeden Wert von Hand ändern</span></summary><div class="fbody" id="g_table" style="padding-top:8px">${goalsTable()}
+      <div class="hint sub" style="margin:8px 0">Die Regler rechnen diese Werte. Änderst du einen Wert von Hand, steht „angepasst“ daneben, und der Regler überschreibt ihn erst wieder, wenn du ihn bewegst. Alle weiteren Werte stehen unter „Regelung“.</div>
+      <button type="button" class="ghost" data-p="control">Alle Regelungswerte öffnen</button></div></details>
+    <div class="card" style="margin-top:14px"><h3>Vor dem Speichern prüfen</h3><div class="sub">Das Was-wäre-wenn rechnet neue Einstellungen mit deinen echten Messwerten der letzten Stunden durch.</div>
+      <p style="margin:10px 0 0"><button type="button" class="ghost" data-p="replay">Was-wäre-wenn öffnen</button></p></div>`;
+  GOAL_DEF.forEach(([k])=>{document.getElementById("g_"+k).addEventListener("input",e=>{goalState[k]=+e.target.value;goalsPreview();});});
+  box.querySelectorAll("[data-gpath]").forEach(i=>i.addEventListener("input",()=>{
+    const v=i.value===""?null:parseFloat(i.value);set(i.dataset.gpath,v);
+    const r=goalRows().find(x=>x.path===i.dataset.gpath),tag=i.closest("tr").querySelector(".tag");
+    if(r&&tag){tag.className="tag "+(r.custom?"warn":"ok");tag.textContent=r.custom?"angepasst":"wie berechnet";}}));}
+function goalsPreview(){
+  clearTimeout(goalTimer);
+  goalTimer=setTimeout(async()=>{
+    try{
+      const r=await (await fetch("api/goals/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(goalState)})).json();
+      if(!r||!r.derived)return;
+      goalDerived=r.derived;
+      for(const [path,v] of Object.entries(r.derived))set(path,v);
+      cfg.goals={mode:"",...r.goals};
+      GOAL_DEF.forEach(([k,,,,txt])=>{const el=document.getElementById("gv_"+k);if(el)el.textContent=txt(goalDerived);});
+      const t=document.getElementById("g_table");if(t&&t.firstElementChild)t.firstElementChild.outerHTML=goalsTable();
+      t&&t.querySelectorAll("[data-gpath]").forEach(i=>i.addEventListener("input",()=>{
+        const v=i.value===""?null:parseFloat(i.value);set(i.dataset.gpath,v);
+        const rr=goalRows().find(x=>x.path===i.dataset.gpath),tag=i.closest("tr").querySelector(".tag");
+        if(rr&&tag){tag.className="tag "+(rr.custom?"warn":"ok");tag.textContent=rr.custom?"angepasst":"wie berechnet";}}));
+    }catch(e){}},140);}
+
+// ---- Einstellungen: Übersicht ----
+function renderSettings(){
+  const me=meInfo;
+  const s=lastStatus||{},us=s.units||[],ok=us.filter(u=>u.available&&!u.paused).length;
+  const m=goalsData&&goalsData.modes.find(x=>x.id===modeId(s));
+  const T=[["units","🔋","Meine Speicher","Geräte, Reserve, Grenzen, Betrieb",us.length?[`${ok} von ${us.length} bereit`,ok===us.length?"ok":"warn"]:["noch keine Daten","mut"]],
+    ["goals","🎯","Ziele & Verhalten","Reserve, Genauigkeit, Akku schonen",[m?`Modus: ${m.name}`:"Eigene Einstellung","mut"]],
+    ["meters","⚡","Strom & Zähler","Hausverbrauch, Netz, Solar, eigene Zähler",[s.meter_ok===false?"Zähler ohne Meldung":s.meter_ok?"Zähler in Ordnung":"–",s.meter_ok===false?"warn":s.meter_ok?"ok":"mut"]],
+    ["surplus","☀️","Überschuss","Verbraucher bei Überschuss schalten",[cfg&&cfg.surplus&&cfg.surplus.enabled?"an":"aus","mut"]],
+    ["extras","🛡️","Sicherheit & Meldungen","Not-Aus, Rückfall, Wartung, Push",[s.safety&&s.safety.state==="stopped"?"gestoppt":"aktiv",s.safety&&s.safety.state==="stopped"?"warn":"ok"]],
+    ["look","🖥️","Darstellung & Karte","Energiefluss, Dashboard-Karte, Farben",["Vorschau live","mut"]],
+    ["control","🎚️","Regelung (alle Werte)","Alle Einzelwerte für Profis",["Experte","mut"]],
+    ["accounts","👤","Konten & Zugang","Wer darf was – eigener Port mit Anmeldung",[me.direct?`angemeldet: ${me.name}`:"Home Assistant","mut"]],
+    ["mqtt","🔌","Verbindungen","Home Assistant, MQTT, Entitäten",[s.connected===false?"nicht verbunden":"verbunden",s.connected===false?"warn":"ok"]]];
+  $("#p-settings").innerHTML=`<div class="hub">${T.map(([id,ic,t,d,st])=>`<button type="button" class="cat" data-p="${id}"><div class="ic">${ic}</div><b>${t}</b><p>${d}</p><div class="st ${st[1]}">${st[1]==="ok"?"● ":""}${esc(st[0])}</div></button>`).join("")}</div>
+    <div class="card"><h3>Ansicht</h3><label class="tg" style="display:inline-flex"><input type="checkbox" id="set_classic" ${isClassic()?"checked":""}><i></i>Klassische Ansicht</label>
+      <div class="hint sub" style="margin-top:6px">Die alte Menüführung ohne Modi und Einstellungs-Übersicht. Alle Seiten und Werte bleiben gleich; gilt nur für dieses Gerät.</div></div>`;
+  $("#set_classic").addEventListener("change",e=>{lookSet("classic",e.target.checked?"1":"0");renderNav();showPage(isClassic()?"control":"settings");if(lastStatus)renderStatus(lastStatus);});}
+
+loadMe();
 loadAll().then(()=>{
   const sp=lookGet("start","status");if(sp!=="status"&&cfg&&cfg.grid.entity)showPage(sp);
   poll();setInterval(poll,2000);});
+
+// ---- Suche & Fragen (Strg+K) ----
+let palSel=0,palItems=[];
+function palBuild(q){
+  const ql=q.trim().toLowerCase(),out=[];
+  const add=(icon,label,hint,run)=>out.push({icon,label,hint,run});
+  const m=ql.match(/(reserve|präzision|praezision|schonung)\D{0,12}(\d{1,3})/);
+  if(m){const key={reserve:"reserve","präzision":"precision",praezision:"precision",schonung:"care"}[m[1]],v=Math.min(100,+m[2]),nm={reserve:"Reserve",precision:"Präzision",care:"Schonung"}[key];
+    add("🎚️",`${nm} auf ${v} % stellen`,"Befehl",async()=>{try{const r=await (await fetch("api/goals/set",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({[key]:v})})).json();if(!r.ok)throw 0;cfg=await (await fetch("api/config")).json();baseCfg=JSON.parse(JSON.stringify(cfg));goalsData=r;renderForms();toast(`${nm} auf ${v} % gestellt`);}catch(e){toast("Konnte den Regler nicht setzen");}});}
+  const pages=[...NAVS.flatMap(g=>g[1]),...navFoot(),...setSub()];
+  const seen=new Set();
+  for(const [id,l] of pages){if(seen.has(id))continue;seen.add(id);if(!ql||l.toLowerCase().includes(ql))add("📄",l,"Seite",()=>showPage(id));}
+  if(goalsData)for(const md of goalsData.modes||[])if(!ql||("modus "+md.name).toLowerCase().includes(ql)||md.name.toLowerCase().includes(ql))add(md.icon||"🎯",`Modus: ${md.name}`,"Modus aktivieren",()=>activateMode(md.id));
+  const acts=[["Speicher hinzufügen","Aktion",()=>{showPage("units");setTimeout(()=>{const b=document.getElementById("addunit");if(b)b.click();},50);}],
+    ["Änderungen speichern","Aktion",()=>save()],["Klassische Ansicht umschalten","Aktion",()=>{showPage("settings");}]];
+  for(const [l,h,f] of acts)if(!ql||l.toLowerCase().includes(ql))add("⚡",l,h,f);
+  if(/\?|^(wann|warum|wieso|was|wie|wer|wo|hat|ist)\b/.test(ql)){
+    const words=ql.replace(/[?.,!]/g,"").split(/\s+/).filter(w=>w.length>3&&!["wann","warum","wieso","wurde","wurden","gestern","heute","welche","hatte","wieviel"].includes(w));
+    const ev=((lastStatus&&lastStatus.events)||[]).filter(e=>words.some(w=>String(e.msg).toLowerCase().includes(w.slice(0,Math.max(4,w.length-2))))).slice(0,5);
+    for(const e of ev)add("💬",e.msg,new Date(e.ts*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}),()=>showPage("log"));
+    if(!ev.length)add("💬","Dazu steht nichts im Protokoll","Antwort",()=>showPage("log"));
+  }
+  return out.slice(0,12);
+}
+function palRender(){
+  const q=document.getElementById("palq").value;palItems=palBuild(q);if(palSel>=palItems.length)palSel=0;
+  document.getElementById("pallist").innerHTML=palItems.map((it,i)=>`<li data-pal="${i}" class="${i===palSel?"on":""}"><span>${it.icon}</span><span>${esc(it.label)}</span><small>${esc(it.hint)}</small></li>`).join("")||`<li>Nichts gefunden</li>`;
+}
+function palOpen(){let o=document.getElementById("pal");if(!o){o=document.createElement("div");o.id="pal";o.innerHTML=`<div class="box" role="dialog" aria-label="Suchen und Fragen"><input id="palq" placeholder="Seite, Modus, Befehl oder Frage …" autocomplete="off"><ul id="pallist"></ul><div class="hint">Beispiele: „Reserve auf 40 %“ · „Urlaub“ · „Wann hat DACH umgeladen?“</div></div>`;document.body.appendChild(o);
+  o.addEventListener("click",e=>{if(e.target===o)palClose();const li=e.target.closest("[data-pal]");if(li)palRun(+li.dataset.pal);});
+  document.getElementById("palq").addEventListener("input",()=>{palSel=0;palRender();});
+  document.getElementById("palq").addEventListener("keydown",e=>{if(e.key==="ArrowDown"){palSel=Math.min(palSel+1,palItems.length-1);palRender();e.preventDefault();}else if(e.key==="ArrowUp"){palSel=Math.max(palSel-1,0);palRender();e.preventDefault();}else if(e.key==="Enter"){palRun(palSel);}});}
+  o.classList.add("on");const q=document.getElementById("palq");q.value="";palSel=0;palRender();q.focus();}
+function palClose(){const o=document.getElementById("pal");if(o)o.classList.remove("on");}
+function palRun(i){const it=palItems[i];if(!it)return;palClose();it.run();}
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();palOpen();}else if(e.key==="Escape")palClose();});
+document.addEventListener("click",e=>{if(e.target.closest("#palbtn"))palOpen();});
+
+// ---- Automatik: Zeitpläne & Wenn-dann ----
+const WHEN_KINDS=[["time","zu einer Uhrzeit"],["soc_below","der Ladestand fällt unter"],["soc_above","der Ladestand steigt über"],["grid_above","der Netzbezug zu hoch ist"],["pv_above","die Solarleistung hoch ist"]];
+const THEN_KINDS=[["mode","wechsle den Modus"],["notify","schicke mir eine Meldung"]];
+const WD=["Mo","Di","Mi","Do","Fr","Sa","So"];
+let reportPreview=null;
+function ruleDefault(){return {id:"r"+Date.now().toString(36),name:"Neue Regel",enabled:true,when:{kind:"time",at:"22:00",days:[0,1,2,3,4,5,6]},then:{kind:"mode",mode:"care"}};}
+function ruleHtml(r,i){
+  const w=r.when,t=r.then,modes=(goalsData&&goalsData.modes)||[];
+  const sel=(attr,opts,cur)=>`<select ${attr}>${opts.map(([v,l])=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`).join("")}</select>`;
+  let wp="";
+  if(w.kind==="time")wp=`<input type="time" data-rf="when.at" value="${esc(w.at)}"> <span class="wd">${WD.map((d,k)=>`<label><input type="checkbox" data-rday="${k}"${w.days.includes(k)?" checked":""}>${d}</label>`).join(" ")}</span>`;
+  else if(w.kind==="soc_below"||w.kind==="soc_above")wp=`<input type="number" min="0" max="100" data-rf="when.value" value="${esc(w.value)}" style="width:80px"> %`;
+  else if(w.kind==="grid_above")wp=`<input type="number" min="0" data-rf="when.value" value="${esc(w.value)}" style="width:90px"> W länger als <input type="number" min="0" max="120" data-rf="when.minutes" value="${esc(w.minutes)}" style="width:70px"> Min.`;
+  else wp=`<input type="number" min="0" data-rf="when.value" value="${esc(w.value)}" style="width:90px"> W`;
+  const tp=t.kind==="mode"?sel("data-rf=\"then.mode\"",modes.map(m=>[m.id,m.name]),t.mode):`<input type="text" data-rf="then.text" value="${esc(t.text||"")}" placeholder="Text der Meldung" style="min-width:200px">`;
+  return `<div class="card rule" data-ri="${i}" style="margin-bottom:10px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="text" data-rf="name" value="${esc(r.name)}" style="font-weight:700;flex:1;min-width:140px" aria-label="Name der Regel"><label class="tg"><input type="checkbox" data-rf="enabled"${r.enabled?" checked":""}><i></i>an</label><button type="button" class="ghost" data-rdel="${i}" title="Regel löschen">✕</button></div>
+  <div style="margin-top:8px"><b>Wenn</b> ${sel("data-rf=\"when.kind\"",WHEN_KINDS,w.kind)} ${wp}</div>
+  <div style="margin-top:6px"><b>dann</b> ${sel("data-rf=\"then.kind\"",THEN_KINDS,t.kind)} ${tp}</div></div>`;}
+function renderAuto(){
+  const el=$("#p-auto");if(!el)return;
+  const rules=cfg.rules||[];
+  el.innerHTML=`<div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Automatik</h2><div class="sub">Lege fest, was SOLASI von allein tun soll – zum Beispiel abends den Modus „Akku schonen“ einschalten oder dir Bescheid sagen, wenn der Speicher fast leer ist. Meldungen gehen an den Dienst, den du unter <a href="#" data-p="extras" style="color:var(--accent-d);font-weight:700">Sicherheit &amp; Meldungen</a> eingestellt hast.</div></div>
+  <div id="rules">${rules.map(ruleHtml).join("")||`<div class="sub" style="padding:8px 2px">Noch keine Regeln.</div>`}</div>
+  <button type="button" class="udev add" id="addrule" ${rules.length>=30?"disabled":""}>＋ Regel hinzufügen</button>
+  <div class="card" style="margin-top:14px"><h2 style="margin:0 0 6px">Wochenbericht</h2><label class="tg"><input type="checkbox" id="rep_weekly"${cfg.reports&&cfg.reports.weekly?" checked":""}><i></i>Jeden Montag um 8 Uhr per Meldung senden</label>
+  <div class="sub" style="margin-top:8px;white-space:pre-line" id="repbox">${reportPreview?`<b>${esc(reportPreview.title)}</b>\n${esc(reportPreview.text)}`:"Lade Vorschau …"}</div></div>`;
+  if(!reportPreview)fetch("api/report").then(r=>r.json()).then(j=>{if(j&&j.text){reportPreview=j;if(curPage==="auto")renderAuto();}}).catch(()=>{});
+}
+function ruleSet(r,path,v){const [a,b]=path.split(".");if(b)r[a][b]=v;else r[a]=v;}
+document.addEventListener("change",e=>{
+  const f=e.target.closest("#p-auto [data-rf]"),box=e.target.closest("#p-auto .rule");
+  if(f&&box){
+    const r=cfg.rules[+box.dataset.ri],p=f.dataset.rf;
+    let v=f.type==="checkbox"?f.checked:f.type==="number"?+f.value:f.value;
+    ruleSet(r,p,v);
+    if(p==="when.kind"){const k=v;r.when={kind:k,...(k==="time"?{at:"22:00",days:[0,1,2,3,4,5,6]}:k.startsWith("soc")?{value:20}:k==="grid_above"?{value:2000,minutes:5}:{value:3000})};}
+    if(p==="then.kind"){r.then=v==="mode"?{kind:"mode",mode:((goalsData&&goalsData.modes[0])||{}).id||"balanced"}:{kind:"notify",text:""};}
+    markDirty();if(/kind$/.test(p))renderAuto();return;}
+  const dy=e.target.closest("#p-auto [data-rday]");
+  if(dy&&box){const r=cfg.rules[+box.dataset.ri],k=+dy.dataset.rday,ds=new Set(r.when.days);dy.checked?ds.add(k):ds.delete(k);r.when.days=[...ds].sort();markDirty();return;}
+  if(e.target.id==="rep_weekly"){cfg.reports=cfg.reports||{};cfg.reports.weekly=e.target.checked;markDirty();}
+});
+document.addEventListener("click",e=>{
+  if(e.target.closest("#addrule")){cfg.rules=cfg.rules||[];cfg.rules.push(ruleDefault());markDirty();renderAuto();return;}
+  const d=e.target.closest("[data-rdel]");if(d){cfg.rules.splice(+d.dataset.rdel,1);markDirty();renderAuto();}
+});
+
+// ---- Konten & Rollen ----
+let meInfo={name:"Home Assistant",role:"owner",direct:false},acctData=null;
+async function loadMe(){
+  try{const j=await (await fetch("api/me")).json();if(j&&j.role){meInfo=j;document.body.dataset.role=j.role;}}catch(e){}
+}
+async function loadAccounts(){
+  const el=$("#p-accounts");
+  if(meInfo.role!=="owner"){el.innerHTML=`<div class="card"><h2>Konten &amp; Zugang</h2><div class="sub">Du bist als <b>${esc(meInfo.name)}</b> angemeldet (${esc((meInfo.roles||{})[meInfo.role]||meInfo.role)}). Konten verwaltet nur ein Besitzer.</div><button type="button" class="ghost" id="logoutbtn" style="margin-top:10px">Abmelden</button></div>`;return;}
+  try{const j=await (await fetch("api/accounts")).json();if(j&&Array.isArray(j.users)){acctData=j;}}catch(e){}
+  renderAccounts();
+}
+function renderAccounts(){
+  const el=$("#p-accounts"),users=(acctData&&acctData.users)||[],roles=(acctData&&acctData.roles)||{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"};
+  const ro=sel=>Object.entries(roles).map(([k,l])=>`<option value="${k}"${k===sel?" selected":""}>${l}</option>`).join("");
+  el.innerHTML=`<div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Konten &amp; Zugang</h2>
+  <div class="sub"><b>Besitzer</b> darf alles. <b>Mitbewohner</b> darf Modus wechseln und den Not-Aus bedienen. <b>Nur lesen</b> darf alles ansehen. Über Home Assistant bist du automatisch angemeldet – Konten brauchst du nur für den eigenen Zugang ohne Home Assistant.</div></div>
+  <div id="acctlist">${users.map(u=>`<div class="card" style="margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap" data-acct="${esc(u.name)}"><b style="flex:1;min-width:120px">👤 ${esc(u.name)}</b><select data-arole="${esc(u.name)}" aria-label="Rolle von ${esc(u.name)}">${ro(u.role)}</select><button type="button" class="ghost" data-apw="${esc(u.name)}">Passwort ändern</button><button type="button" class="ghost" data-adel="${esc(u.name)}" title="Konto löschen">✕</button></div>`).join("")||`<div class="sub" style="padding:6px 2px">Noch kein Konto. Lege zuerst ein Besitzer-Konto an – erst dann ist der eigene Zugang nutzbar.</div>`}</div>
+  <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Neues Konto</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="an_name" placeholder="Name" autocomplete="off" style="flex:1;min-width:120px"><input id="an_pw" type="password" placeholder="Passwort (mind. 8 Zeichen)" autocomplete="new-password" style="flex:1;min-width:160px"><select id="an_role">${ro(users.length?"member":"owner")}</select><button type="button" class="primary" id="an_add">Anlegen</button></div><div id="an_msg" class="sub" style="margin-top:6px"></div></div>
+  <div class="card" style="margin-top:12px"><h3 style="margin:0 0 6px">Eigener Port</h3><div class="sub">Mit einem eigenen Port erreichst du SOLASI direkt, ohne den Umweg über Home Assistant: Öffne in Home Assistant <b>Einstellungen → Add-ons → SOLASI → Konfiguration → Netzwerk</b> und trage bei „8100/tcp“ einen Port ein (z. B. 8100). Danach: <code>http://&lt;Adresse-von-Home-Assistant&gt;:8100</code>. Leer lassen = aus. Der Port verlangt immer eine Anmeldung; ohne Konto lässt er niemanden herein. Nutze ihn nur im Heimnetz, nicht im Internet.</div></div>`;
+}
+async function acctCall(method,url,body){
+  const r=await fetch(url,{method,headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+  const j=await r.json();if(!j.ok)throw new Error(j.error||"Fehler");acctData={...acctData,users:j.users};renderAccounts();return j;}
+document.addEventListener("click",async e=>{
+  if(e.target.closest("#an_add")){const msg=$("#an_msg");
+    try{await acctCall("POST","api/accounts",{create:true,name:$("#an_name").value,password:$("#an_pw").value,role:$("#an_role").value});toast("Konto angelegt");}catch(x){msg.textContent=x.message;}return;}
+  const pw=e.target.closest("[data-apw]");if(pw){const n=prompt(`Neues Passwort für ${pw.dataset.apw} (mind. 8 Zeichen):`,"");if(!n)return;
+    try{await acctCall("POST","api/accounts",{name:pw.dataset.apw,password:n});toast("Passwort geändert");}catch(x){toast(x.message);}return;}
+  const dl=e.target.closest("[data-adel]");if(dl){if(!confirm(`Konto „${dl.dataset.adel}“ löschen?`))return;
+    try{await acctCall("DELETE","api/accounts/"+encodeURIComponent(dl.dataset.adel));toast("Konto gelöscht");}catch(x){toast(x.message);}return;}
+  if(e.target.closest("#logoutbtn")){await fetch("api/logout",{method:"POST"});location.reload();}
+});
+document.addEventListener("change",async e=>{
+  const r=e.target.closest("[data-arole]");if(r){try{await acctCall("POST","api/accounts",{name:r.dataset.arole,role:r.value});toast("Rolle geändert");}catch(x){toast(x.message);loadAccounts();}}
+});
 </script>
 </body>
 </html>
