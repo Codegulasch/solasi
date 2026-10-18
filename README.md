@@ -2,6 +2,10 @@
 
 # SOLASI – Nulleinspeisung und Energieregelung für Heimspeicher
 
+🇬🇧 [English version](README.en.md)
+
+> **🧪 Beta:** SOLASI ist noch in der Beta-Phase. Es wurde an einer Anlage mit Anker SOLIX (Solarbank 4) entwickelt und im Alltag erprobt; andere Speichertypen sind nach den Beschreibungen ihrer Integrationen umgesetzt und bisher nur in Simulationen geprüft. Es steuert echte Hardware, Fehler sind möglich. Fang immer im **Testmodus** an, behalte den **Not-Aus** im Blick und prüfe neue Funktionen (zum Beispiel Netz-Laden und Entladesperre) zuerst mit kurzen Versuchen. Die Nutzung erfolgt auf eigene Verantwortung. Rückmeldungen und Fehlerberichte sind willkommen.
+
 SOLASI ist ein Add-on für **Home Assistant**. Es steuert deinen Batteriespeicher so, dass dein Haus möglichst viel von dem Strom verbraucht, den deine
 Solaranlage erzeugt: kaum Einspeisung ins Netz, kaum Bezug aus dem Netz. Alles läuft **lokal** auf deinem Home Assistant, ohne Cloud und ohne Konto.
 

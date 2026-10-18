@@ -962,7 +962,8 @@ const SF = (() => {
       const stopped = ks && ks.state === "on";
       const killBtn = ks ? `<button type="button" class="kill ${stopped ? "go" : this._armed ? "arm" : ""}" data-kill="1">${stopped ? "Fortsetzen" : this._armed ? "Wirklich stoppen?" : "Not-Aus"}</button>` : "";
       const when = st && st.last_updated ? `<span class="when">${ago(st.last_updated)}</span>` : "";
-      const canOpen = c.tap_open && a2.addon_slug;
+      const openPath = c.open_path || (a2.addon_slug ? `/hassio/ingress/${a2.addon_slug}` : "");
+      const canOpen = c.tap_open && openPath;
       const stale = a2.card_version && !VERSION.startsWith("__") && a2.card_version !== VERSION
         ? `<div class="oldv">Karte v${esc(VERSION)} ist veraltet (Add-on v${esc(a2.card_version)}). Bitte Seite neu laden bzw. in der App den Frontend-Cache leeren.</div>` : "";
       const head0 = c.title || killBtn ? `<div class="head"><span class="t">${esc(c.title)}</span>${pill}${when}${killBtn}</div>` : "";
@@ -971,7 +972,7 @@ const SF = (() => {
         ${head}${body}</ha-card>`;
       if (!ready) dbgNote(`Zustand ohne Inhalt: ${!this._hass ? "kein hass" : !st ? "Entität fehlt" : st.state}`);
       this._paint(html, ready);
-      this._slug = canOpen ? a2.addon_slug : "";
+      this._slug = canOpen ? openPath : "";
       this._kill = ks ? a2.kill_switch : "";
       this._stopped = stopped;
     }
@@ -1058,8 +1059,9 @@ const SF = (() => {
           }
         }
         if (this._slug) {
-          history.pushState(null, "", `/hassio/ingress/${this._slug}`);
-          window.dispatchEvent(new CustomEvent("location-changed", { bubbles: true, composed: true }));
+          // Wie die Standardaktion „Navigieren“ von Home Assistant
+          history.pushState(null, "", this._slug);
+          window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false }, bubbles: true, composed: true }));
         }
       });
     }
@@ -1101,7 +1103,7 @@ const SF = (() => {
         this._form = document.createElement("ha-form");
         this._form.computeLabel = s => ({ entity: "Entität", title: "Titel", size: "Größe", show_headline: "Überschrift zeigen",
           show_trend: "Tagesverlauf zeigen", show_meters: "Zählerreihe zeigen", meters_layout: "Anordnung der Zähler", show_batteries: "Speicher zeigen", show_surplus: "Überschuss zeigen", show_tags: "Hinweise zeigen",
-          show_kill: "Not-Aus-Knopf zeigen", tap_open: "Antippen öffnet SOLASI", accent: "Akzentfarbe (z. B. #3F5BD8)", gradient: "Farbverlauf im Hintergrund", meters_compare: "Vergleich mit gestern", flow_layout: "Energiefluss: Vorlage", flow_size: "Energiefluss: Größe", flow_hide: "Energiefluss: ausblenden", flow_grid_pos: "Energiefluss: Platz des Netzes", flow_passthrough: "Umgeladenen Strom als durchgereicht zeigen" }[s.name] || s.name);
+          show_kill: "Not-Aus-Knopf zeigen", tap_open: "Antippen öffnet SOLASI", open_path: "Pfad zum Öffnen (leer = automatisch)", accent: "Akzentfarbe (z. B. #3F5BD8)", gradient: "Farbverlauf im Hintergrund", meters_compare: "Vergleich mit gestern", flow_layout: "Energiefluss: Vorlage", flow_size: "Energiefluss: Größe", flow_hide: "Energiefluss: ausblenden", flow_grid_pos: "Energiefluss: Platz des Netzes", flow_passthrough: "Umgeladenen Strom als durchgereicht zeigen" }[s.name] || s.name);
         this._form.schema = [
           { name: "entity", selector: { entity: { domain: "sensor" } } },
           { name: "title", selector: { text: {} } },
@@ -1116,6 +1118,7 @@ const SF = (() => {
           { name: "show_tags", selector: { boolean: {} } },
           { name: "show_kill", selector: { boolean: {} } },
           { name: "tap_open", selector: { boolean: {} } },
+          { name: "open_path", selector: { text: {} } },
           { name: "accent", selector: { text: {} } },
           { name: "gradient", selector: { boolean: {} } },
           { name: "flow_layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Wie im Add-on" }, { value: "total", label: "Gesamt-Solar oben" }, { value: "pairs", label: "Paare" }, { value: "compact", label: "Kompakt" }] } } },

@@ -1,5 +1,13 @@
 # Änderungen
 
+🇬🇧 [English version](CHANGELOG.en.md)
+
+## 2.3.2
+- **Korrektur Entladesperre:** Die Uhrzeit ließ sich nicht eingeben, weil das Feld bei jeder Aktualisierung neu gezeichnet wurde. Es bleibt jetzt erhalten.
+- **Dashboard-Karte:** „Antippen öffnet SOLASI“ versucht den Add-on-Namen weiter abzurufen, wenn der Start nicht gelang, und die Seite „Dashboard-Karte“ zeigt, ob der Pfad bereit ist. Neu: Feld „Pfad zum Öffnen“ in der Karte (z. B. `/hassio/ingress/<add-on-name>`) als Ausweg.
+- **Beta-Hinweis** in README, Anleitung, Oberfläche und Add-on-Beschreibung (Add-on-Stufe „experimentell“).
+- **Englische Dokumentation:** README, Anleitung, Änderungen und Entwicklung gibt es jetzt auch auf Englisch.
+
 ## 2.3.1
 - **Entladesperre je Speicher:** Unter Betrieb → Laden lässt sich jeder Speicher einzeln sperren, auch ohne Laden-Auftrag, bis zu einer Uhrzeit oder bis zur Freigabe. Gesperrt gibt der Speicher nichts aus der Batterie ab; was die Module gerade liefern, geht weiter ins Haus. Anzeige in der Kopfzeile und auf der Dashboard-Karte, Sperren überstehen einen Neustart.
 - **Beim Laden-Auftrag:** „Währenddessen nicht entladen“ (Standard an) und „Danach halten“ (normal weiter, bis Uhrzeit oder bis zur Freigabe sperren), damit die Ladung für morgen erhalten bleibt.

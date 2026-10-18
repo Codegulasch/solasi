@@ -24,6 +24,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 "Inter",system-
 .brand svg{width:34px;height:34px;flex:none}
 .brand b{font-size:21px;letter-spacing:-.01em}
 .brand small{display:block;color:var(--muted);font-size:12px;margin-top:-3px}
+.betatag{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--test);border:1px solid var(--test);border-radius:6px;padding:0 5px;margin-left:4px;vertical-align:middle}
 .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:600;background:var(--chip);color:var(--muted)}
 .pill i{width:8px;height:8px;border-radius:50%;background:var(--bad)}
 .pill.ok i{background:var(--ok)}.pill.ok{color:var(--ok)}
@@ -327,7 +328,7 @@ body.dens-large{font-size:16.5px}
       <svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#f97316"/></linearGradient></defs>
         <g stroke="url(#lg)" stroke-width="4" stroke-linecap="round"><path d="M32 4v8M32 52v8M4 32h8M52 32h8M12 12l6 6M46 46l6 6M12 52l6-6M46 18l6-6"/></g>
         <circle cx="32" cy="32" r="15" fill="url(#lg)"/><circle cx="32" cy="32" r="7" fill="#fff7e0"/></svg>
-      <div><b>SOLASI</b><small>Dein Energie-Regler</small></div>
+      <div><b>SOLASI <span class="betatag" title="SOLASI ist in der Beta-Phase: Fehler sind möglich, im Testmodus anfangen">Beta</span></b><small>Dein Energie-Regler</small></div>
     </div>
     <nav class="nav" id="nav" aria-label="Hauptmenü"></nav>
     <div class="side-foot">
@@ -1298,6 +1299,8 @@ async function loadCard(){
         <div class="row"><span>Karte installiert</span><span class="tag ${ok?"ok":"warn"}">${ok?"ja":"nein, manuell nötig"}</span></div>
         <div class="row"><span>Dashboard-Ressource</span><span class="tag ${c.resource==="manuell"?"warn":"ok"}">${esc(c.resource)}</span></div>
         ${ok?`<div class="sub" style="margin-top:6px">Datei: ${esc(c.target)}</div>`:""}
+        <div class="row"><span>„Antippen öffnet SOLASI“</span><span class="tag ${c.slug?"ok":"warn"}">${c.slug?"bereit":"Pfad fehlt"}</span></div>
+        <div class="sub" style="margin-top:4px">${c.slug?`Pfad: <code>/hassio/ingress/${esc(c.slug)}</code>`:"SOLASI kennt seinen Add-on-Namen nicht (Supervisor nicht erreichbar). Trage in der Karte unter „Pfad zum Öffnen“ <code>/hassio/ingress/&lt;add-on-name&gt;</code> ein – den Namen siehst du in der Adresse, wenn du SOLASI in der Seitenleiste öffnest."}</div>
         ${c.restart_needed?`<div class="banner off" style="margin-top:10px">Der Ordner <b>www</b> wurde neu angelegt. Bitte Home Assistant einmal neu starten, damit er erreichbar ist.</div>`:""}
       </div>
       <div class="card"><h3>Karte hinzufügen</h3>
@@ -2670,6 +2673,9 @@ function renderChargeLive(){
 }
 function renderLocks(){
   const el=$("#chg_locks");if(!el)return;const lk=(lastStatus&&lastStatus.locks)||{},us=(cfg.units||[]).filter(u=>u.name);
+  const sig=JSON.stringify([lk,us.map(u=>u.name)]);
+  if(el.dataset.sig===sig&&el.firstChild)return;         // nur neu zeichnen, wenn sich etwas ändert – sonst geht die eingetippte Uhrzeit verloren
+  el.dataset.sig=sig;
   const fmt=t=>new Date(t*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
   const act=document.activeElement&&document.activeElement.id==="lk_until"?document.activeElement.value:null;
   el.innerHTML=`<h2 style="margin:0 0 6px">Entladesperre</h2>

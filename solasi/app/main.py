@@ -420,7 +420,7 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
 
     @routes.get("/api/card")
     async def card(_):
-        return web.json_response({**ctrl.card, "yaml": "type: custom:solasi-card\nentity: sensor.solasi"})
+        return web.json_response({**ctrl.card, "slug": ctrl.addon_slug, "yaml": "type: custom:solasi-card\nentity: sensor.solasi"})
 
     @routes.get("/card.js")
     async def card_js(_):
@@ -548,9 +548,24 @@ async def fetch_slug():
                              timeout=aiohttp.ClientTimeout(total=8)) as r:
                 if r.status == 200:
                     return ((await r.json()).get("data") or {}).get("slug", "")
+                log.warning("Add-on-Name: Supervisor antwortet mit Status %s", r.status)
     except Exception as e:  # noqa: BLE001
-        log.info("Add-on-Name nicht abrufbar: %s", e)
+        log.warning("Add-on-Name nicht abrufbar: %s", e)
     return ""
+
+
+async def slug_retry(ctrl):
+    """Der Add-on-Name wird für „Antippen öffnet SOLASI“ gebraucht. Gelingt der Abruf beim Start nicht, wird er weiter versucht."""
+    for wait in (15, 30, 60, 120, 300, 600, 600, 600):
+        if ctrl.addon_slug:
+            return
+        await asyncio.sleep(wait)
+        ctrl.addon_slug = await fetch_slug()
+        if ctrl.addon_slug:
+            ctrl.event("info", f"Add-on-Name gefunden ({ctrl.addon_slug}): „Antippen öffnet SOLASI“ in der Karte ist bereit")
+            ctrl.wake.set()
+            return
+    ctrl.event("warn", "Add-on-Name nicht abrufbar: „Antippen öffnet SOLASI“ braucht den Pfad von Hand (Karte → Pfad zum Öffnen)")
 
 
 async def main():
@@ -560,6 +575,7 @@ async def main():
             api_url=HA_API_URL, on_connected=lambda: ctrl.post_connect())
     ctrl.ha = ha
     ctrl.addon_slug = await fetch_slug()
+    asyncio.create_task(slug_retry(ctrl))
     target, created = install_card()
     full_url = f"{CARD_BASE_URL}?v={VERSION}"
     ctrl.card.update(installed=bool(target), target=target or "", url=full_url, base_url=CARD_BASE_URL,

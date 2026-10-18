@@ -138,7 +138,13 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  ok(mi==="sensor.w1"&&navd===0,"Tipp auf Zählerkachel öffnet den Verlauf des Zählers in HA (nicht das Add-on)");
  el6.shadowRoot.querySelector('[data-tile="day"]').click();
  ok(navd===1,"Tipp auf Tagesverbrauch öffnet das Add-on");
- ok(el6.getCardSize()>=3,"getCardSize liefert eine Zahl");}
+ ok(el6.getCardSize()>=3,"getCardSize liefert eine Zahl");
+ // eigener Pfad, wenn der Add-on-Name fehlt
+ const el7=w.document.createElement("solasi-card");w.document.body.appendChild(el7);el7.setConfig({open_path:"/hassio/ingress/xyz_solasi"});
+ el7.hass={states:st("Entladen",{...a6})};
+ let nav7=0;w.addEventListener("location-changed",()=>nav7++);
+ el7.shadowRoot.querySelector('[data-tile="day"]').click();
+ ok(nav7===1&&w.location.pathname==="/hassio/ingress/xyz_solasi","Karte: eigener Pfad öffnet SOLASI, auch ohne Add-on-Namen");}
 
 { // zwei Anlagen: je Solar und Speicher eine Kachel, kWh, Speicher-Fläche im Verlauf
  const now=Math.floor(Date.now()/1000),n=30;

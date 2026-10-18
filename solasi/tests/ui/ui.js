@@ -503,6 +503,8 @@ const w=dom.window,d=w.document;
   ok(w.eval("cfg.charge.order")==="parallel","Laden: Standard-Reihenfolge wird in die Einstellungen übernommen");
   // Entladesperre
   w.showPage("charge");await new Promise(r=>setTimeout(r,300));
+  { const ti=d.querySelector("#chg_locks [data-lkt]");ti.value="07:30";w.renderChargeLive();
+    ok(d.querySelector("#chg_locks [data-lkt]").value==="07:30","Sperre: eingetippte Uhrzeit bleibt bei der Aktualisierung erhalten"); ti.value=""; }
   ok(d.querySelectorAll("#chg_locks [data-lk]").length>=1&&/gibt normal ab/.test(d.getElementById("chg_locks").textContent),"Sperre: Speicher mit Sperren-Knopf");
   d.querySelector('#chg_locks [data-lk][data-on="1"]').click();await new Promise(r=>setTimeout(r,200));
   ok(calls.some(c=>/^lock:.*:true:$/.test(c))&&/gesperrt bis zur Freigabe/.test(d.getElementById("chg_locks").textContent)&&d.getElementById("lkchip").style.display!=="none","Sperre: gesetzt, in der Liste und in der Kopfzeile");

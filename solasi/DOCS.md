@@ -1,5 +1,9 @@
 # SOLASI – Anleitung
 
+🇬🇧 [English version](DOCS.en.md)
+
+> **🧪 Beta:** SOLASI ist noch in der Beta-Phase. Es wurde an einer Anlage mit Anker SOLIX (Solarbank 4) entwickelt und im Alltag erprobt; andere Speichertypen sind nach den Beschreibungen ihrer Integrationen umgesetzt und bisher nur in Simulationen geprüft. Es steuert echte Hardware, Fehler sind möglich. Fang immer im **Testmodus** an, behalte den **Not-Aus** im Blick und prüfe neue Funktionen (zum Beispiel Netz-Laden und Entladesperre) zuerst mit kurzen Versuchen. Die Nutzung erfolgt auf eigene Verantwortung. Rückmeldungen und Fehlerberichte sind willkommen.
+
 SOLASI regelt deinen Batteriespeicher so, dass dein Haus möglichst viel Solarstrom selbst verbraucht: kaum Einspeisung ins Netz, kaum Bezug aus dem Netz.
 Alle Einstellungen nimmst du in der Oberfläche von SOLASI vor (Seitenleiste in Home Assistant), du brauchst keine Konfigurationsdatei.
 

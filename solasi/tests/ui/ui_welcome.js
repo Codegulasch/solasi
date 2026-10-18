@@ -57,7 +57,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  ok(d.getElementById("p-setup").textContent.includes("Testlauf"),"Testlauf-Seite");
  d.getElementById("wz_next").click();await wait(100);
  ok(d.getElementById("p-status").classList.contains("act")&&!d.body.classList.contains("first"),"Fertig führt zur Übersicht, Seitenleiste wieder da");
- ok(d.title==="SOLASI"&&d.querySelector(".brand b").textContent==="SOLASI","Name SOLASI");
+ ok(d.title==="SOLASI"&&d.querySelector(".brand b").firstChild.textContent.trim()==="SOLASI"&&!!d.querySelector(".brand .betatag"),"Name SOLASI mit Beta-Hinweis");
  ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));
  process.exit(process.exitCode||0);
 })();
