@@ -8,12 +8,13 @@ Eine Regel: {id, name, enabled, when: {...}, then: {...}}
         pv_above    value (W)                           -> wenn die Solarleistung darüber steigt
   then  mode        mode (Modus-ID)                     -> Modus aktivieren
         notify      text                                -> Meldung senden
+        charge      target (%), power_w (0 = max), units    -> Netz-Laden starten (Speicher aus dem Netz bis Ziel laden)
 Bedingungen lösen nur beim Wechsel von „nicht erfüllt“ zu „erfüllt“ aus, nicht dauernd.
 """
 import re
 
 WHEN = ("time", "soc_below", "soc_above", "grid_above", "pv_above")
-THEN = ("mode", "notify")
+THEN = ("mode", "notify", "charge")
 MAX_RULES = 30
 
 
@@ -53,6 +54,10 @@ def clean_rules(raw):
         then = {"kind": act}
         if act == "mode":
             then["mode"] = str(t.get("mode") or "")[:40]
+        elif act == "charge":
+            then["target"] = int(_num(t.get("target"), 1, 100, 20))
+            then["power_w"] = int(_num(t.get("power_w"), 0, 20000, 0))
+            then["units"] = [str(x)[:40] for x in (t.get("units") or []) if isinstance(x, str)][:8]
         else:
             then["text"] = str(t.get("text") or "")[:200]
         out.append({"id": rid, "name": str(r.get("name") or "Regel")[:60], "enabled": bool(r.get("enabled", True)),
@@ -75,7 +80,13 @@ def describe(rule, modes=None):
         cond = f"der Netzbezug {w['minutes']:.0f} Min. lang über {w['value']:.0f} W liegt"
     else:
         cond = f"die Solarleistung über {w['value']:.0f} W steigt"
-    what = f"Modus „{names.get(t.get('mode'), t.get('mode'))}“ aktivieren" if t["kind"] == "mode" else f"melden: {t.get('text')}"
+    if t["kind"] == "mode":
+        what = f"Modus „{names.get(t.get('mode'), t.get('mode'))}“ aktivieren"
+    elif t["kind"] == "charge":
+        what = f"Akkus bis {t['target']} % laden" + (f" ({t['power_w']} W)" if t.get("power_w") else "") + (
+            " – " + ", ".join(t["units"]) if t.get("units") else "")
+    else:
+        what = f"melden: {t.get('text')}"
     if w["kind"] == "time":
         return f"{cond}: {what}"
     return f"Wenn {cond} → {what}"

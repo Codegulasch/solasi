@@ -35,6 +35,9 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
       "api/accounts":()=>({users:global.ACCTS||[],roles:{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"}}),
       "api/report":()=>({title:"SOLASI Wochenbericht",text:"Verbrauch 70 kWh.",weekly:false}),
       "api/phases/discover":()=>({sensors:[{entity:"sensor.em_a_power",name:"3EM Phase A Power",kind:"power",phase:"L1",value:"120",unit:"W"},{entity:"sensor.em_b_power",name:"3EM Phase B Power",kind:"power",phase:"L2",value:"80",unit:"W"},{entity:"sensor.em_c_power",name:"3EM Phase C Power",kind:"power",phase:"L3",value:"40",unit:"W"}]}),
+      "api/charge/estimate":()=>({estimate:{kwh:2.5,hours:3.1,power_w:800,rows:[]}}),
+      "api/charge/start":()=>{const b=JSON.parse(o.body);if(!(b.target>0))return {ok:false,error:"Ungültiges Ziel"};calls.push("charge:start:"+b.target+":"+b.power_w+":"+(b.units||[]).join("|"));status.charge={active:true,job:{target:b.target,power_w:b.power_w,units:b.units,hours:b.hours,started:Date.now()/1000,source:"Oberfläche",start_soc:{"Speicher A":10}},units:[{name:"Speicher A",soc:10,start:10}],alloc:{"Speicher A":800},estimate:{kwh:2.5,hours:3.1,power_w:800}};return {ok:true,...status.charge};},
+      "api/charge/stop":()=>{calls.push("charge:stop");status.charge={active:false,job:null};return {ok:true,changed:true};},
       "api/phases/reset":()=>{calls.push("phases:reset");return {ok:true};},
       "api/hogs/discover":()=>({sensors:[{entity:"sensor.plug_tv_power",name:"Plug TV Power",w:"12"}]}),
       "api/hogs/curve":()=>({dev:"k",res:60,points:[{t:0,w:50},{t:3600,w:120},{t:7200,w:60}],...(/cmp=/.test(String(u))?{compare:[{t:0,w:40},{t:3600,w:90}]}:{})}),
@@ -484,10 +487,26 @@ const w=dom.window,d=w.document;
   const fv=d.getElementById("fl_view");fv.value="house";fv.dispatchEvent(new w.Event("change",{bubbles:true}));
   ok(w.eval("cfg.flow.view")==="house","Darstellung: Ansicht „Haus“ wählbar");
   w.eval("cfg.flow.view='flow'");
+  // Laden aus dem Netz
+  w.showPage("charge");await new Promise(r=>setTimeout(r,500));
+  ok(d.getElementById("p-charge").classList.contains("act")&&!!d.getElementById("chg_go")&&/3,1 Stunden/.test(d.getElementById("chg_est").textContent),"Laden: Seite mit Schätzung");
+  const ct=d.getElementById("chg_target");ct.value="30";ct.dispatchEvent(new w.Event("change",{bubbles:true}));
+  const cp=d.getElementById("chg_power");cp.value="600";cp.dispatchEvent(new w.Event("change",{bubbles:true}));
+  d.getElementById("chg_go").click();await new Promise(r=>setTimeout(r,200));
+  ok(calls.includes("charge:start:30:600:"),"Laden: Start sendet Ziel und Leistung");
+  ok(d.getElementById("chg_form").style.display==="none"&&/Laden bis 30 %/.test(d.getElementById("chg_live").textContent)&&/800 W/.test(d.getElementById("chg_live").textContent),"Laden: Fortschritt statt Formular");
+  ok(d.getElementById("chgchip").style.display!=="none"&&/30 %/.test(d.getElementById("chgchiptxt").textContent),"Laden: Anzeige in der Kopfzeile");
+  d.getElementById("chg_stop").click();await new Promise(r=>setTimeout(r,200));
+  ok(calls.includes("charge:stop")&&d.getElementById("chgchip").style.display==="none"&&d.getElementById("chg_form").style.display==="","Laden: Beenden stellt Formular und Kopfzeile zurück");
+  const dord=d.getElementById("chg_dorder");dord.value="parallel";dord.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.charge.order")==="parallel","Laden: Standard-Reihenfolge wird in die Einstellungen übernommen");
   // Automatik
   w.showPage("auto");await new Promise(r=>setTimeout(r,120));
   ok(d.getElementById("p-auto").classList.contains("act")&&d.querySelectorAll("#p-auto .rule").length===0&&/Wochenbericht/.test(d.getElementById("p-auto").textContent),"Automatik: leere Liste und Wochenbericht");
   d.getElementById("addrule").click();
+  w.eval('cfg.rules[0].then={kind:"charge",target:20,power_w:0,units:[]}');w.renderAuto();
+  ok(!!d.querySelector('#p-auto [data-rf="then.target"]')&&!!d.querySelector('#p-auto [data-runit]'),"Automatik: Aktion „Akkus laden“ mit Ziel und Speichern");
+  w.eval('cfg.rules[0].then={kind:"mode",mode:"care"}');w.renderAuto();
   ok(d.querySelectorAll("#p-auto .rule").length===1&&w.eval("cfg.rules.length")===1&&d.getElementById("discard").style.display==="","Automatik: Regel hinzufügen markiert Änderung");
   const rk=d.querySelector("#p-auto [data-rf='when.kind']");rk.value="soc_below";rk.dispatchEvent(new w.Event("change",{bubbles:true}));
   ok(w.eval("cfg.rules[0].when.kind")==="soc_below"&&!!d.querySelector("#p-auto [data-rf='when.value']"),"Automatik: Bedingung wechseln zeigt passende Felder");

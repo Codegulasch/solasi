@@ -20,6 +20,7 @@ from ha import is_num, num
 import automation
 import hogs as hogs_mod
 import phases as phases_mod
+import charge as charge_mod
 import goals
 from learn import BaseLoadLearner, is_night
 from meters import Meters
@@ -129,6 +130,7 @@ DEFAULT_CONFIG = {
     "phases": {"enabled": False, "invert": False, "fuse_a": 0, "warn_pct": 90, "feed": "",
                "sensors": {"L1": {"power": "", "voltage": "", "current": ""}, "L2": {"power": "", "voltage": "", "current": ""},
                            "L3": {"power": "", "voltage": "", "current": ""}}},
+    "charge": {"order": "low", "max_w": 0},
     "reports": {"weekly": False},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
     "meters": {"show_day": True, "extra": False, "items": [], "order": [], "compare": "same"},
@@ -397,9 +399,12 @@ def decide(cfg, snap):
         base_hi = own_hi if own_hi is not None else so["max"]
         u["min"] = max(base_lo, lo) if lo is not None else base_lo
         u["max"] = min(base_hi, hi) if hi is not None else base_hi
+        job = snap.get("charge")
+        if job and (not job["units"] or u["k"] in job["units"]) and not u.get("obs"):
+            u["max"] = max(u["max"], job["target"])         # Auftrag hebt die Ladeobergrenze an
         u["full"] = ok and soc >= u["max"]
         u["elig_dis"] = ok and (soc > u["min"] if st > 5 else soc >= u["min"] + so["hyst"])
-        u["elig_chg"] = bool(f["ac_charge"]) and drivers.can_charge(u["cfg"]) and ok and (
+        u["elig_chg"] = (bool(f["ac_charge"]) or bool(snap.get("charge"))) and drivers.can_charge(u["cfg"]) and ok and (
             soc < u["max"] if st < -5 else soc <= u["max"] - so["hyst"])
         # PV-Durchleitung: Der Speicher darf so viel ins Haus geben, wie seine Module gerade liefern, auch wenn die
         # Batterie unter dem Mindest-Ladestand ist. Die Batterie wird dadurch nicht entladen.
@@ -467,6 +472,15 @@ def decide(cfg, snap):
             w = [1 if caps[i] > 0 else 0 for i in range(len(units))]
         plan = [-p for p in _split(total, caps, w)]
 
+    chg_alloc = {}
+    job = snap.get("charge")
+    if job:
+        for u in units:
+            u["ccap_job"] = min(x for x in (u["cfg"]["max_chg"], u.get("nmax_chg") or 1e9) if x) if drivers.can_charge(u["cfg"]) else 0
+        chg_alloc = charge_mod.alloc(cfg, job, units, snap.get("charge_caps"))
+        for i, u in enumerate(units):
+            if u["k"] in chg_alloc:
+                plan[i] = -chg_alloc[u["k"]]
     for i, u in enumerate(units):
         p = _round_step(plan[i], c["step"]) if meter_ok else 0
         u["p"] = p
@@ -482,7 +496,7 @@ def decide(cfg, snap):
         "meter_ok": meter_ok, "grid_w": grid_w, "net_balance": net_balance, "net_dis": net_dis,
         "want_dis": want_dis, "want_chg": want_chg, "eco_active": eco_active,
         "avg_soc": avg_soc, "kwh": kwh_now, "cap_kwh": cap_all, "t_target": t, "blocked_w": blocked_w,
-        "slot_own": slot_own, "surplus_w": surplus_w,
+        "slot_own": slot_own, "surplus_w": surplus_w, "charge_alloc": chg_alloc,
     }
 
 
@@ -525,6 +539,11 @@ class Controller:
         self.feed_det = phases_mod.FeedDetector(data_path("phases.json"))
         self.phases_view = None
         self._fuse_warned = 0.0
+        self.chg_path = data_path("chargejob.json")
+        self.chg_job = charge_mod.clean_job(load_json(self.chg_path, {}).get("job"))
+        self._chg_progress = None        # (Zeitpunkt, Summe kWh) für die Fortschrittskontrolle
+        self._chg_restore = {}           # Speicher -> (Entität, alter Wert) der Ladeobergrenze nach dem Auftrag
+        self.chg_last = None             # Ergebnis des letzten Auftrags für die Anzeige
         self.learner = BaseLoadLearner(data_path("learn.json"))
         self.notifier = Notifier(self)
         self.curtail = {"state": "unbekannt", "since": None, "export_w": None, "note": "Noch nicht beurteilt"}
@@ -860,6 +879,11 @@ class Controller:
             self.phases_cycle(snap)
         except Exception:  # noqa: BLE001
             log.exception("Fehler bei der Phasenauswertung")
+        try:
+            await self.charge_cycle(snap)
+        except Exception:  # noqa: BLE001
+            log.exception("Fehler beim Netz-Laden")
+            snap["charge"] = None
         d = decide(cfg, snap)
         dry = cfg["dry_run"]
         await self._safety_check(snap, d)
@@ -898,6 +922,11 @@ class Controller:
                     m = await self.activate_mode(t.get("mode"), who=f"Regel „{r['name']}“")
                     if not m:
                         self.event("warn", f"Regel „{r['name']}“: Modus „{t.get('mode')}“ gibt es nicht")
+                elif t["kind"] == "charge":
+                    job, err = await self.charge_start({"target": t.get("target"), "power_w": t.get("power_w"), "units": t.get("units")},
+                                                       f"Regel „{r['name']}“")
+                    if not job:
+                        self.event("warn", f"Regel „{r['name']}“: Netz-Laden nicht gestartet: {err}")
                 else:
                     self.event("info", f"Regel „{r['name']}“: {t.get('text')}")
                     await self.notifier.send(f"SOLASI: {r['name']}", t.get("text") or r["name"], tag="rule_" + r["id"])
@@ -915,12 +944,25 @@ class Controller:
     async def _enforce_limits(self, snap, dry):
         """Schreibt Mindest- und Höchst-Ladestand in Entladegrenze und Ladeobergrenze der Speicher (je Speicher abschaltbar).
         SOLASI ist die Steuereinheit: Weicht der Wert im Speicher ab, auch durch die Hersteller-App, wird er zurückgesetzt."""
+        for k, (eid, old) in list(self._chg_restore.items()):
+            if is_num(self.ha.state(eid)):
+                val, _n = clamp_limit(self.ha, eid, old)
+                if abs(float(self.ha.state(eid)) - val) >= 0.5:
+                    await self.act(dry, f"{k}: Ladeobergrenze nach dem Netz-Laden zurück auf {val:g} %", eid.split(".")[0],
+                                   "set_value", {"entity_id": eid, "value": val})
+            self._chg_restore.pop(k, None)
+        job = snap.get("charge")
         for u in snap["units"]:
             uc = u["cfg"]
-            if u.get("obs") or not uc.get("write_limits"):
+            on_job = bool(job) and (not job["units"] or u["k"] in job["units"])
+            if u.get("obs") or not (uc.get("write_limits") or (on_job and uc.get("lim_chg"))):
                 continue
             want = {w: wanted_limit(self.cfg, uc, w) for w in ("min", "max")}
-            if want["min"] >= want["max"]:
+            if on_job:
+                want["max"] = max(want["max"], job["target"])
+            if not uc.get("write_limits"):
+                want["min"] = None
+            if want["min"] is not None and want["min"] >= want["max"]:
                 note = f"Mindest-Ladestand {want['min']:g} % ist nicht kleiner als Höchst-Ladestand {want['max']:g} %, die Grenzen werden nicht geschrieben"
                 if self._lim_note.get((u["k"], "pair")) != note:
                     self._lim_note[(u["k"], "pair")] = note
@@ -929,6 +971,8 @@ class Controller:
             self._lim_note.pop((u["k"], "pair"), None)
             for which, key, label in (("min", "lim_dis", "Entladegrenze"), ("max", "lim_chg", "Ladeobergrenze")):
                 eid = uc.get(key)
+                if want[which] is None:
+                    continue
                 if not eid or eid.split(".")[0] not in ("number", "input_number"):
                     continue
                 cur = self.ha.state(eid)
@@ -996,6 +1040,112 @@ class Controller:
                            dom, svc, data)
         if drivers.driver(uc) == "script":
             self._script_mem[u["k"]] = float(p)
+
+    # ---------- Netz-Laden ----------
+    STUCK_S = 1200             # so lange darf der Ladestand trotz Auftrag nicht steigen
+
+    def _save_chg(self):
+        save_json(self.chg_path, {"job": self.chg_job})
+
+    async def charge_cycle(self, snap):
+        """Auftrag prüfen (Ziel erreicht, abgelaufen, hängt) und für decide() in den Snapshot legen."""
+        snap["charge"] = None
+        job = self.chg_job
+        if not job:
+            return
+        if self.stopped:
+            await self.charge_stop("SOLASI ist gestoppt", "stopped")
+            return
+        scope = [u for u in charge_mod.in_scope(job, snap["units"]) if u["soc"] >= 0]
+        if not scope:
+            return                                      # Speicher gerade nicht lesbar: warten
+        now = time.time()
+        if now - job["started"] > job["hours"] * 3600:
+            await self.charge_stop(f"Zeit von {job['hours']:g} h abgelaufen", "timeout")
+            return
+        if all(u["soc"] >= job["target"] for u in scope):
+            await self.charge_stop(f"Ziel {job['target']} % erreicht", "done")
+            return
+        kwh = sum(u["soc"] / 100.0 * (u.get("cap") or 5.0) for u in scope)
+        mono = time.monotonic()
+        if self._chg_progress is None or kwh > self._chg_progress[1] + 0.05 or kwh < self._chg_progress[1] - 0.5:
+            self._chg_progress = (mono, kwh)
+        elif mono - self._chg_progress[0] > self.STUCK_S and not self.cfg["dry_run"]:
+            await self.charge_stop("Der Ladestand steigt seit 20 Minuten nicht (Speicher nimmt nichts an?)", "stuck")
+            return
+        fuse = (self.cfg.get("phases") or {}).get("fuse_a", 0)
+        snap["charge_caps"] = charge_mod.headroom_caps(self.phases_view, snap["units"], fuse)
+        snap["charge"] = job
+
+    def charge_view(self, snap=None, d=None):
+        snap = snap or self.last_snap
+        job = self.chg_job
+        out = {"active": bool(job), "job": job, "last": self.chg_last, "orders": charge_mod.ORDER_LABEL,
+               "config": self.cfg.get("charge")}
+        if job and snap:
+            sc = [u for u in charge_mod.in_scope(job, snap["units"])]
+            for u in snap["units"]:
+                u.setdefault("ccap_job", min(x for x in (u["cfg"]["max_chg"], u.get("nmax_chg") or 1e9) if x)
+                             if drivers.can_charge(u["cfg"]) else 0)
+            out["estimate"] = charge_mod.estimate(job, snap["units"], self.cfg, snap.get("charge_caps"))
+            out["units"] = [{"name": u["k"], "soc": u["soc"], "start": job["start_soc"].get(u["k"])} for u in sc]
+            out["alloc"] = {k: round(v) for k, v in ((d or {}).get("charge_alloc") or {}).items()}
+        return out
+
+    def charge_estimate(self, raw):
+        snap = self.last_snap
+        job = charge_mod.clean_job(raw, {u["name"] for u in self.cfg["units"]})
+        if not job or not snap:
+            return None
+        for u in snap["units"]:
+            u["ccap_job"] = min(x for x in (u["cfg"]["max_chg"], u.get("nmax_chg") or 1e9) if x) if drivers.can_charge(u["cfg"]) else 0
+        return charge_mod.estimate(job, snap["units"], self.cfg, snap.get("charge_caps"))
+
+    async def charge_start(self, raw, who=""):
+        if self.stopped:
+            return None, "SOLASI ist gestoppt – erst fortsetzen"
+        job = charge_mod.clean_job(raw, {u["name"] for u in self.cfg["units"]})
+        if not job:
+            return None, "Ungültiges Ziel"
+        snap = self.last_snap
+        if snap:
+            sc = [u for u in charge_mod.in_scope(job, snap["units"]) if u["soc"] >= 0]
+            if not sc:
+                return None, "Kein ladbarer Speicher gewählt oder erreichbar"
+            job["start_soc"] = {u["k"]: u["soc"] for u in sc}
+            job["prev_lim"] = {u["k"]: u.get("lim_chg") for u in sc if u.get("lim_chg") is not None}
+        job["started"] = time.time()
+        job["source"] = who
+        self.chg_job, self._chg_progress, self._chg_restore = job, None, {}
+        self._save_chg()
+        names = ", ".join(job["units"]) or "alle Speicher"
+        self.event("info", f"Netz-Laden gestartet: {names} bis {job['target']} %"
+                           + (f", {job['power_w']} W" if job["power_w"] else "") + (f" ({who})" if who else ""))
+        self.wake.set()
+        return job, ""
+
+    async def charge_stop(self, why, kind="manual"):
+        job = self.chg_job
+        if not job:
+            return False
+        snap = self.last_snap
+        if snap:                                        # nicht (mehr) wirksame Ladeobergrenze zurücksetzen, wenn SOLASI sie sonst nicht pflegt
+            for u in snap["units"]:
+                uc, old = u["cfg"], job["prev_lim"].get(u["k"])
+                if old is not None and uc.get("lim_chg") and not uc.get("write_limits"):
+                    self._chg_restore[u["k"]] = (uc["lim_chg"], old)
+        self.chg_last = {"why": why, "kind": kind, "target": job["target"], "at": time.strftime("%d.%m. %H:%M"),
+                         "hours": round((time.time() - job["started"]) / 3600, 2)}
+        self.chg_job, self._chg_progress = None, None
+        self._save_chg()
+        self.event("warn" if kind in ("stuck", "timeout") else "info", f"Netz-Laden beendet: {why}")
+        if kind in ("stuck", "timeout", "done") and self.cfg["notify"]["events"].get("charge", True):
+            try:
+                await self.notifier.send("🔋 Netz-Laden beendet", why, "charge")
+            except Exception:  # noqa: BLE001
+                log.exception("Benachrichtigung")
+        self.wake.set()
+        return True
 
     # ---------- Überschuss ----------
     async def surplus_cycle(self):
@@ -1094,6 +1244,8 @@ class Controller:
             data = {**data, "rules": automation.clean_rules(data["rules"])}
         if isinstance(data, dict) and "phases" in data:
             data = {**data, "phases": phases_mod.clean_phases(data["phases"])}
+        if isinstance(data, dict) and "charge" in data:
+            data = {**data, "charge": charge_mod.clean_charge(data["charge"])}
         if isinstance(data, dict) and "hogs" in data:
             new = hogs_mod.clean_hogs(data["hogs"])
             gone = {d["id"] for d in (self.cfg.get("hogs") or {}).get("devices", [])} - {d["id"] for d in new["devices"]}
@@ -1178,6 +1330,7 @@ class Controller:
         live = bool(cfg["enabled"]) and not cfg["dry_run"]
         self.safety = {"state": "stopped", "reason": reason, "since": time.strftime("%d.%m. %H:%M:%S"), "source": source}
         self._save_safety()
+        await self.charge_stop("SOLASI gestoppt", "stopped")
         self.event("error", f"⛔ SOLASI gestoppt: {reason}")
         if cfg["safety"]["release_on_stop"] and live:
             await self.release_all("Stopp")
@@ -1546,6 +1699,7 @@ class Controller:
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
             "flow_cfg": clean_flow(self.cfg.get("flow")), "phases": st.get("phases"),
+            "charge": {"active": bool((st.get("charge") or {}).get("active")), "target": ((st.get("charge") or {}).get("job") or {}).get("target")},
             "card_cfg": clean_card(self.cfg.get("card")),
             "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"], "order": self.meter_view()["order"],
                            "compare": self.meter_view()["compare"]},
@@ -1608,6 +1762,7 @@ class Controller:
             "curtail": dict(self.curtail), "learned_base_load": self.learner.value, "safety": dict(self.safety),
             "base_load_used": round(self.base_load_effective()),
             "trend": self.trend_series(), "meter_view": self.meter_view(), "phases": self.phases_view,
+            "charge": self.charge_view(snap, d),
             "want": "Entladen" if d["want_dis"] else "Laden" if d["want_chg"] else "Leerlauf",
             "surplus_w": None if d["surplus_w"] is None else round(d["surplus_w"]),
             "units": [{

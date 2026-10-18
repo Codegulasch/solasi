@@ -1,5 +1,12 @@
 # Änderungen
 
+## 2.3.0
+- **Laden aus dem Netz:** Neue Seite „Laden“ unter Betrieb. Ziel in %, Leistung (gesamt), Speicherauswahl und Reihenfolge einstellen, „Laden starten“ – SOLASI lädt die Speicher auch bei Netzbezug, bis das Ziel erreicht ist, und hört dann von selbst auf. Mit Schätzung (kWh, Dauer), Fortschritt je Speicher und Anzeige in der Kopfzeile und auf der Dashboard-Karte.
+- **Reihenfolge festlegbar:** niedrigster Ladestand zuerst, höchster zuerst, wie in der Speicherliste oder alle gleichzeitig; Standard unter „Laden“, je Auftrag überschreibbar. Dazu eine Höchstleistung gesamt.
+- **Schutz:** Die Ladeobergrenze im Speicher wird für den Auftrag angehoben und danach zurückgesetzt. Ist die Sicherung bei den Phasen eingetragen, wird die Ladeleistung so begrenzt, dass die Einspeise-Phase nicht überlastet wird. Der Auftrag endet bei Not-Aus, nach der gewählten Höchstdauer oder wenn der Ladestand 20 Minuten nicht steigt (mit Meldung).
+- **Automatik:** Neue Aktion „lade die Akkus aus dem Netz“ (Ziel, Leistung, Speicher), z. B. nachts um 02:00 bis 80 %.
+- Nicht dabei: Preisfenster / dynamischer Tarif – kommt, sobald du einen hast.
+
 ## 2.2.2
 - **Korrektur:** SOLASI startete nach dem Update auf 2.2.1 nicht, wenn schon eine Lerndatei der Phasen-Erkennung aus 2.2.0 vorhanden war. Alte oder beschädigte Dateien werden jetzt ignoriert, die Erkennung beginnt dann neu.
 

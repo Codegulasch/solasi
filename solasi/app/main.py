@@ -258,6 +258,34 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
         out.sort(key=lambda x: x["name"].lower())
         return web.json_response({"sensors": out[:300]})
 
+    @routes.get("/api/charge")
+    async def charge_get(_):
+        return web.json_response(ctrl.charge_view())
+
+    @routes.post("/api/charge/estimate")
+    async def charge_estimate(req):
+        try:
+            body = await req.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        return web.json_response({"estimate": ctrl.charge_estimate(body)})
+
+    @routes.post("/api/charge/start")
+    async def charge_start(req):
+        try:
+            body = await req.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        job, err = await ctrl.charge_start(body, "Oberfläche")
+        if not job:
+            return web.json_response({"ok": False, "error": err}, status=400)
+        return web.json_response({"ok": True, **ctrl.charge_view()})
+
+    @routes.post("/api/charge/stop")
+    async def charge_stop(_):
+        did = await ctrl.charge_stop("Von Hand beendet", "manual")
+        return web.json_response({"ok": True, "changed": did})
+
     @routes.get("/api/phases")
     async def phases_get(_):
         return web.json_response({"view": ctrl.phases_view, "config": store.cfg.get("phases")})

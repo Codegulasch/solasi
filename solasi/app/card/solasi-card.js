@@ -943,6 +943,7 @@ const SF = (() => {
             ${(a.slots || []).map(s => `<div class="row"><span>${esc(s.name)}</span><span>${s.state ? esc(s.state) + " · " : ""}<b>${W(s.own_w)}</b></span></div>`).join("")}</div>` : "",
           tags: c.show_tags ? `<div class="tags">
             ${a.mode_name ? `<span class="tag">${esc(a.mode_icon || "")} Modus: ${esc(a.mode_name)}</span>` : ""}
+            ${a.charge && a.charge.active ? `<span class="tag warn">🔌 Netz-Laden${a.charge.target ? " bis " + esc(a.charge.target) + " %" : ""}</span>` : ""}
             ${a.eco_active ? '<span class="tag warn">🌙 Eco-Modus</span>' : ""}
             <span class="tag ${a.meter_ok === false ? "bad" : "ok"}">Zähler ${a.meter_ok === false ? "Ausfall" : "in Ordnung"}</span>
             <span class="tag">Sollwert ${W(a.target_w)}</span>

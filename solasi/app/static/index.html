@@ -341,6 +341,7 @@ body.dens-large{font-size:16.5px}
     <div class="bar">
       <h1 id="title">Übersicht</h1>
       <button type="button" class="pill" id="modechip" data-p="goals" title="Aktueller Modus – öffnet Ziele &amp; Verhalten" style="cursor:pointer;border:0;font:inherit"><span id="modechiptxt">–</span></button>
+      <button type="button" class="pill ok" id="chgchip" data-p="charge" title="Netz-Laden läuft – öffnet die Ladeseite" style="display:none;cursor:pointer;border:0;font:inherit"><span id="chgchiptxt"></span></button>
       <span class="pill" id="modepill"><i></i><span id="modetext">–</span></span>
       <label class="tg"><input type="checkbox" id="q_enabled"><i></i>Regelung</label>
       <label class="tg test"><input type="checkbox" id="q_dry"><i></i>Testmodus</label>
@@ -367,6 +368,7 @@ body.dens-large{font-size:16.5px}
       <section class="page" id="p-stats"></section>
       <section class="page" id="p-hogs"></section>
       <section class="page" id="p-phases"></section>
+      <section class="page" id="p-charge"></section>
       <section class="page" id="p-tile"></section>
       <section class="page" id="p-replay"></section>
       <section class="page" id="p-selftest"></section>
@@ -698,6 +700,7 @@ function renderExtras(){
     field("notify.events.curtail","Einspeisung trotz vollem Speicher","bool")+
     field("notify.events.errors","Steuerbefehle schlagen fehl","bool")+
     field("notify.events.stopped","SOLASI wurde gestoppt (Not-Aus oder automatisch)","bool")+
+    field("notify.events.charge","Netz-Laden beendet (Ziel erreicht, Zeit um oder hängt)","bool")+
     field("notify.delay_min","Erst melden nach (Minuten)","num",{min:0,step:0.5,adv:true})+
     field("notify.cooldown_min","Gleiche Meldung frühestens nach (Minuten)","num",{min:1,adv:true})+
     field("notify.recovery","Auch Entwarnung senden","bool",{adv:true})+
@@ -852,6 +855,7 @@ const IC={
   stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   phases:'<path d="M4 8h16M4 12h16M4 16h16"/><circle cx="8" cy="8" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="16" r="1.6"/>',
   hogs:'<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
+  charge:'<rect x="3" y="8" width="15" height="8" rx="2"/><path d="M21 11v2M9 10.5 7.5 12.5h3L9 14.5"/>',
   replay:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="m10 9 5 3-5 3z"/>',
   selftest:'<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
   log:'<path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/>',
@@ -863,15 +867,15 @@ const IC={
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'};
 const svgi=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]||""}</svg>`;
 const isClassic=()=>lookGet("classic","0")==="1";
-const NAVS=[["Betrieb",[["status","Übersicht"],["units","Speicher"],["surplus","Überschuss"],["meters","Zähler"],["phases","Phasen"],["auto","Automatik"]]],
+const NAVS=[["Betrieb",[["status","Übersicht"],["units","Speicher"],["charge","Laden"],["surplus","Überschuss"],["meters","Zähler"],["phases","Phasen"],["auto","Automatik"]]],
   ["Auswertung",[["stats","Statistik"],["hogs","Stromfresser"],["replay","Was-wäre-wenn"]]],
   ["System",[["selftest","Gesundheit"],["log","Protokoll"],["card","Dashboard-Karte"],["mqtt","Entitäten (MQTT)"]]]];
 const NAV_FOOT_NEW=[["settings","Einstellungen"],["setup","Einrichtung"]],NAV_FOOT_OLD=[["setup","Einrichtung"],["control","Einstellungen"]];
-const TITLES={tile:"Kachel-Statistik",status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",phases:"Phasen",stats:"Statistik",hogs:"Stromfresser",replay:"Was-wäre-wenn",selftest:"Gesundheit",log:"Protokoll",
+const TITLES={tile:"Kachel-Statistik",status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",phases:"Phasen",charge:"Laden aus dem Netz",stats:"Statistik",hogs:"Stromfresser",replay:"Was-wäre-wenn",selftest:"Gesundheit",log:"Protokoll",
   card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung",settings:"Einstellungen",goals:"Ziele & Verhalten",auto:"Automatik",accounts:"Konten & Zugang"};
 const SET_SUB_NEW=[["settings","Übersicht"],["goals","Ziele"],["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]],
   SET_SUB_OLD=[["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]];
-const SETTINGS_PAGES=["phases","hogs","units","goals","auto","control","surplus","extras","meters","look"];
+const SETTINGS_PAGES=["charge","phases","hogs","units","goals","auto","control","surplus","extras","meters","look"];
 const setSub=()=>isClassic()?SET_SUB_OLD:SET_SUB_NEW,setGroup=()=>setSub().map(x=>x[0]),navFoot=()=>isClassic()?NAV_FOOT_OLD:NAV_FOOT_NEW;
 const TAB_ITEMS=[["status","Übersicht"],["units","Speicher"],["stats","Statistik"],["surplus","Überschuss"]];
 let curPage="status";
@@ -910,6 +914,7 @@ function showPage(p){
   if(p==="auto")renderAuto();
   if(p==="hogs")openHogs();
   if(p==="phases")openPhases();
+  if(p==="charge")openCharge();
   if(p==="accounts")loadAccounts();
   updateSavebar();
 }
@@ -2090,6 +2095,7 @@ function renderBadges(s){
   const stopped=s.safety&&s.safety.state==="stopped";
   kb.textContent=stopped?"▶ Fortsetzen":"⛔ Not-Aus";kb.classList.toggle("resume",!!stopped);
   const mc=$("#modechip");if(mc){mc.style.display=isClassic()?"none":"";$("#modechiptxt").textContent=s.mode_name?`${s.mode_icon||"🎯"} ${s.mode_name}`:"🎛️ Eigene Einstellung";mc.className="pill"+(s.mode_name?" ok":"");}
+  const cc=$("#chgchip");if(cc){const ch=s.charge&&s.charge.active&&s.charge.job;cc.style.display=ch?"":"none";if(ch){const al=Object.values(s.charge.alloc||{}).reduce((a,b)=>a+b,0);$("#chgchiptxt").textContent=`🔌 Laden bis ${ch.target} %${al?` · ${al} W`:""}`;}}
   if(stopped){mp.className="pill stop";$("#modetext").textContent="Gestoppt"}
   else if(!s.enabled){mp.className="pill off";$("#modetext").textContent="Beobachten"}
   else if(s.dry_run){mp.className="pill test";$("#modetext").textContent="Testmodus"}
@@ -2169,7 +2175,7 @@ function layoutBlocks(root,B,order,weights){
 }
 let firstRun=false,wizDismissed=false;
 function renderStatus(s){
-  lastStatus=s;renderBadges(s);loadToday();if(curPage==="phases")renderPhasesLive();
+  lastStatus=s;renderBadges(s);loadToday();if(curPage==="phases")renderPhasesLive();if(curPage==="charge")renderChargeLive();
   const needSetup=cfg&&!cfg.grid.entity;
   if(needSetup&&!wizDismissed&&!firstRun){firstRun=true;showPage("setup");}
   if(needSetup){
@@ -2395,7 +2401,7 @@ loadAll().then(()=>{
 
 // ---- Automatik: Zeitpläne & Wenn-dann ----
 const WHEN_KINDS=[["time","zu einer Uhrzeit"],["soc_below","der Ladestand fällt unter"],["soc_above","der Ladestand steigt über"],["grid_above","der Netzbezug zu hoch ist"],["pv_above","die Solarleistung hoch ist"]];
-const THEN_KINDS=[["mode","wechsle den Modus"],["notify","schicke mir eine Meldung"]];
+const THEN_KINDS=[["mode","wechsle den Modus"],["notify","schicke mir eine Meldung"],["charge","lade die Akkus aus dem Netz"]];
 const WD=["Mo","Di","Mi","Do","Fr","Sa","So"];
 let reportPreview=null;
 function ruleDefault(){return {id:"r"+Date.now().toString(36),name:"Neue Regel",enabled:true,when:{kind:"time",at:"22:00",days:[0,1,2,3,4,5,6]},then:{kind:"mode",mode:"care"}};}
@@ -2407,7 +2413,8 @@ function ruleHtml(r,i){
   else if(w.kind==="soc_below"||w.kind==="soc_above")wp=`<input type="number" min="0" max="100" data-rf="when.value" value="${esc(w.value)}" style="width:80px"> %`;
   else if(w.kind==="grid_above")wp=`<input type="number" min="0" data-rf="when.value" value="${esc(w.value)}" style="width:90px"> W länger als <input type="number" min="0" max="120" data-rf="when.minutes" value="${esc(w.minutes)}" style="width:70px"> Min.`;
   else wp=`<input type="number" min="0" data-rf="when.value" value="${esc(w.value)}" style="width:90px"> W`;
-  const tp=t.kind==="mode"?sel("data-rf=\"then.mode\"",modes.map(m=>[m.id,m.name]),t.mode):`<input type="text" data-rf="then.text" value="${esc(t.text||"")}" placeholder="Text der Meldung" style="min-width:200px">`;
+  const un=(cfg.units||[]).filter(u=>u.name);
+  const tp=t.kind==="charge"?`bis <input type="number" min="1" max="100" data-rf="then.target" value="${esc(t.target)}" style="width:70px"> % mit <input type="number" min="0" step="100" data-rf="then.power_w" value="${esc(t.power_w||0)}" style="width:90px"> W (0 = so viel wie möglich) <span class="wd">${un.map(u=>`<label><input type="checkbox" data-runit="${esc(u.name)}"${(t.units||[]).includes(u.name)?" checked":""}>${esc(u.name)}</label>`).join(" ")}</span>${un.length?`<div class="sub">Nichts angekreuzt = alle Speicher.</div>`:""}`:t.kind==="mode"?sel("data-rf=\"then.mode\"",modes.map(m=>[m.id,m.name]),t.mode):`<input type="text" data-rf="then.text" value="${esc(t.text||"")}" placeholder="Text der Meldung" style="min-width:200px">`;
   return `<div class="card rule" data-ri="${i}" style="margin-bottom:10px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="text" data-rf="name" value="${esc(r.name)}" style="font-weight:700;flex:1;min-width:140px" aria-label="Name der Regel"><label class="tg"><input type="checkbox" data-rf="enabled"${r.enabled?" checked":""}><i></i>an</label><button type="button" class="ghost" data-rdel="${i}" title="Regel löschen">✕</button></div>
   <div style="margin-top:8px"><b>Wenn</b> ${sel("data-rf=\"when.kind\"",WHEN_KINDS,w.kind)} ${wp}</div>
   <div style="margin-top:6px"><b>dann</b> ${sel("data-rf=\"then.kind\"",THEN_KINDS,t.kind)} ${tp}</div></div>`;}
@@ -2429,8 +2436,10 @@ document.addEventListener("change",e=>{
     let v=f.type==="checkbox"?f.checked:f.type==="number"?+f.value:f.value;
     ruleSet(r,p,v);
     if(p==="when.kind"){const k=v;r.when={kind:k,...(k==="time"?{at:"22:00",days:[0,1,2,3,4,5,6]}:k.startsWith("soc")?{value:20}:k==="grid_above"?{value:2000,minutes:5}:{value:3000})};}
-    if(p==="then.kind"){r.then=v==="mode"?{kind:"mode",mode:((goalsData&&goalsData.modes[0])||{}).id||"balanced"}:{kind:"notify",text:""};}
+    if(p==="then.kind"){r.then=v==="mode"?{kind:"mode",mode:((goalsData&&goalsData.modes[0])||{}).id||"balanced"}:v==="charge"?{kind:"charge",target:20,power_w:0,units:[]}:{kind:"notify",text:""};}
     markDirty();if(/kind$/.test(p))renderAuto();return;}
+  const ru=e.target.closest("#p-auto [data-runit]");
+  if(ru&&box){const r=cfg.rules[+box.dataset.ri],us=new Set(r.then.units||[]);ru.checked?us.add(ru.dataset.runit):us.delete(ru.dataset.runit);r.then.units=[...us];markDirty();return;}
   const dy=e.target.closest("#p-auto [data-rday]");
   if(dy&&box){const r=cfg.rules[+box.dataset.ri],k=+dy.dataset.rday,ds=new Set(r.when.days);dy.checked?ds.add(k):ds.delete(k);r.when.days=[...ds].sort();markDirty();return;}
   if(e.target.id==="rep_weekly"){cfg.reports=cfg.reports||{};cfg.reports.weekly=e.target.checked;markDirty();}
@@ -2612,6 +2621,78 @@ async function openPhases(){
   try{phSensors=(await (await fetch("api/phases/discover")).json()).sensors||[];}catch(e){phSensors=[];}
   if(curPage==="phases")renderPhases();
 }
+
+
+// ---- Laden aus dem Netz ----
+const chgF={target:80,power_w:0,units:[],order:"",hours:12,init:false};
+let chgEst=null,chgTimer=null,chgBusy="";
+const CHG_ORD={low:"Niedrigster Ladestand zuerst",high:"Höchster Ladestand zuerst",list:"Wie in der Speicherliste",parallel:"Alle gleichzeitig"};
+function chgCfg(){cfg.charge=Object.assign({order:"low",max_w:0},cfg.charge||{});return cfg.charge;}
+function chgBody(){return {target:chgF.target,power_w:chgF.power_w,units:chgF.units,order:chgF.order,hours:chgF.hours};}
+function renderCharge(){
+  const el=$("#p-charge");if(!el)return;const cc=chgCfg(),us=(cfg.units||[]).filter(u=>u.name);
+  const opts=o=>Object.entries(CHG_ORD).map(([k,l])=>`<option value="${k}"${k===o?" selected":""}>${l}</option>`).join("");
+  el.innerHTML=`<div id="chg_live"></div>
+  <div class="card" id="chg_form" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Jetzt laden</h2>
+    <div class="sub">Lädt die Speicher bis zum Ziel – auch aus dem Netz, wenn die Sonne nicht reicht (z. B. für ein Update, das 20 % braucht, oder für morgen früh). Am Ziel hört SOLASI von selbst auf und stellt alles zurück. Der Strom kostet; im Testmodus werden die Befehle nur protokolliert.</div>
+    <div class="phrow" style="margin-top:10px"><label>Ziel (%)<input type="number" id="chg_target" min="1" max="100" value="${chgF.target}" style="width:90px"></label>
+    <label>Leistung gesamt (W, 0 = so viel wie möglich)<input type="number" id="chg_power" min="0" step="100" value="${chgF.power_w}" style="width:110px"></label>
+    <label>Spätestens nach<select id="chg_hours">${[1,2,4,8,12,24].map(h=>`<option value="${h}"${h===+chgF.hours?" selected":""}>${h} h</option>`).join("")}</select></label></div>
+    <div style="margin-top:8px"><b>Speicher</b> <span class="wd">${us.map(u=>`<label><input type="checkbox" data-chgunit="${esc(u.name)}"${!chgF.units.length||chgF.units.includes(u.name)?" checked":""}>${esc(u.name)}</label>`).join(" ")}</span></div>
+    <div style="margin-top:8px"><label>Reihenfolge <select id="chg_order"><option value="">Standard (${CHG_ORD[cc.order]||""})</option>${opts(chgF.order)}</select></label></div>
+    <div class="sub" id="chg_est" style="margin-top:10px">–</div>
+    <div style="margin-top:10px"><button type="button" class="primary" id="chg_go">🔌 Laden starten</button> <span class="sub" id="chg_err" style="color:var(--bad)"></span></div></div>
+  <div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Standard</h2>
+    <div class="sub">Gilt für jedes Netz-Laden, auch aus der Automatik. Die Ladeleistung je Speicher ist die „max. Laden“ des Speichers.</div>
+    <div class="phrow" style="margin-top:8px"><label>Reihenfolge<select id="chg_dorder">${opts(cc.order)}</select></label>
+    <label>Höchstleistung gesamt (W, 0 = nur Speichergrenzen)<input type="number" id="chg_dmax" min="0" step="100" value="${cc.max_w||0}" style="width:110px"></label></div>
+    <div class="sub" style="margin-top:8px">Hast du die Phasen mit Sicherung eingerichtet, begrenzt SOLASI die Ladeleistung außerdem so, dass die Einspeise-Phase des Speichers nicht überlastet wird.</div></div>`;
+  renderChargeLive();chgEstimate();
+}
+function renderChargeLive(){
+  const box=$("#chg_live");if(!box)return;const c=lastStatus&&lastStatus.charge,form=$("#chg_form");
+  if(form)form.style.display=c&&c.active?"none":"";
+  let h="";
+  if(c&&c.active&&c.job){const j=c.job,e=c.estimate||{},al=c.alloc||{};
+    const rows=(c.units||[]).map(u=>{const pct=Math.max(0,Math.min(100,u.soc));return `<div class="phfeed"><div><b>${esc(u.name)}</b><div>${u.soc<0?"–":Math.round(u.soc)} % von ${j.target} %${u.start!=null?` <span class="sub">(Start ${Math.round(u.start)} %)</span>`:""}${al[u.name]?` · lädt ${al[u.name]} W`:u.soc>=j.target?" · Ziel erreicht":""}</div></div><div class="hogbar" style="width:120px;height:7px"><i style="width:${pct}%"></i></div></div>`;}).join("");
+    h=`<div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">🔌 Laden bis ${j.target} %</h2>${rows}
+      <div class="sub" style="margin-top:8px">${e.kwh!=null?`Noch etwa ${e.kwh} kWh${e.hours!=null?` – ungefähr ${e.hours<1?Math.round(e.hours*60)+" Minuten":e.hours.toFixed(1).replace(".",",")+" Stunden"}`:""}.`:""} Gestartet ${esc(new Date(j.started*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}))}${j.source?" ("+esc(j.source)+")":""}, endet spätestens nach ${j.hours} h.</div>
+      <div style="margin-top:10px"><button type="button" class="ghost" id="chg_stop">Beenden</button></div></div>`;
+  }else if(c&&c.last){const l=c.last;h=`<div class="card" style="margin-bottom:12px"><div class="sub">Zuletzt: ${esc(l.at)} – ${esc(l.why)}${l.kind==="done"?" ✅":l.kind==="stuck"||l.kind==="timeout"?" ⚠":""}</div></div>`;}
+  box.innerHTML=h;
+}
+function chgEstimate(){
+  clearTimeout(chgTimer);chgTimer=setTimeout(async()=>{
+    const el=$("#chg_est");if(!el)return;
+    try{const j=await (await fetch("api/charge/estimate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(chgBody())})).json();chgEst=j.estimate;}catch(e){chgEst=null;}
+    const e=chgEst,el2=$("#chg_est");if(!el2)return;
+    if(!e){el2.textContent="Noch keine Speicherdaten.";return;}
+    if(e.kwh<=0){el2.textContent="Alle gewählten Speicher sind schon über dem Ziel.";return;}
+    el2.innerHTML=`Fehlen etwa <b>${e.kwh} kWh</b>`+(e.hours!=null?`, bei ${e.power_w} W dauert das ungefähr <b>${e.hours<1?Math.round(e.hours*60)+" Minuten":e.hours.toFixed(1).replace(".",",")+" Stunden"}</b>`:"")+`.`;
+  },250);
+}
+document.addEventListener("change",e=>{
+  const t=e.target;if(!t.closest||!t.closest("#p-charge"))return;
+  if(t.id==="chg_target"){chgF.target=Math.max(1,Math.min(100,+t.value||1));chgEstimate();return;}
+  if(t.id==="chg_power"){chgF.power_w=Math.max(0,+t.value||0);chgEstimate();return;}
+  if(t.id==="chg_hours"){chgF.hours=+t.value;return;}
+  if(t.id==="chg_order"){chgF.order=t.value;chgEstimate();return;}
+  if(t.dataset.chgunit){const all=(cfg.units||[]).filter(u=>u.name).map(u=>u.name),cur=new Set(chgF.units.length?chgF.units:all);t.checked?cur.add(t.dataset.chgunit):cur.delete(t.dataset.chgunit);chgF.units=cur.size===all.length?[]:[...cur];chgEstimate();return;}
+  if(t.id==="chg_dorder"){chgCfg().order=t.value;markDirty();return;}
+  if(t.id==="chg_dmax"){chgCfg().max_w=Math.max(0,+t.value||0);markDirty();return;}
+});
+document.addEventListener("click",async e=>{
+  if(e.target.closest("#chg_go")){
+    const err=$("#chg_err");err.textContent="";
+    try{const r=await fetch("api/charge/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(chgBody())}),j=await r.json();
+      if(!j.ok){err.textContent=j.error||"Konnte nicht starten";return;}
+      lastStatus=Object.assign({},lastStatus||{},{charge:j});renderChargeLive();renderBadges(lastStatus);
+    }catch(x){err.textContent="Keine Verbindung";}
+    return;}
+  if(e.target.closest("#chg_stop")){try{await fetch("api/charge/stop",{method:"POST"});}catch(x){}
+    if(lastStatus&&lastStatus.charge){lastStatus.charge.active=false;lastStatus.charge.job=null;}renderChargeLive();if(lastStatus)renderBadges(lastStatus);}
+});
+function openCharge(){renderCharge();}
 
 // ---- Konten & Rollen ----
 let meInfo={name:"Home Assistant",role:"owner",direct:false},acctData=null;
