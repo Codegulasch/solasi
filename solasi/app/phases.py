@@ -111,11 +111,15 @@ class FeedDetector:
         self.prev = None
         self._dirty = 0
         raw = load_json(path, {}) if path else {}
-        self.names = [str(x) for x in raw.get("names", [])]
-        self.sxx = {a: {b: float(v) for b, v in d.items()} for a, d in (raw.get("sxx") or {}).items()}
-        self.sxy = {a: {p: float(v) for p, v in d.items()} for a, d in (raw.get("sxy") or {}).items()}
-        self.nu = {a: float(v) for a, v in (raw.get("nu") or {}).items()}
-        self.n = float(raw.get("n", 0.0))
+        try:
+            self.names = [str(x) for x in raw.get("names", [])]
+            self.sxx = {a: {b: float(v) for b, v in d.items()} for a, d in (raw.get("sxx") or {}).items()}
+            self.sxy = {a: {p: float(v) for p, v in d.items()} for a, d in (raw.get("sxy") or {}).items()}
+            self.nu = {a: float(v) for a, v in (raw.get("nu") or {}).items()}
+            self.n = float(raw.get("n", 0.0))
+        except (AttributeError, TypeError, ValueError):
+            # Datei aus einer älteren Version (2.2.0 speicherte ein Gesamtergebnis) oder beschädigt: neu anfangen
+            self.names, self.sxx, self.sxy, self.nu, self.n = [], {}, {}, {}, 0.0
 
     def reset(self):
         self.names, self.sxx, self.sxy, self.nu, self.n, self.prev = [], {}, {}, {}, 0.0, None

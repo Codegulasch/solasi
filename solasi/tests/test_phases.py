@@ -166,3 +166,15 @@ async def test_controller_and_api(tmp_path, monkeypatch):
         assert r["ok"] and ctrl.feed_det.result()["units"] == {}
         d = await (await c.get("/api/phases/discover")).json()
         assert [s["phase"] for s in d["sensors"]] == ["L1", "L2", "L3"]
+
+
+def test_old_or_broken_state_file_does_not_crash(tmp_path):
+    import json
+    p = tmp_path / "ph.json"
+    p.write_text(json.dumps({"sxx": 123.4, "sxy": {"L1": 1.0, "L2": 2.0, "L3": 3.0}, "n": 9.0}))   # Format aus 2.2.0
+    det = P.FeedDetector(str(p))
+    assert det.result()["units"] == {} and det.n == 0
+    p.write_text("{kaputt")
+    assert P.FeedDetector(str(p)).result()["units"] == {}
+    p.write_text(json.dumps({"names": ["A"], "sxx": {"A": "x"}, "sxy": [], "nu": None}))
+    assert P.FeedDetector(str(p)).result()["units"] == {}

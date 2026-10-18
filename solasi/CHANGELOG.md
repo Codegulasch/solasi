@@ -1,5 +1,8 @@
 # Änderungen
 
+## 2.2.2
+- **Korrektur:** SOLASI startete nach dem Update auf 2.2.1 nicht, wenn schon eine Lerndatei der Phasen-Erkennung aus 2.2.0 vorhanden war. Alte oder beschädigte Dateien werden jetzt ignoriert, die Erkennung beginnt dann neu.
+
 ## 2.2.1
 - **Phasen-Anzeige:** Die Balken zeigen jetzt die Auslastung der Sicherung (grün bis 70 %, gelb darüber, rot ab deiner Warnschwelle) und schlagen nur so weit aus. Ohne eingetragene Sicherung wird mit 16 A gerechnet.
 - **Phasen im Energiefluss und auf der Karte:** Unter dem Fluss steht eine Leiste mit L1–L3 (Watt, Ampere, Auslastung, ⚡ welcher Speicher auf der Phase einspeist). In Darstellung abschaltbar.
