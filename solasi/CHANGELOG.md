@@ -1,5 +1,10 @@
 # Änderungen
 
+## 2.3.1
+- **Entladesperre je Speicher:** Unter Betrieb → Laden lässt sich jeder Speicher einzeln sperren, auch ohne Laden-Auftrag, bis zu einer Uhrzeit oder bis zur Freigabe. Gesperrt gibt der Speicher nichts aus der Batterie ab; was die Module gerade liefern, geht weiter ins Haus. Anzeige in der Kopfzeile und auf der Dashboard-Karte, Sperren überstehen einen Neustart.
+- **Beim Laden-Auftrag:** „Währenddessen nicht entladen“ (Standard an) und „Danach halten“ (normal weiter, bis Uhrzeit oder bis zur Freigabe sperren), damit die Ladung für morgen erhalten bleibt.
+- Die Leistung im Auftrag ist der Netzanteil: Die Solarleistung kommt bei Anker zusätzlich in die Batterie.
+
 ## 2.3.0
 - **Laden aus dem Netz:** Neue Seite „Laden“ unter Betrieb. Ziel in %, Leistung (gesamt), Speicherauswahl und Reihenfolge einstellen, „Laden starten“ – SOLASI lädt die Speicher auch bei Netzbezug, bis das Ziel erreicht ist, und hört dann von selbst auf. Mit Schätzung (kWh, Dauer), Fortschritt je Speicher und Anzeige in der Kopfzeile und auf der Dashboard-Karte.
 - **Reihenfolge festlegbar:** niedrigster Ladestand zuerst, höchster zuerst, wie in der Speicherliste oder alle gleichzeitig; Standard unter „Laden“, je Auftrag überschreibbar. Dazu eine Höchstleistung gesamt.

@@ -13,7 +13,7 @@ import time
 from util import load_json, save_json
 
 ROLES = {"owner": "Besitzer", "member": "Mitbewohner", "viewer": "Nur lesen"}
-MEMBER_POST = {"/api/goals/mode", "/api/goals/set", "/api/goals/preview", "/api/kill", "/api/resume"}
+MEMBER_POST = {"/api/goals/mode", "/api/goals/set", "/api/goals/preview", "/api/kill", "/api/resume", "/api/locks"}
 MIN_PW = 8
 MAX_FAILS, LOCK_S, SESSION_S = 5, 300, 30 * 86400
 NAME_RE = re.compile(r"^[\w .@-]{2,32}$")

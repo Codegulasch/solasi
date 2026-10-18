@@ -258,6 +258,24 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
         out.sort(key=lambda x: x["name"].lower())
         return web.json_response({"sensors": out[:300]})
 
+    @routes.get("/api/locks")
+    async def locks_get(_):
+        return web.json_response({"locks": ctrl.lock_view()})
+
+    @routes.post("/api/locks")
+    async def locks_set(req):
+        try:
+            b = await req.json()
+        except Exception:  # noqa: BLE001
+            b = {}
+        name = str(b.get("unit") or "")
+        until = ctrl.until_from_time(b["until"]) if b.get("until") else 0
+        ok = ctrl.set_lock(name, bool(b.get("on")), until, "Von Hand")
+        if not ok:
+            return web.json_response({"ok": False, "error": "Speicher unbekannt"}, status=400)
+        await ctrl.publish_entities()
+        return web.json_response({"ok": True, "locks": ctrl.lock_view()})
+
     @routes.get("/api/charge")
     async def charge_get(_):
         return web.json_response(ctrl.charge_view())

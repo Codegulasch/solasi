@@ -173,3 +173,67 @@ def test_automation_charge_rule():
                                 "then": {"kind": "charge", "target": 150, "power_w": "300", "units": ["A", 4]}}])
     assert r[0]["then"] == {"kind": "charge", "target": 100, "power_w": 300, "units": ["A"]}
     assert "100 %" in automation.describe(r[0])
+
+
+# ---- Entladesperre ----
+def test_sperre_verhindert_entladen_laesst_pv_durch():
+    cfg = mk_cfg()
+    units = [mk_unit(cfg, i, 80) for i in range(2)]
+    units[0]["dis_lock"] = True
+    units[0]["pv"] = 300
+    decide(cfg, mk_snap(cfg, 600, units))
+    assert units[0]["p"] <= 290 and units[0]["dcap"] == units[0]["pvcap"]
+    assert units[1]["p"] > 0                     # der andere gibt ab
+
+
+def test_sperre_ohne_pv_gibt_nichts_ab():
+    cfg = mk_cfg()
+    units = [mk_unit(cfg, 0, 80)]
+    units[0]["dis_lock"] = True
+    decide(cfg, mk_snap(cfg, 600, units))
+    assert units[0]["p"] == 0
+
+
+def test_job_sperrt_entladen_waehrend_laden():
+    cfg = mk_cfg()
+    units = [mk_unit(cfg, 0, 10), mk_unit(cfg, 1, 80)]
+    decide(cfg, mk_snap(cfg, 600, units, charge=job(units=["U0"])))
+    assert units[0]["p"] < 0 and units[1]["p"] == 0
+    units = [mk_unit(cfg, 0, 10), mk_unit(cfg, 1, 80)]
+    decide(cfg, mk_snap(cfg, 600, units, charge=job(units=["U0"], nodis=False)))
+    assert units[1]["p"] > 0
+
+
+def test_hold_bereinigt():
+    assert charge.clean_job({"target": 50, "hold": {"mode": "until", "at": "08:00"}})["hold"] == {"mode": "until", "at": "08:00"}
+    assert charge.clean_job({"target": 50, "hold": {"mode": "until", "at": "99:00"}})["hold"]["mode"] == "manual"
+    assert charge.clean_job({"target": 50})["hold"]["mode"] == "none"
+
+
+@pytest.mark.asyncio
+async def test_sperre_api_ablauf_und_halten(tmp_path):
+    import main as appmain
+    from aiohttp.test_utils import TestClient, TestServer
+    m, ctrl, ha, tasks = await start(str(tmp_path))
+    try:
+        assert await wait_for(lambda: ctrl.last_snap is not None)
+        ctrl.resume(); ctrl.chg_job = None; ctrl.locks.clear()
+        names = [u["name"] for u in ctrl.cfg["units"]]
+        async with TestClient(TestServer(appmain.build_app(ctrl, ctrl.store, ha))) as c:
+            assert (await c.post("/api/locks", json={"unit": "gibtsnicht", "on": True})).status == 400
+            r = await (await c.post("/api/locks", json={"unit": names[0], "on": True})).json()
+            assert names[0] in r["locks"]
+            assert await wait_for(lambda: ctrl.status.get("locks") and names[0] in ctrl.status["locks"])
+            assert await wait_for(lambda: any(u["dis_lock"] for u in ctrl.status["units"]))
+            ctrl.locks[names[0]]["until"] = 1.0                 # abgelaufen
+            assert await wait_for(lambda: names[0] not in ctrl.locks)
+            # Ziel erreicht + halten bis Uhrzeit
+            await ctrl.charge_start({"target": 60, "units": [names[1]], "hold": {"mode": "manual"}}, "Test")
+            m.set_state("sensor.soc_b", 61)
+            assert await wait_for(lambda: ctrl.chg_job is None)
+            assert names[1] in ctrl.locks and ctrl.locks[names[1]]["until"] == 0
+            r = await (await c.post("/api/locks", json={"unit": names[1], "on": False})).json()
+            assert names[1] not in r["locks"]
+    finally:
+        ctrl.locks.clear()
+        await stop(m, tasks)

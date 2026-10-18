@@ -35,6 +35,7 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
       "api/accounts":()=>({users:global.ACCTS||[],roles:{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"}}),
       "api/report":()=>({title:"SOLASI Wochenbericht",text:"Verbrauch 70 kWh.",weekly:false}),
       "api/phases/discover":()=>({sensors:[{entity:"sensor.em_a_power",name:"3EM Phase A Power",kind:"power",phase:"L1",value:"120",unit:"W"},{entity:"sensor.em_b_power",name:"3EM Phase B Power",kind:"power",phase:"L2",value:"80",unit:"W"},{entity:"sensor.em_c_power",name:"3EM Phase C Power",kind:"power",phase:"L3",value:"40",unit:"W"}]}),
+      "api/locks":()=>{const b=JSON.parse(o.body);calls.push("lock:"+b.unit+":"+b.on+":"+(b.until||""));status.locks=status.locks||{};if(b.on)status.locks[b.unit]={until:0};else delete status.locks[b.unit];return {ok:true,locks:status.locks};},
       "api/charge/estimate":()=>({estimate:{kwh:2.5,hours:3.1,power_w:800,rows:[]}}),
       "api/charge/start":()=>{const b=JSON.parse(o.body);if(!(b.target>0))return {ok:false,error:"Ungültiges Ziel"};calls.push("charge:start:"+b.target+":"+b.power_w+":"+(b.units||[]).join("|"));status.charge={active:true,job:{target:b.target,power_w:b.power_w,units:b.units,hours:b.hours,started:Date.now()/1000,source:"Oberfläche",start_soc:{"Speicher A":10}},units:[{name:"Speicher A",soc:10,start:10}],alloc:{"Speicher A":800},estimate:{kwh:2.5,hours:3.1,power_w:800}};return {ok:true,...status.charge};},
       "api/charge/stop":()=>{calls.push("charge:stop");status.charge={active:false,job:null};return {ok:true,changed:true};},
@@ -500,6 +501,15 @@ const w=dom.window,d=w.document;
   ok(calls.includes("charge:stop")&&d.getElementById("chgchip").style.display==="none"&&d.getElementById("chg_form").style.display==="","Laden: Beenden stellt Formular und Kopfzeile zurück");
   const dord=d.getElementById("chg_dorder");dord.value="parallel";dord.dispatchEvent(new w.Event("change",{bubbles:true}));
   ok(w.eval("cfg.charge.order")==="parallel","Laden: Standard-Reihenfolge wird in die Einstellungen übernommen");
+  // Entladesperre
+  w.showPage("charge");await new Promise(r=>setTimeout(r,300));
+  ok(d.querySelectorAll("#chg_locks [data-lk]").length>=1&&/gibt normal ab/.test(d.getElementById("chg_locks").textContent),"Sperre: Speicher mit Sperren-Knopf");
+  d.querySelector('#chg_locks [data-lk][data-on="1"]').click();await new Promise(r=>setTimeout(r,200));
+  ok(calls.some(c=>/^lock:.*:true:$/.test(c))&&/gesperrt bis zur Freigabe/.test(d.getElementById("chg_locks").textContent)&&d.getElementById("lkchip").style.display!=="none","Sperre: gesetzt, in der Liste und in der Kopfzeile");
+  d.querySelector('#chg_locks [data-lk][data-on="0"]').click();await new Promise(r=>setTimeout(r,200));
+  ok(calls.some(c=>/^lock:.*:false:/.test(c))&&d.getElementById("lkchip").style.display==="none","Sperre: Freigeben entfernt Sperre und Anzeige");
+  const hd=d.getElementById("chg_hold");hd.value="until";hd.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(d.getElementById("chg_holdat").style.display!=="none"&&w.eval("chgF.hold")==="until"&&w.eval("chgBody().hold.at")==="08:00","Laden: „Danach halten bis Uhrzeit“ zeigt das Zeitfeld");
   // Automatik
   w.showPage("auto");await new Promise(r=>setTimeout(r,120));
   ok(d.getElementById("p-auto").classList.contains("act")&&d.querySelectorAll("#p-auto .rule").length===0&&/Wochenbericht/.test(d.getElementById("p-auto").textContent),"Automatik: leere Liste und Wochenbericht");

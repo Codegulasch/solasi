@@ -11,7 +11,7 @@ import logging
 import math
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import drivers
 import energy
@@ -413,6 +413,11 @@ def decide(cfg, snap):
         u["pvcap"] = min(u["cfg"]["max_dis"], max(pv_u - 10.0, 0.0)) if pass_ok else 0.0
         u["dcap"] = u["cfg"]["max_dis"] if (u["elig_dis"] and not u.get("locked")) else u["pvcap"]
         u["ccap"] = u["cfg"]["max_chg"] if u["elig_chg"] else 0
+        jb = snap.get("charge")
+        if u.get("dis_lock") or (jb and jb.get("nodis", True)):
+            # Entladesperre: nichts aus der Batterie, nur was die Module gerade liefern (PV-Durchleitung) geht ins Haus
+            u["elig_dis"] = False
+            u["dcap"] = u["pvcap"]
         if u.get("obs"):
             u["dcap"] = u["ccap"] = u["pvcap"] = 0
         # Die Leistungs-Entität selbst begrenzt, was der Speicher annimmt (z. B. 800 W). Mehr zu verlangen bringt nichts,
@@ -543,6 +548,9 @@ class Controller:
         self.chg_job = charge_mod.clean_job(load_json(self.chg_path, {}).get("job"))
         self._chg_progress = None        # (Zeitpunkt, Summe kWh) für die Fortschrittskontrolle
         self._chg_restore = {}           # Speicher -> (Entität, alter Wert) der Ladeobergrenze nach dem Auftrag
+        self.lock_path = data_path("dislock.json")
+        raw_l = load_json(self.lock_path, {}).get("locks")
+        self.locks = {str(k): v for k, v in (raw_l if isinstance(raw_l, dict) else {}).items() if isinstance(v, dict)}
         self.chg_last = None             # Ergebnis des letzten Auftrags für die Anzeige
         self.learner = BaseLoadLearner(data_path("learn.json"))
         self.notifier = Notifier(self)
@@ -879,6 +887,7 @@ class Controller:
             self.phases_cycle(snap)
         except Exception:  # noqa: BLE001
             log.exception("Fehler bei der Phasenauswertung")
+        self.locks_cycle(snap)
         try:
             await self.charge_cycle(snap)
         except Exception:  # noqa: BLE001
@@ -1041,6 +1050,58 @@ class Controller:
         if drivers.driver(uc) == "script":
             self._script_mem[u["k"]] = float(p)
 
+    # ---------- Entladesperre ----------
+    def _save_locks(self):
+        save_json(self.lock_path, {"locks": self.locks})
+
+    def locks_cycle(self, snap):
+        """Abgelaufene Sperren lösen, Sperre in die Speicher des Snapshots schreiben."""
+        now = time.time()
+        for k, v in list(self.locks.items()):
+            if v.get("until") and now >= v["until"]:
+                del self.locks[k]
+                self._save_locks()
+                self.event("info", f"{k}: Entladesperre abgelaufen, der Speicher gibt wieder ab")
+                self.wake.set()
+        for u in snap["units"]:
+            u["dis_lock"] = u["k"] in self.locks
+
+    def lock_view(self):
+        return {k: {"until": v.get("until") or 0, "since": v.get("since"), "why": v.get("why", "")} for k, v in self.locks.items()}
+
+    def set_lock(self, name, on, until=0, why=""):
+        """Entladen eines Speichers sperren oder freigeben. until: Epoch-Sekunden, 0 = bis zur Freigabe."""
+        if name not in [u["name"] for u in self.cfg["units"]]:
+            return False
+        if on:
+            until = float(until) if isinstance(until, (int, float)) and until > time.time() else 0
+            self.locks[name] = {"until": until, "since": time.time(), "why": str(why)[:60]}
+            self.event("info", f"{name}: Entladen gesperrt" + (f" bis {datetime.fromtimestamp(until).strftime('%d.%m. %H:%M')}" if until else "")
+                       + (f" ({why})" if why else ""))
+        elif name in self.locks:
+            del self.locks[name]
+            self.event("info", f"{name}: Entladesperre aufgehoben")
+        else:
+            return True
+        self._save_locks()
+        self.wake.set()
+        return True
+
+    @staticmethod
+    def until_from_time(hhmm):
+        """„HH:MM“ -> nächste solche Uhrzeit als Epoch-Sekunden (0 bei ungültiger Eingabe)."""
+        try:
+            h, m = (int(x) for x in str(hhmm).split(":"))
+            if not (0 <= h < 24 and 0 <= m < 60):
+                return 0
+        except (TypeError, ValueError):
+            return 0
+        now = now_local()
+        t = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if t <= now:
+            t = t + timedelta(days=1)
+        return t.timestamp()
+
     # ---------- Netz-Laden ----------
     STUCK_S = 1200             # so lange darf der Ladestand trotz Auftrag nicht steigen
 
@@ -1134,6 +1195,11 @@ class Controller:
                 uc, old = u["cfg"], job["prev_lim"].get(u["k"])
                 if old is not None and uc.get("lim_chg") and not uc.get("write_limits"):
                     self._chg_restore[u["k"]] = (uc["lim_chg"], old)
+        hold = job.get("hold") or {}
+        if kind == "done" and hold.get("mode") in ("until", "manual"):
+            until = self.until_from_time(hold.get("at")) if hold["mode"] == "until" else 0
+            for u in charge_mod.in_scope(job, snap["units"]) if snap else []:
+                self.set_lock(u["k"], True, until, "gehalten nach dem Laden")
         self.chg_last = {"why": why, "kind": kind, "target": job["target"], "at": time.strftime("%d.%m. %H:%M"),
                          "hours": round((time.time() - job["started"]) / 3600, 2)}
         self.chg_job, self._chg_progress = None, None
@@ -1699,6 +1765,7 @@ class Controller:
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
             "flow_cfg": clean_flow(self.cfg.get("flow")), "phases": st.get("phases"),
+            "locks": sorted((st.get("locks") or {}).keys()),
             "charge": {"active": bool((st.get("charge") or {}).get("active")), "target": ((st.get("charge") or {}).get("job") or {}).get("target")},
             "card_cfg": clean_card(self.cfg.get("card")),
             "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"], "order": self.meter_view()["order"],
@@ -1762,7 +1829,7 @@ class Controller:
             "curtail": dict(self.curtail), "learned_base_load": self.learner.value, "safety": dict(self.safety),
             "base_load_used": round(self.base_load_effective()),
             "trend": self.trend_series(), "meter_view": self.meter_view(), "phases": self.phases_view,
-            "charge": self.charge_view(snap, d),
+            "charge": self.charge_view(snap, d), "locks": self.lock_view(),
             "want": "Entladen" if d["want_dis"] else "Laden" if d["want_chg"] else "Leerlauf",
             "surplus_w": None if d["surplus_w"] is None else round(d["surplus_w"]),
             "units": [{
@@ -1772,7 +1839,7 @@ class Controller:
                 "auto_paused": bool(self._reach.get(u["k"], {}).get("auto")),
                 "cap": u["cap"], "kwh": None if u["soc"] < 0 else round(max(0.0, min(100.0, u["soc"])) / 100 * u["cap"], 2),
                 "ac": None if u.get("ac") is None else round(u["ac"]), "bat": None if u.get("bat") is None else round(u["bat"]),
-                "locked": bool(u.get("locked")), "full": bool(u.get("full")),
+                "locked": bool(u.get("locked")), "full": bool(u.get("full")), "dis_lock": bool(u.get("dis_lock")),
                 "min": u.get("min"), "max": u.get("max"), "lim_dis": u.get("lim_dis"), "lim_chg": u.get("lim_chg"), "lim_res": u.get("lim_res"),
             } for u in snap["units"]],
             "limited": any(u.get("locked") for u in snap["units"]),

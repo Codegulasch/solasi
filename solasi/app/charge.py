@@ -29,6 +29,17 @@ def clean_charge(raw):
     return {"order": order if order in ORDERS else "low", "max_w": int(_num(raw.get("max_w"), 0, 20000, 0))}
 
 
+def _hold(raw):
+    """Nach dem Ziel halten: none | until (Uhrzeit HH:MM) | manual (bis zur Freigabe)."""
+    raw = raw if isinstance(raw, dict) else {}
+    mode = raw.get("mode") if raw.get("mode") in ("until", "manual") else "none"
+    at = str(raw.get("at") or "")
+    ok = len(at) == 5 and at[2] == ":" and at[:2].isdigit() and at[3:].isdigit() and int(at[:2]) < 24 and int(at[3:]) < 60
+    if mode == "until" and not ok:
+        mode = "manual"
+    return {"mode": mode, "at": at if ok else ""}
+
+
 def clean_job(raw, names=None):
     """Auftrag prüfen. None, wenn ungültig."""
     if not isinstance(raw, dict):
@@ -45,6 +56,8 @@ def clean_job(raw, names=None):
             "started": raw.get("started") if isinstance(raw.get("started"), (int, float)) else time.time(),
             "start_soc": raw.get("start_soc") if isinstance(raw.get("start_soc"), dict) else {},
             "prev_lim": raw.get("prev_lim") if isinstance(raw.get("prev_lim"), dict) else {},
+            "nodis": raw.get("nodis", True) is not False,
+            "hold": _hold(raw.get("hold")),
             "source": str(raw.get("source") or "")[:60]}
 
 
