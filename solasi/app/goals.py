@@ -152,6 +152,28 @@ def active_mode(cfg):
     return m["id"]
 
 
+def effect(cfg, units=None):
+    """Was bewirken die aktuellen Grenzen gerade? -> {head, units: [{name, soc, state, text}], note}. Reine Beschreibung, steuert nichts."""
+    so = cfg.get("soc") or {}
+    lo, hi = so.get("min", 15), so.get("max", 99)
+    rows = []
+    for u in units or []:
+        soc = u.get("soc")
+        if soc is None or soc < 0 or u.get("paused"):
+            continue
+        n = u.get("name") or "Speicher"
+        if soc >= hi:
+            rows.append({"name": n, "soc": soc, "state": "full", "text": f"{n} ({soc} %) ist voll (ab {hi} %) – lädt nicht weiter, gibt ab."})
+        elif soc <= lo:
+            rows.append({"name": n, "soc": soc, "state": "low", "text": f"{n} ({soc} %) liegt unter {lo} % – gibt nichts ab, nur die eigene Solarleistung geht ins Haus."})
+        else:
+            rows.append({"name": n, "soc": soc, "state": "ok", "text": f"{n} ({soc} %) darf abgeben, bis {lo} % erreicht sind."})
+    return {"head": f"Gibt ab bis {lo} %, lädt bis {hi} %",
+            "units": rows,
+            "note": "Geladen wird nur bei Überschuss (Solar größer als Verbrauch, bzw. Einspeisung). SOLASI lädt nicht aus dem Netz nach – ein Modus setzt Grenzen, er erzwingt kein Laden."}
+
+
 def snapshot(cfg):
-    return {"goals": effective(cfg), "derived": derive(effective(cfg)), "mode": active_mode(cfg), "modes": all_modes(cfg), "table": table(cfg),
+    modes = [dict(m, derived=derive(m)) for m in all_modes(cfg)]
+    return {"goals": effective(cfg), "derived": derive(effective(cfg)), "mode": active_mode(cfg), "modes": modes, "table": table(cfg),
             "set": copy.deepcopy(cfg.get("goals") or {})}

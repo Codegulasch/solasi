@@ -210,7 +210,151 @@ const SF = (() => {
     return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Energiefluss">${CSS}<g transform="translate(${(W - 640) / 2} 0)">${drawLines(lines)}${tiles.join("")}</g></svg>`;
   }
 
-  const FLOW_DEF = { size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
+  /* Haus-Ansicht: Schrägansicht (isometrisch). Solaranlagen: die erste auf dem Hausdach, weitere auf Pergolen hinter dem Haus.
+     Speicher stehen als Schränke vor dem Haus, das Netz als Mast. Linien tragen den Fluss (Punkte laufen gleichmäßig). */
+  function flowHouse(d, U, o) {
+    const S = 52, OX = 470, OY = 130, K = .866;
+    const P = (x, y, z = 0) => [OX + (x - y) * K * S, OY + (x + y) * .5 * S - z * S];
+    const pts = a => a.map(p => P(...p).map(v => v.toFixed(1)).join(",")).join(" ");
+    const px = Number(d.w) || 0, m = px ? Math.max(1, Math.min(2.4, 850 / px * .8)) : 1;
+    const mix = (c, k, w) => `color-mix(in srgb,var(${c}),${k} ${w}%)`;
+    const FT = mix("--sf-tile", "#fff", 7), FL = mix("--sf-tile", "#000", 10), FR = mix("--sf-tile", "#000", 20), ST = "var(--sf-line)";
+    let ob = "";
+    const poly = (a, f, st = ST, sw = 1.4, ex = "") => { ob += `<polygon points="${pts(a)}" style="fill:${f};stroke:${st};stroke-width:${sw}" stroke-linejoin="round" ${ex}/>`; };
+    const box = (x, y, z, w, dd, h, top = FT, left = FL, right = FR, st = ST) => {
+      poly([[x + w, y, z], [x + w, y + dd, z], [x + w, y + dd, z + h], [x + w, y, z + h]], right, st);
+      poly([[x, y + dd, z], [x + w, y + dd, z], [x + w, y + dd, z + h], [x, y + dd, z + h]], left, st);
+      poly([[x, y, z + h], [x + w, y, z + h], [x + w, y + dd, z + h], [x, y + dd, z + h]], top, st);
+    };
+    const tint = (c, w) => `color-mix(in srgb,var(${c}) ${w}%,var(--sf-tile))`;
+
+    // ---- Daten ----
+    const grid = d.grid == null ? 0 : d.grid, gv = d.f && d.f.gh != null ? d.f.gh : grid;
+    const units = U.length ? U : [{ name: "Speicher", soc: d.soc, kwh: d.kwh, pv: d.pv, bat: d.bat }];
+    const n = Math.min(units.length, 4), UU = units.slice(0, n), names = shortNames(UU.map(u => u.name));
+    const arrays = UU.map((u, i) => ({ i, pv: u.paused || u.pv == null ? null : Math.max(u.pv, 0), name: names[i] })).filter(a => a.pv != null);
+    if (!arrays.length && d.pv != null) arrays.push({ i: 0, pv: Math.max(d.pv, 0), name: "Solar" });
+    const pvTotal = arrays.length ? arrays.reduce((a, s) => a + s.pv, 0) : null;
+    const lanes = [];      // {pts (Welt), col, val, chip}
+
+    // ---- Boden ----
+    box(-.4, -.4, -.3, 11.2, 7.6, .3, mix("--sf-tile", "#fff", 3), mix("--sf-tile", "#000", 8), mix("--sf-tile", "#000", 16));
+
+    // ---- Zusätzliche Anlagen: Aufständerung auf dem Boden vor dem Haus ----
+    const GR = [{ x: 8.6, y: 3.2, w: 1.9, d: 1.5, entry: [[8.6, 3.95, .3], [8.02, 3.95, .3]] },
+      { x: 8.6, y: 5.1, w: 1.9, d: 1.5, entry: [[8.6, 5.85, .25], [8.3, 5.85, .02], [8.3, 3.3, .02], [8.02, 3.3, .3]] },
+      { x: 6.7, y: 5.1, w: 1.7, d: 1.5, entry: [[7.55, 5.1, .3], [7.55, 4.6, .02], [7.2, 4.15, .02]] }];
+    arrays.forEach((a, k) => {
+      if (k === 0) return;
+      const g = GR[Math.min(k - 1, GR.length - 1)], y1 = g.y + g.d;
+      box(g.x + .1, y1 - .1, 0, .1, .1, .3, FL, FL, FR); box(g.x + g.w - .2, y1 - .1, 0, .1, .1, .3, FL, FL, FR);
+      const pt = (u, v) => [g.x + u * g.w, y1 - v * g.d, .3 + v * .75];
+      poly([pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)], FR, ST, 1.2);
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
+        const u0 = .04 + i * .32, u1 = u0 + .28, v0 = .06 + j * .47, v1 = v0 + .42;
+        poly([pt(u0, v0), pt(u1, v0), pt(u1, v1), pt(u0, v1)], tint("--sf-sun", 22), "var(--sf-sun)", 1.3);
+      }
+      a.world = pt(.5, 1); a.pole = g.entry;
+    });
+
+    // ---- Netzmast (hinten rechts) ----
+    box(9.6, 1.4, 0, .3, .3, 3.2, FL, FL, FR);
+    box(9.15, 1.35, 2.9, 1.2, .4, .12, tint("--sf-grid", 55), tint("--sf-grid", 40), tint("--sf-grid", 30), "var(--sf-grid)");
+    ob += `<polyline points="${pts([[9.6, 1.55, 3.0], [8.6, 1.9, 2.4], [8, 2.0, 2.3]])}" style="fill:none;stroke:var(--sf-grid);stroke-width:2;opacity:.55"/>`;
+
+    // ---- Haus ----
+    box(4, 1, 0, 4, 3, 2.6);
+    const win = (x0, x1, z0, z1, f) => poly([[x0, 4.001, z0], [x1, 4.001, z0], [x1, 4.001, z1], [x0, 4.001, z1]], f, ST, 1.2);
+    const wf = tint("--sf-sun", 16);
+    win(4.3, 4.9, 1.1, 2.0, wf); win(6.7, 7.5, 1.1, 2.0, wf); win(5.2, 5.9, 0, 1.7, mix("--sf-tile", "#000", 38));
+    poly([[8.001, 1.5, 1.1], [8.001, 2.2, 1.1], [8.001, 2.2, 2.0], [8.001, 1.5, 2.0]], wf, ST, 1.2);
+    poly([[8.001, 2.9, 1.1], [8.001, 3.6, 1.1], [8.001, 3.6, 2.0], [8.001, 2.9, 2.0]], wf, ST, 1.2);
+    poly([[8, 1, 2.6], [8, 4, 2.6], [8, 2.5, 3.9]], FR, ST, 1.6);
+    poly([[4, 4, 2.6], [8, 4, 2.6], [8, 2.5, 3.9], [4, 2.5, 3.9]], mix("--sf-tile", "#fff", 12), "var(--sf-muted)", 1.6);
+    const roofPt = (u, v) => [4 + u * 4, 4 - v * 1.5, 2.6 + v * 1.3];
+    if (arrays.length) for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) {
+      const u0 = .07 + i * .235, u1 = u0 + .205, v0 = .12 + j * .43, v1 = v0 + .38;
+      poly([roofPt(u0, v0), roofPt(u1, v0), roofPt(u1, v1), roofPt(u0, v1)], tint("--sf-sun", 22), "var(--sf-sun)", 1.5);
+    }
+
+    // ---- Speicher-Schränke ----
+    const cw = n > 2 ? 1.1 : 1.2, step = n > 2 ? 1.3 : 2.6, cab = [];
+    UU.forEach((u, i) => {
+      const x = i * step, soc = u.soc != null && u.soc >= 0 ? Math.round(u.soc) : null, pz = !!u.paused;
+      box(x, 4.4, 0, cw, 1.0, 1.7, tint("--sf-bat", 26), tint("--sf-bat", 16), tint("--sf-bat", 10), "var(--sf-bat)");
+      if (soc != null && !pz) {
+        const fill = Math.max(.05, soc / 100) * 1.35;
+        poly([[x + .12, 5.401, .15], [x + cw - .12, 5.401, .15], [x + cw - .12, 5.401, .15 + fill], [x + .12, 5.401, .15 + fill]], socCol(soc), "none", 0, 'opacity=".85"');
+      }
+      cab.push({ x, soc, pz, u });
+      const bat = pz || u.bat == null ? 0 : u.bat;
+      const doorx = 6.6 - i * .45, lane = 6.1 + (n - 1 - i) * .5, xc = x + cw / 2;
+      lanes.push({ pts: [[xc, 5.5, .02], [xc, lane, .02], [doorx, lane, .02], [doorx, 4.15, .02]], col: "--sf-bat", val: bat, at: .34 + .1 * (i % 3) });
+    });
+
+    // ---- Linien: Netz, Solar ----
+    lanes.push({ pts: [[9.6, 1.7, .02], [8.1, 1.7, .02]], col: "--sf-grid", val: gv });
+    arrays.forEach((a, k) => {
+      if (k === 0) lanes.push({ pts: [[6, 2.9, 3.8], [6, 3.6, 2.5], [6, 4, 1.8]], col: "--sf-sun", val: a.pv });
+      else lanes.push({ pts: a.pole, col: "--sf-sun", val: a.pv });
+    });
+
+    // ---- Linien zeichnen (abgerundet, gleichmäßig laufende Punkte) ----
+    const scr = a => a.map(p => P(...p));
+    const rounded = (A, r = 14) => {
+      let s = `M${A[0][0].toFixed(1)} ${A[0][1].toFixed(1)}`;
+      for (let i = 1; i < A.length - 1; i++) {
+        const p0 = A[i - 1], p1 = A[i], p2 = A[i + 1];
+        const l1 = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), l2 = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]), rr = Math.min(r, l1 / 2, l2 / 2);
+        if (rr < 1) { s += `L${p1[0].toFixed(1)} ${p1[1].toFixed(1)}`; continue; }
+        const a1 = [p1[0] + (p0[0] - p1[0]) / l1 * rr, p1[1] + (p0[1] - p1[1]) / l1 * rr], a2 = [p1[0] + (p2[0] - p1[0]) / l2 * rr, p1[1] + (p2[1] - p1[1]) / l2 * rr];
+        s += `L${a1[0].toFixed(1)} ${a1[1].toFixed(1)}Q${p1[0].toFixed(1)} ${p1[1].toFixed(1)} ${a2[0].toFixed(1)} ${a2[1].toFixed(1)}`;
+      }
+      const e = A[A.length - 1]; return s + `L${e[0].toFixed(1)} ${e[1].toFixed(1)}`;
+    };
+    const plen = A => A.reduce((t, p, i) => i ? t + Math.hypot(p[0] - A[i - 1][0], p[1] - A[i - 1][1]) : 0, 0);
+    const along = (A, f) => { let t = plen(A) * f; for (let i = 1; i < A.length; i++) { const l = Math.hypot(A[i][0] - A[i - 1][0], A[i][1] - A[i - 1][1]); if (t <= l) return [A[i - 1][0] + (A[i][0] - A[i - 1][0]) * t / l, A[i - 1][1] + (A[i][1] - A[i - 1][1]) * t / l]; t -= l; } return A[A.length - 1]; };
+    let base = "", live = "", chips = "";
+    for (const x of lanes) {
+      const A = scr(x.pts), val = x.val == null ? 0 : x.val, a = Math.abs(val);
+      base += `<path d="${rounded(A)}" style="fill:none;stroke:var(${x.col});stroke-width:9;stroke-linecap:round;stroke-linejoin:round;opacity:.13"/>`;
+      if (a < 5) continue;
+      const Fw = val >= 0 ? A : [...A].reverse(), len = plen(Fw), w = Math.min(7, 3.2 + a / 500), spd = Math.max(55, Math.min(200, 55 + a / 8)), dur = len / spd, cnt = Math.max(2, Math.round(len / 46));
+      const dstr = rounded(Fw);
+      live += `<path d="${dstr}" style="fill:none;stroke:var(${x.col});stroke-width:${w.toFixed(1)};stroke-linecap:round;stroke-linejoin:round;opacity:.45"/>`;
+      for (let i = 0; i < cnt; i++) {
+        if (reduced()) { const [qx, qy] = along(Fw, (i + .5) / cnt); live += `<circle cx="${qx.toFixed(1)}" cy="${qy.toFixed(1)}" r="${(w / 2 + 1.6).toFixed(1)}" style="fill:var(${x.col})"/>`; }
+        else live += `<circle r="${(w / 2 + 1.7).toFixed(1)}" style="fill:var(${x.col})"><animateMotion dur="${dur.toFixed(2)}s" begin="${(-i * dur / cnt).toFixed(2)}s" repeatCount="indefinite" path="${dstr}"/></circle>`;
+      }
+      const [cx, cy] = along(A, x.at || .5), t = fmt(a) + " W", tw = (t.length * 7.4 + 16) * m;
+      chips += `<g><rect x="${(cx - tw / 2).toFixed(1)}" y="${(cy - 12 * m).toFixed(1)}" width="${tw.toFixed(1)}" height="${(24 * m).toFixed(1)}" rx="${12 * m}" style="fill:var(--sf-card);stroke:var(${x.col});stroke-opacity:.6;stroke-width:1.4"/><text x="${cx.toFixed(1)}" y="${(cy + 4.6 * m).toFixed(1)}" text-anchor="middle" style="font-size:${(13 * m).toFixed(1)}px" class="sf-c">${t}</text></g>`;
+    }
+
+    // ---- Beschriftungen ----
+    const card = (p, l1, l2, col, lift = 0) => {
+      const [x, y0] = P(...p), y = y0 - lift, w = (Math.max(l1.length, l2.length) * 8 + 26) * m, h = 44 * m;
+      return `<g><rect x="${(x - w / 2).toFixed(1)}" y="${(y - h / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${12 * m}" style="fill:var(--sf-card);stroke:var(${col});stroke-width:1.5"/>
+        <text x="${x.toFixed(1)}" y="${(y - 4 * m).toFixed(1)}" text-anchor="middle" class="sf-hl" style="font-size:${(11.5 * m).toFixed(1)}px;fill:var(${col})">${l1}</text>
+        <text x="${x.toFixed(1)}" y="${(y + 14 * m).toFixed(1)}" text-anchor="middle" class="sf-hv" style="font-size:${(15 * m).toFixed(1)}px">${l2}</text></g>`;
+    };
+    let lab = "";
+    cab.forEach((c, i) => {
+      const [bv, bt] = batState(c.u, c.u.bat);
+      lab += card([c.x + cw / 2, 4.9, 1.75], esc(clip(names[i], 9)) + (c.soc != null ? " · " + c.soc + " %" : ""), bt ? bv + " " + bt : bv, "--sf-bat", (n > 2 ? (2 - i % 3) * 50 * m : 0));
+    });
+    arrays.forEach((a, k) => { lab += card(k === 0 ? [6, 2.5, 5.0] : a.world.map((v, j) => j === 2 ? v + .9 : v), "SOLAR" + (arrays.length > 1 ? " " + esc(clip(a.name, 8)) : ""), wl(a.pv), "--sf-sun"); });
+    lab += card([9.75, 1.55, 4.3], "NETZ", fmt(Math.abs(grid)) + " W" + (grid >= 5 ? " Bezug" : grid <= -5 ? " Einspeisung" : ""), "--sf-grid");
+    lab += card([5.6, 4.0, 1.5], "HAUS", wl(d.house), "--sf-home");
+    // Sonne
+    const [sx, sy] = P(8.6, .2, 5.4), sun = pvTotal != null && pvTotal >= 5, sc = sun ? "var(--sf-sun)" : "var(--sf-muted)";
+    const rays = [0, 45, 90, 135, 180, 225, 270, 315].map(a => `<line x1="${(sx + 22 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y1="${(sy + 22 * Math.sin(a * Math.PI / 180)).toFixed(1)}" x2="${(sx + 30 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y2="${(sy + 30 * Math.sin(a * Math.PI / 180)).toFixed(1)}" style="stroke:${sc};stroke-width:3;stroke-linecap:round"/>`).join("");
+    const sunSvg = `<g opacity="${sun ? 1 : .35}"><circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="16" style="fill:${sc}"/>${rays}</g>`;
+    // Ansichtsfenster: bei schmaler Anzeige etwas enger
+    const vb = "60 0 900 625";
+    return `<svg viewBox="${vb}" role="img" aria-label="Energiefluss als Haus">${CSS}<style>.sf-hl{font-weight:700;letter-spacing:.04em}.sf-hv{font-weight:800;fill:var(--sf-fg)}</style>${sunSvg}${ob}${base}${live}${lab}${chips}</svg>`;
+  }
+
+  const FLOW_DEF = { view: "flow", size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
   /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}],
          fl?:{layout: total|pairs|compact, total, solar, bat, grid, house, grid_pos: mid|side, order:[Namen]}} */
   function flow(d) {
@@ -221,6 +365,7 @@ const SF = (() => {
       const rk = u => { const i = ord.indexOf(u.name); return i < 0 ? 999 : i; };
       U = U.map((u, i) => [u, i]).sort((a, b) => rk(a[0]) - rk(b[0]) || a[1] - b[1]).map(x => x[0]);
     }
+    if (o.view === "house") return flowHouse(d, U, o);
     if (o.layout !== "compact") {
       if (U.length === 2) return flowPairs(d, U, o);
       if (U.length > 2) return flowMulti(d, U, o);
@@ -367,25 +512,25 @@ const SF = (() => {
     .sfm-r{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
     .sfm-t{cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-radius:14px;padding:12px 14px;min-width:0;background:var(--sf-tile,rgba(128,128,128,.12))}
     .sfm-h{display:grid}
-    .sfm-h .sfm-t{justify-content:center;gap:8px;padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--sf-sun) 18%,var(--sf-tile,transparent)),var(--sf-tile,transparent) 85%)}
+    .sfm-h .sfm-t{justify-content:center;gap:8px;padding:16px;min-width:0;background:linear-gradient(135deg,color-mix(in srgb,var(--sf-sun) 18%,var(--sf-tile,transparent)),var(--sf-tile,transparent) 85%)}
     .sfm-hd{display:flex;align-items:center;gap:9px;min-width:0;width:100%}
     .sfm-ic{flex:none;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c)}
     .sfm-h .sfm-ic{width:38px;height:38px;border-radius:12px}
     .sfm-ic svg{width:18px;height:18px}.sfm-h .sfm-ic svg{width:22px;height:22px}
-    .sfm-n{font-size:13px;line-height:1.25;color:var(--sf-muted);font-weight:600;min-width:0;overflow-wrap:anywhere}
+    .sfm-n{font-size:13px;line-height:1.25;color:var(--sf-muted);font-weight:600;min-width:0;overflow-wrap:break-word;hyphens:auto}
     .sfm-v{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--sf-fg);white-space:nowrap}
     .sfm-h .sfm-v{font-size:28px}
     .sfm-v small{font-size:12.5px;font-weight:600;color:var(--sf-muted);margin-left:3px}
-    .sfm-d{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:nowrap}
+    .sfm-d{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:normal;overflow-wrap:break-word}
     .sfm-d b{color:var(--sf-ok);font-weight:700}
-    .sfm-c{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:nowrap}
+    .sfm-c{font-size:12px;color:var(--sf-muted);margin-top:1px;white-space:normal;overflow-wrap:break-word}
     .sfm-c i{font-style:normal;font-weight:700}.sfm-c .cg{color:var(--sf-ok)}.sfm-c .cb{color:var(--sf-bad)}
     .sfm.even .sfm-h .sfm-t{height:100%}
     .sfm.big .sfm-r .sfm-t{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
     .sfm.big .sfm-r .sfm-hd{width:auto;flex:1}
     .sfm.big .sfm-r .sfm-val{text-align:right;flex:none}
     .sfm.big .sfm-r .sfm-v{font-size:18px}
-    @container (max-width:440px){
+    @container (max-width:560px){
       .sfm.big{grid-template-columns:minmax(0,1fr)}
       .sfm.big .sfm-h .sfm-t{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;height:auto}
       .sfm.big .sfm-h .sfm-hd{width:auto;flex:1}.sfm.big .sfm-h .sfm-val{text-align:right;flex:none}

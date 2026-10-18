@@ -70,3 +70,14 @@ async def test_api_modi(tmp_path):
         cfg["goals"] = {"mode": "x", "reserve": 900, "precision": None, "care": 5}
         assert (await c.post("/api/config", json=cfg)).status == 200
         assert store.cfg["goals"]["reserve"] == 100 and store.cfg["goals"]["precision"] is None
+
+
+def test_wirkung_beschreibt_grenzen():
+    cfg = copy.deepcopy(DEFAULT_CONFIG)
+    goals.apply(cfg, goals.mode_by_id(cfg, "balanced"), "balanced")
+    e = goals.effect(cfg, [{"name": "A", "soc": 5}, {"name": "B", "soc": 60}, {"name": "C", "soc": 97}, {"name": "D", "soc": -1}, {"name": "E", "soc": 50, "paused": True}])
+    assert e["head"] == "Gibt ab bis 26 %, lädt bis 94 %"
+    assert [(x["name"], x["state"]) for x in e["units"]] == [("A", "low"), ("B", "ok"), ("C", "full")]
+    assert "unter 26 %" in e["units"][0]["text"] and "nicht aus dem Netz" in e["note"]
+    snap = goals.snapshot(cfg)
+    assert all("derived" in m for m in snap["modes"]) and snap["modes"][1]["derived"]["soc.min"] == 10

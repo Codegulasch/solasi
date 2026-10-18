@@ -10,9 +10,9 @@ from aiohttp import web
 import copy
 import accounts as acc
 
-import demo
 import discover
 import goals
+import hogs
 import meterhist
 import replay
 import selfcheck
@@ -175,11 +175,6 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
 
     @routes.get("/api/status")
     async def status(_):
-        if store.cfg.get("demo"):
-            st = demo.status(store.cfg)
-            st["mode_id"] = goals.active_mode(store.cfg)
-            st["goal_mode"] = st["mode_id"]
-            return web.json_response(st)
         st = dict(ctrl.status)
         st.setdefault("connected", ha.connected)
         st["enabled"] = store.cfg["enabled"]
@@ -187,6 +182,10 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
         st["safety"] = dict(ctrl.safety)
         st["events"] = list(ctrl.events)[:80]
         st["mode_id"] = goals.active_mode(store.cfg)
+        m = goals.mode_by_id(store.cfg, st["mode_id"]) if st["mode_id"] else None
+        st["mode_name"] = m["name"] if m else ""
+        st["mode_icon"] = m.get("icon", "") if m else ""
+        st["mode_effect"] = goals.effect(store.cfg, st.get("units"))
         return web.json_response(st)
 
     @routes.get("/api/defaults")
@@ -199,6 +198,80 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
     async def discover_get(_):
         """Erkennt Speicher und Netz-Sensoren in Home Assistant (Einrichtungs-Assistent)."""
         return web.json_response(discover.discover(ha.states or {}, store.cfg))
+
+    def _hog_filter(q):
+        def iv(k, d=None):
+            try:
+                return int(q.get(k))
+            except (TypeError, ValueError):
+                return d
+        wd = [int(x) for x in (q.get("wd") or "").split(",") if x.strip().isdigit() and 0 <= int(x) <= 6]
+        return iv("days", 7), iv("from"), iv("to"), wd
+
+    @routes.get("/api/hogs")
+    async def hogs_get(request):
+        """Rangliste der Stromfresser für Zeitraum, Uhrzeit und Wochentage."""
+        days, tf, tt, wd = _hog_filter(request.query)
+        devs = (store.cfg.get("hogs") or {}).get("devices") or []
+        res = ctrl.hogs.rank(devs, days, tf, tt, wd, float((store.cfg.get("prices") or {}).get("import_ct", 35.0)))
+        res["info"] = ctrl.hogs.info()
+        res["configured"] = len(devs)
+        res["profile"] = {d["id"]: ctrl.hogs.profile(d["id"], days, tf, tt, wd) for d in devs[:40]}
+        return web.json_response(res)
+
+    @routes.get("/api/hogs/curve")
+    async def hogs_curve(request):
+        q = request.query
+        dev = q.get("dev") or ""
+        ok = {d["id"] for d in (store.cfg.get("hogs") or {}).get("devices") or []} | {hogs.HOUSE}
+        if dev not in ok:
+            return web.json_response({"error": "unbekanntes Gerät"}, status=400)
+        try:
+            res = int(q.get("res") or 60)
+            day = q.get("day") or None
+            if day:
+                datetime.strptime(day, "%Y-%m-%d")
+            cmp_day = q.get("cmp") or None
+            if cmp_day:
+                datetime.strptime(cmp_day, "%Y-%m-%d")
+        except ValueError:
+            return web.json_response({"error": "ungültiger Parameter"}, status=400)
+        out = {"dev": dev, "res": res, "points": ctrl.hogs.curve(dev, day, res)}
+        if cmp_day:
+            out["compare"] = ctrl.hogs.curve(dev, cmp_day, res)
+        return web.json_response(out)
+
+    @routes.get("/api/hogs/discover")
+    async def hogs_discover(_):
+        """Leistungssensoren (W/kW) in Home Assistant, die als Stromfresser in Frage kommen."""
+        have = {d["power"] for d in (store.cfg.get("hogs") or {}).get("devices") or []}
+        out = []
+        for eid, st in (ha.states or {}).items():
+            if not eid.startswith("sensor."):
+                continue
+            a = st.get("attributes") or {}
+            if a.get("device_class") != "power" and a.get("unit_of_measurement") not in ("W", "kW"):
+                continue
+            if eid in have or eid.startswith("sensor.solasi_"):
+                continue
+            out.append({"entity": eid, "name": a.get("friendly_name") or eid, "w": st.get("state"), "unit": a.get("unit_of_measurement") or "W"})
+        out.sort(key=lambda x: x["name"].lower())
+        return web.json_response({"sensors": out[:300]})
+
+    @routes.get("/api/phases")
+    async def phases_get(_):
+        return web.json_response({"view": ctrl.phases_view, "config": store.cfg.get("phases")})
+
+    @routes.get("/api/phases/discover")
+    async def phases_discover(_):
+        import phases
+        return web.json_response({"sensors": phases.discover(ha.states or {})})
+
+    @routes.post("/api/phases/reset")
+    async def phases_reset(_):
+        """Erkennung der Einspeise-Phase von vorn beginnen."""
+        ctrl.feed_det.reset()
+        return web.json_response({"ok": True})
 
     @routes.get("/api/report")
     async def report_get(_):
@@ -351,8 +424,6 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
             days = max(1, min(int(request.query.get("days", 30)), 400))
         except ValueError:
             days = 30
-        if store.cfg.get("demo"):
-            return web.json_response(demo.stats())
         ctrl.stats.save()
         return web.json_response(ctrl.stats.summary(days, store.cfg["prices"]))
 

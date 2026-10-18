@@ -18,6 +18,8 @@ import energy
 import watchdog
 from ha import is_num, num
 import automation
+import hogs as hogs_mod
+import phases as phases_mod
 import goals
 from learn import BaseLoadLearner, is_night
 from meters import Meters
@@ -122,8 +124,11 @@ DEFAULT_CONFIG = {
             "learn_base_load": False, "base_load_margin": 10, "base_load_min": 50, "base_load_max": 600},
     "notify": {"service": "", "delay_min": 2, "cooldown_min": 60, "recovery": True,
                "events": {"meter": True, "offline": True, "empty": True, "curtail": True, "errors": True, "stopped": True}},
-    "demo": False,
     "rules": [],
+    "hogs": {"devices": []},
+    "phases": {"enabled": False, "invert": False, "fuse_a": 0, "warn_pct": 90, "feed": "",
+               "sensors": {"L1": {"power": "", "voltage": "", "current": ""}, "L2": {"power": "", "voltage": "", "current": ""},
+                           "L3": {"power": "", "voltage": "", "current": ""}}},
     "reports": {"weekly": False},
     "prices": {"import_ct": 35.0, "feedin_ct": 8.0},
     "meters": {"show_day": True, "extra": False, "items": [], "order": [], "compare": "same"},
@@ -133,7 +138,7 @@ DEFAULT_CONFIG = {
              "accent": "", "gradient": True, "order": []},
     # Anordnung der Blöcke in Übersicht und Statistik (leer = Standardreihenfolge, gilt für alle Geräte)
     # Energiefluss: Vorlage (total, pairs, compact), einzelne Kacheln, Platz des Netzes, Reihenfolge der Anlagen (Namen)
-    "flow": {"size": "auto", "layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
+    "flow": {"view": "flow", "size": "auto", "layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
              "grid_pos": "mid", "passthrough": True, "order": []},
     "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
     # Ziele und Modi (siehe goals.py): Regler in Alltagssprache, aus denen die Einzelwerte berechnet werden
@@ -173,7 +178,8 @@ def clean_flow(raw):
     """Energiefluss-Einstellungen mit festen Werten; Unbekanntes wird zum Standard."""
     raw = raw if isinstance(raw, dict) else {}
     d = DEFAULT_CONFIG["flow"]
-    out = {"size": raw.get("size") if raw.get("size") in ("auto", "compact", "large") else d["size"],
+    out = {"view": raw.get("view") if raw.get("view") in ("flow", "house") else d["view"],
+           "size": raw.get("size") if raw.get("size") in ("auto", "compact", "large") else d["size"],
            "layout": raw.get("layout") if raw.get("layout") in ("total", "pairs", "compact") else d["layout"],
            "grid_pos": raw.get("grid_pos") if raw.get("grid_pos") in ("mid", "side") else d["grid_pos"],
            "order": clean_order(raw.get("order"))}
@@ -514,6 +520,10 @@ class Controller:
         self._releasing = False
         self._shutdown = False
         self.stats = Stats(data_path("stats.json"))
+        self.hogs = hogs_mod.Hogs(data_path("hogs.db"))
+        self.feed_det = phases_mod.FeedDetector(data_path("phases.json"))
+        self.phases_view = None
+        self._fuse_warned = 0.0
         self.learner = BaseLoadLearner(data_path("learn.json"))
         self.notifier = Notifier(self)
         self.curtail = {"state": "unbekannt", "since": None, "export_w": None, "note": "Noch nicht beurteilt"}
@@ -755,7 +765,7 @@ class Controller:
 
     # ---------- Hauptschleifen ----------
     async def run(self):
-        await asyncio.gather(self._control_loop(), self._surplus_loop(), self._heartbeat_loop())
+        await asyncio.gather(self._control_loop(), self._surplus_loop(), self._heartbeat_loop(), self._hogs_loop())
 
     async def _control_loop(self):
         while True:
@@ -769,19 +779,63 @@ class Controller:
             if wait > 0:
                 await asyncio.sleep(wait)
             self._last_cycle = time.monotonic()
-            if not self.ha.connected or self.cfg.get("demo"):
-                continue                     # Demo: es wird nichts gesteuert
+            if not self.ha.connected:
+                continue
             try:
                 await self.cycle()
             except Exception:  # noqa: BLE001
                 log.exception("Fehler im Regelzyklus")
                 self.event("error", "Fehler im Regelzyklus (siehe Add-on-Protokoll)")
 
+    def phases_cycle(self, snap):
+        """Phasenwerte lesen, Schieflast/Sicherung bewerten, Einspeise-Phase mitlernen."""
+        pc = self.cfg.get("phases") or {}
+        if not pc.get("enabled"):
+            self.phases_view = None
+            return
+        vals = phases_mod.read(pc, self.ha)
+        res = phases_mod.analyse(pc, vals)
+        out = snap.get("out_w") if snap.get("has_out") else None
+        self.feed_det.update(time.time(), out, {p: vals[p]["w"] for p in phases_mod.PH})
+        det = self.feed_det.result()
+        manual = pc.get("feed") or ""
+        self.phases_view = {"enabled": True, "phases": vals, **res,
+                            "feed": {"phase": manual or det["phase"], "manual": bool(manual), "detected": det["phase"],
+                                     "confidence": 100 if manual else det["confidence"], "steps": det["steps"], "slopes": det["slopes"]},
+                            "fuse_a": pc.get("fuse_a", 0), "warn_pct": pc.get("warn_pct", 90)}
+        f = res.get("fuse")
+        if f and f["warn"] and time.monotonic() - self._fuse_warned > 1800:
+            self._fuse_warned = time.monotonic()
+            self.event("warn", f"Phase {f['phase']} ist mit {f['a']} A zu {f['pct']} % der Sicherung ausgelastet")
+
+    def hogs_sample(self):
+        """Eine Messung aller Stromfresser-Steckdosen plus Gesamtverbrauch des Hauses."""
+        devs = (self.cfg.get("hogs") or {}).get("devices") or []
+        if not devs:
+            return
+        vals = {}
+        for d in devs:
+            vals[d["id"]] = hogs_mod._watts(self.ha.state(d["power"]),
+                                            self.ha.attr(d["power"], "unit_of_measurement"))
+        hw = (self.status or {}).get("house_w")
+        vals[hogs_mod.HOUSE] = None if hw is None else float(hw)
+        self.hogs.sample(vals)
+
+    async def _hogs_loop(self):
+        while True:
+            await asyncio.sleep(10)
+            if not self.ha.connected:
+                continue
+            try:
+                self.hogs_sample()
+            except Exception:  # noqa: BLE001
+                log.exception("Fehler bei der Stromfresser-Aufzeichnung")
+
     async def _surplus_loop(self):
         while True:
             await asyncio.sleep(2)
             if (not self.ha.connected or not self.cfg["surplus"]["enabled"] or self.stopped or self._releasing
-                    or self._shutdown or self.cfg.get("demo")):
+                    or self._shutdown):
                 self._timers.clear()
                 continue
             try:
@@ -795,6 +849,10 @@ class Controller:
         cfg = self.cfg
         snap = self.gather()
         self.last_snap = snap
+        try:
+            self.phases_cycle(snap)
+        except Exception:  # noqa: BLE001
+            log.exception("Fehler bei der Phasenauswertung")
         d = decide(cfg, snap)
         dry = cfg["dry_run"]
         await self._safety_check(snap, d)
@@ -1025,10 +1083,16 @@ class Controller:
         if isinstance(data, dict) and isinstance(data.get("modes"), list):
             data = {**data, "modes": [{k: m.get(k) for k in ("id", "name", "icon", "text", *goals.KEYS)}
                                       for m in data["modes"] if isinstance(m, dict) and m.get("id") and m.get("name")]}
-        if isinstance(data, dict) and "demo" in data:
-            data = {**data, "demo": bool(data["demo"])}
         if isinstance(data, dict) and "rules" in data:
             data = {**data, "rules": automation.clean_rules(data["rules"])}
+        if isinstance(data, dict) and "phases" in data:
+            data = {**data, "phases": phases_mod.clean_phases(data["phases"])}
+        if isinstance(data, dict) and "hogs" in data:
+            new = hogs_mod.clean_hogs(data["hogs"])
+            gone = {d["id"] for d in (self.cfg.get("hogs") or {}).get("devices", [])} - {d["id"] for d in new["devices"]}
+            for g in gone:
+                self.hogs.remove_device(g)
+            data = {**data, "hogs": new}
         if isinstance(data, dict) and isinstance(data.get("reports"), dict):
             data = {**data, "reports": {"weekly": bool(data["reports"].get("weekly"))}}
         if isinstance(data, dict) and isinstance(data.get("meters"), dict):
@@ -1264,6 +1328,12 @@ class Controller:
             tot += max(max(-u["bat"], 0.0) - max(u.get("pv") or 0.0, 0.0), 0.0)
         return tot if tot >= 10 else 0.0
 
+    def _mode_label(self):
+        """(Name, Symbol) des aktiven Modus, sonst „Eigene Einstellung“."""
+        mid = goals.active_mode(self.cfg)
+        m = goals.mode_by_id(self.cfg, mid) if mid else None
+        return (m["name"], m.get("icon", "")) if m else ("Eigene Einstellung", "🎛️")
+
     @staticmethod
     def crosscharge_state(units):
         """Umladen erkennen: ein Speicher gibt ab, ein anderer lädt über seine eigene Solarleistung hinaus.
@@ -1464,6 +1534,7 @@ class Controller:
             "stop_reason": st.get("safety", {}).get("reason", "") if stopped else "",
             "addon_slug": self.addon_slug,
             "card_version": self.card_version,
+            "mode_name": self._mode_label()[0], "mode_icon": self._mode_label()[1],
             "trend": self.trend_series(),
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
@@ -1529,7 +1600,7 @@ class Controller:
             "avg_soc": round(d["avg_soc"], 1), "blocked_w": round(d["blocked_w"]),
             "curtail": dict(self.curtail), "learned_base_load": self.learner.value, "safety": dict(self.safety),
             "base_load_used": round(self.base_load_effective()),
-            "trend": self.trend_series(), "meter_view": self.meter_view(),
+            "trend": self.trend_series(), "meter_view": self.meter_view(), "phases": self.phases_view,
             "want": "Entladen" if d["want_dis"] else "Laden" if d["want_chg"] else "Leerlauf",
             "surplus_w": None if d["surplus_w"] is None else round(d["surplus_w"]),
             "units": [{

@@ -270,5 +270,14 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
  e=mk({flow_passthrough:false},st("Laden",cc));sv=e.shadowRoot.querySelector('svg[aria-label="Energiefluss"]').textContent;
  ok(sv.includes("640 W")&&!sv.includes("durchgereicht"),"flow_passthrough: false zeigt den Rohwert");
 }
+{ // Haus-Ansicht
+  const U3=[{name:"Anker Solix 4 HÜTTE",soc:80,kwh:4,pv:340,bat:0,full:false},{name:"Anker Solix 4 DACH",soc:40,kwh:4,pv:250,bat:-200}];
+  const eh=mk({},st("Entladen",{...attrs,units:U3,pv_w:590,flow_cfg:{view:"house"}}));
+  const hs=eh.shadowRoot.querySelector('svg[aria-label="Energiefluss als Haus"]');
+  ok(!!hs&&hs.textContent.includes("HAUS")&&hs.textContent.includes("NETZ")&&/SOLAR HÜTTE/.test(hs.textContent)&&/SOLAR DACH/.test(hs.textContent),"Haus-Ansicht: Haus, Netz und beide Solaranlagen beschriftet");
+  ok(hs.querySelectorAll("animateMotion").length>=4,"Haus-Ansicht: Fluss läuft als Punkte entlang der Linien");
+  const e1=mk({},st("Entladen",{...attrs,units:[],pv_w:0,flow_cfg:{view:"house"}}));
+  ok(!!e1.shadowRoot.querySelector('svg[aria-label="Energiefluss als Haus"]'),"Haus-Ansicht ohne Speicherliste zeichnet trotzdem");
+}
 ok(w.__kwScrollGuard===true,"Scroll-Wächter ist aktiv");
 ok(errors.length===0,"keine JS-Fehler "+errors.join("|"));

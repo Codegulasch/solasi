@@ -362,12 +362,16 @@ SOLASI ist ein unabhängiges Projekt und steht in keiner Verbindung zu SolarAssi
 
 **Modi:** Oben auf der Übersicht wechselst du mit einem Tipp zwischen Ausgewogen, Autark, Akku schonen, Urlaub und Notfall. Unter Einstellungen → Ziele stellst du eigene Regler ein; die berechneten Werte siehst du dort in einer Tabelle und kannst jeden von Hand ändern.
 
-**Suche:** Strg+K (oder „Suchen“ oben) öffnet die Suche. Du kannst Seiten finden, Modi wechseln, „Reserve auf 40 %“ eintippen oder fragen, z. B. „Wann wurde umgeladen?“ – die Antwort kommt aus dem Protokoll.
-
 **Automatik:** Unter Betrieb → Automatik legst du Regeln an. Meldungen gehen an den Dienst aus Sicherheit & Meldungen. Der Wochenbericht kommt montags um 8 Uhr.
 
 **Konten und eigener Port:** Unter Einstellungen → Konten & Zugang legst du Konten an. Um SOLASI ohne Home Assistant zu öffnen, trägst du in der Add-on-Konfiguration unter Netzwerk bei „8100/tcp“ einen Port ein. Ohne Konto ist der Port offen (jeder im Netzwerk darf alles bedienen); sobald du ein Konto anlegst, verlangt er eine Anmeldung. Nutze ihn nur im Heimnetz.
 
 **Klassische Ansicht:** Wer die alte Menüführung möchte, schaltet sie unter Einstellungen → Ansicht ein.
 
-**Demo-Modus:** Einstellungen → Ansicht → „Demo-Modus“ zeigt simulierte Werte, damit du SOLASI ohne Geräte ausprobieren kannst. Solange er an ist, steuert SOLASI nichts.
+**Modi:** Der aktive Modus steht oben in der Kopfzeile und auf der Dashboard-Karte. Unter Einstellungen → Ziele erklärt „So arbeitet SOLASI“, was jeder Modus bewirkt (Tabelle mit den berechneten Werten und den Formeln). Modi setzen nur Grenzen: Entladen bis X %, Laden bis Y %. SOLASI lädt nie aktiv aus dem Netz, sondern nur aus Überschuss.
+
+**Haus-Ansicht:** Einstellungen → Darstellung → Ansicht „Haus in Schrägansicht“. Die erste Solaranlage liegt auf dem Hausdach, weitere stehen vor dem Haus; Speicher sind Schränke vor dem Haus. Sie funktioniert für bis zu vier Speicher.
+
+**Phasen:** Unter Betrieb → Phasen schaltest du die Auswertung ein und ordnest jeder Phase ihre Sensoren zu („Vorschläge übernehmen“ rät die Zuordnung aus den Namen). SOLASI zeigt Leistung je Phase, Schieflast und – wenn du deine Sicherung einträgst – die Auslastung. Die Einspeise-Phase erkennt SOLASI passiv: Es vergleicht, auf welcher Phase der Netzbezug sinkt, wenn die Speicher mehr abgeben. Dafür braucht es einige Leistungsänderungen (etwa 12), das ergibt sich im normalen Betrieb. Bei Fehlern kannst du die Phase von Hand festlegen.
+
+**Stromfresser:** Unter Auswertung → Stromfresser trägst du Messsteckdosen (Shelly, LSC …) über ihren Leistungssensor ein. SOLASI zeichnet ab dann alle 10 Sekunden auf (10-s-Werte 48 Stunden, Minutenwerte 90 Tage) und zeigt eine Rangliste mit kWh, Anteil am Haus, €/Jahr und Standby; der Rest ist „nicht gemessen“. Filter: Zeitraum, Tageszeit (auch über Mitternacht) und Wochentage. Die Leistungskurve gibt es in 10 s, 1 min und 15 min, mit Vergleich zu gestern. Es gibt keine Daten rückwirkend. Wird ein Gerät entfernt, werden seine Aufzeichnungen gelöscht.

@@ -1,5 +1,16 @@
 # Änderungen
 
+## 2.2.0
+- **Haus-Ansicht:** Unter Einstellungen → Darstellung lässt sich der Energiefluss als Haus in Schrägansicht anzeigen (gilt auch für die Dashboard-Karte). Das Haus trägt die erste Solaranlage auf dem Dach, weitere Anlagen stehen aufgeständert vor dem Haus; jeder Speicher ist ein Schrank mit Ladestand, das Netz ein Mast. Der Fluss läuft als gleichmäßig wandernde Punkte entlang der Wege, mit Watt-Angabe je Weg.
+- **Phasen (3-phasiger Zähler):** Neue Seite unter Betrieb. Leistung, Spannung und Strom je Phase (z. B. Shelly 3EM), Schieflast, Auslastung der Sicherung mit Warnung. Der Gesamtzähler bleibt unverändert.
+- **Einspeise-Phase wird erkannt:** SOLASI vergleicht die Leistungssprünge der Speicher mit den Änderungen je Phase und zeigt, auf welcher Phase eingespeist wird (mit Sicherheit in %). Manuell festlegbar, „Neu messen“ beginnt von vorn.
+
+## 2.1.0
+- **Modi sichtbar und erklärt:** Der aktive Modus steht in der Kopfzeile und als Tag auf der Dashboard-Karte. Die Übersicht zeigt die „Wirkung“ (Gibt ab bis X %, lädt bis Y %, je Speicher). Neu: „So arbeitet SOLASI“ unter Ziele mit Tabelle aller Modi und den Formeln.
+- **Stromfresser:** Neue Seite unter Auswertung. Zeichnet Messsteckdosen auf (10 s / 1 min), Rangliste mit kWh, Anteil, €/Jahr, Standby und „nicht gemessen“, Filter nach Zeitraum, Uhrzeit und Wochentagen, Leistungskurve mit Vergleich zu gestern. Optional Phase je Gerät (Vorbereitung für 3-Phasen).
+- **Entfernt:** Suche (Strg+K) und Demo-Modus.
+- **Korrektur:** Kacheln in „Heute und Zähler“ brechen bei schmaler Breite nicht mehr mitten im Wort um.
+
 ## 2.0.1
 - **Korrektur:** Auf der Übersicht überlappten sich die Kennzahlen-Kacheln mit der Karte darunter (Abstand ging verloren). Abstand ist wieder da.
 - **Eigener Port wie bei PrintDock:** Ohne Konto ist der Port offen (jeder im Netzwerk gilt als Besitzer). Sobald das erste Konto existiert, verlangt er eine Anmeldung. Die Konten-Seite weist darauf hin, solange der Port offen ist.

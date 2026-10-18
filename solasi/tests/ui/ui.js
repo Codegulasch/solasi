@@ -34,6 +34,14 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
       "api/me":()=>({name:"Home Assistant",role:"owner",direct:false,roles:{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"}}),
       "api/accounts":()=>({users:global.ACCTS||[],roles:{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"}}),
       "api/report":()=>({title:"SOLASI Wochenbericht",text:"Verbrauch 70 kWh.",weekly:false}),
+      "api/phases/discover":()=>({sensors:[{entity:"sensor.em_a_power",name:"3EM Phase A Power",kind:"power",phase:"L1",value:"120",unit:"W"},{entity:"sensor.em_b_power",name:"3EM Phase B Power",kind:"power",phase:"L2",value:"80",unit:"W"},{entity:"sensor.em_c_power",name:"3EM Phase C Power",kind:"power",phase:"L3",value:"40",unit:"W"}]}),
+      "api/phases/reset":()=>{calls.push("phases:reset");return {ok:true};},
+      "api/hogs/discover":()=>({sensors:[{entity:"sensor.plug_tv_power",name:"Plug TV Power",w:"12"}]}),
+      "api/hogs/curve":()=>({dev:"k",res:60,points:[{t:0,w:50},{t:3600,w:120},{t:7200,w:60}],...(/cmp=/.test(String(u))?{compare:[{t:0,w:40},{t:3600,w:90}]}:{})}),
+      "api/hogs":()=>({devices:[{id:"k",name:"Kühlschrank",icon:"🧊",phase:"L1",kwh:1.2,share:12,eur_year:60,kwh_year:170,standby_w:30,avg_w:50,peak_w:120,samples:100},
+        {id:"t",name:"TV",icon:"📺",phase:"",kwh:0.4,share:4,eur_year:20,kwh_year:60,standby_w:12,avg_w:20,peak_w:90,samples:100}],
+        house_kwh:10,measured_kwh:1.6,rest_kwh:8.4,rest_share:84,rest_eur_year:420,minutes:2880,days:7,standby_w:42,standby_eur_year:129,
+        info:{since:1700000000,minutes:2880},configured:2,profile:{k:Array(24).fill(40),t:Array(24).fill(null)}}),
       "api/discover":()=>({units:global.DISC||[],grid:[]}),
       "api/defaults":()=>({unit:{name:"Speicher",driver:"anker",state:"active",num:"",dir:"",soc:"",mode:"",capacity_kwh:5,max_dis:800,max_chg:800,can_charge:true,curtail:true}}),
       "api/kill":()=>{calls.push("kill");status.safety={state:"stopped",reason:"Von Hand gestoppt",since:"04.10. 12:00:00"};return {ok:true}},
@@ -398,7 +406,9 @@ const w=dom.window,d=w.document;
   ok(calls.includes("custom:Wochenende")&&d.querySelectorAll("#p-status .mode [data-modedel]").length===1,"Eigener Modus wird angelegt und lässt sich löschen");
   w.showPage("settings");
   ok(d.querySelectorAll("#p-settings .cat").length===9&&d.querySelector("#nav button[aria-current=page]").textContent.includes("Einstellungen"),"Einstellungen-Übersicht mit neun Themen");
+  ok(d.querySelector("#modechip")&&d.getElementById("modechiptxt").textContent.length>1,"Kopfzeile zeigt den aktiven Modus");
   d.querySelector('#p-settings .cat[data-p="goals"]').click();await new Promise(r=>setTimeout(r,100));
+  ok(d.querySelector("#p-goals .modeexplain, #p-goals .fx-tab, #p-goals table"),"„So arbeitet SOLASI“ ist auf der Ziele-Seite vorhanden");
   ok(d.getElementById("p-goals").classList.contains("act")&&d.querySelectorAll("#p-goals input[type=range]").length===3,"Ziele: drei Regler");
   const rs=d.getElementById("g_reserve");rs.value="80";rs.dispatchEvent(new w.Event("input"));await new Promise(r=>setTimeout(r,400));
   ok(cfg.soc.min===40&&cfg.goals&&cfg.goals.reserve===80&&cfg.goals.mode==="","Regler schreibt berechnete Werte in die Einstellungen");
@@ -424,6 +434,43 @@ const w=dom.window,d=w.document;
   d.getElementById("addmanual").click();await new Promise(r=>setTimeout(r,200));
   ok(w.eval("cfg.units.length")===n0+1&&w.eval("cfg.units[cfg.units.length-1].num")===""&&!d.getElementById("addwiz"),"Assistent: „Von Hand“ legt einen leeren Speicher an");
   w.eval("cfg.units.pop()");w.renderUnits();global.DISC=[];
+  // Stromfresser
+  w.eval('cfg.hogs={devices:[{id:"k",name:"Kühlschrank",icon:"🧊",power:"sensor.k",phase:"L1"},{id:"t",name:"TV",icon:"📺",power:"sensor.t",phase:""}]}');
+  w.showPage("hogs");await new Promise(r=>setTimeout(r,250));
+  ok(d.querySelectorAll("#p-hogs .hogrow").length===3&&/nicht gemessen/.test(d.getElementById("p-hogs").textContent),"Stromfresser: Rangliste mit Rest „nicht gemessen“");
+  ok(d.querySelector("#p-hogs svg path")&&d.querySelectorAll("#p-hogs svg path").length===1,"Stromfresser: Leistungskurve gezeichnet");
+  d.querySelector("#hog_cmp").click();d.querySelector("#hog_cmp").dispatchEvent(new w.Event("change",{bubbles:true}));await new Promise(r=>setTimeout(r,200));
+  ok(d.querySelectorAll("#p-hogs svg path").length===2,"Stromfresser: Vergleich mit gestern zeichnet zweite Kurve");
+  const hq=[];const of=w.fetch;w.fetch=(u,o)=>{hq.push(String(u));return of(u,o);};
+  const ts=d.getElementById("hog_tod");ts.value="night";ts.dispatchEvent(new w.Event("change",{bubbles:true}));await new Promise(r=>setTimeout(r,200));
+  d.querySelector('#hog_wd button[data-v="5"]').click();await new Promise(r=>setTimeout(r,200));
+  ok(hq.some(u=>/from=1320&to=360/.test(u))&&hq.some(u=>/wd=0%2C1%2C2%2C3%2C4%2C6/.test(u)),"Stromfresser: Filter Uhrzeit und Wochentage gehen an die Abfrage");
+  w.fetch=of;
+  const ha=d.getElementById("hog_add");ha.value="sensor.plug_tv_power";ha.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.hogs.devices.length")===3&&w.eval("cfg.hogs.devices[2].power")==="sensor.plug_tv_power"&&d.getElementById("discard").style.display==="","Stromfresser: Sensor hinzufügen markiert Änderung");
+  d.querySelector("[data-hdel='2']").click();
+  ok(w.eval("cfg.hogs.devices.length")===2,"Stromfresser: Gerät entfernen");
+  // Phasen
+  w.eval('cfg.phases={enabled:false,invert:false,fuse_a:0,warn_pct:90,feed:"",sensors:{}}');
+  w.showPage("phases");await new Promise(r=>setTimeout(r,200));
+  ok(d.getElementById("p-phases").classList.contains("act")&&!d.querySelector("#p-phases #ph_cfg").offsetParent&&d.getElementById("ph_on"),"Phasen: aus, solange nicht eingeschaltet");
+  const pon=d.getElementById("ph_on");pon.checked=true;pon.dispatchEvent(new w.Event("change",{bubbles:true}));
+  d.getElementById("ph_guess").click();
+  ok(w.eval("cfg.phases.enabled")===true&&w.eval("cfg.phases.sensors.L2.power")==="sensor.em_b_power"&&w.eval("cfg.phases.sensors.L3.power")==="sensor.em_c_power","Phasen: Vorschläge ordnen Sensoren L1–L3 zu");
+  w.eval('lastStatus=Object.assign({},lastStatus,{phases:{enabled:true,phases:{L1:{w:1200,v:231,a:5.2},L2:{w:-300,v:230,a:null},L3:{w:150,v:229,a:0.7}},imbalance_w:1500,max_phase:"L1",fuse:{phase:"L1",a:17.2,pct:107,warn:true,loads:{L1:17.2,L2:1.3,L3:0.7}},fuse_a:16,warn_pct:90,feed:{phase:"L2",manual:false,detected:"L2",confidence:87,steps:14,slopes:{}}}})');
+  w.renderPhasesLive();
+  const pt=d.getElementById("ph_live").textContent;
+  ok(/1200/.test(pt)&&/auf L2 ein/.test(pt)&&/87 % sicher/.test(pt)&&/1500 W/.test(pt)&&/107 %/.test(pt),"Phasen: Werte, Einspeise-Phase mit Sicherheit, Schieflast und Sicherung");
+  ok(d.querySelectorAll("#ph_live .kpi").length===3,"Phasen: drei Kacheln");
+  const pf=d.getElementById("ph_feed");pf.value="L3";pf.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.phases.feed")==="L3","Phasen: manuelle Phase wird gesetzt");
+  d.getElementById("ph_reset").click();await new Promise(r=>setTimeout(r,50));
+  ok(calls.includes("phases:reset"),"Phasen: „Neu messen“ ruft die API");
+  // Haus-Ansicht wählbar
+  w.showPage("look");await new Promise(r=>setTimeout(r,100));
+  const fv=d.getElementById("fl_view");fv.value="house";fv.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.flow.view")==="house","Darstellung: Ansicht „Haus“ wählbar");
+  w.eval("cfg.flow.view='flow'");
   // Automatik
   w.showPage("auto");await new Promise(r=>setTimeout(r,120));
   ok(d.getElementById("p-auto").classList.contains("act")&&d.querySelectorAll("#p-auto .rule").length===0&&/Wochenbericht/.test(d.getElementById("p-auto").textContent),"Automatik: leere Liste und Wochenbericht");
@@ -440,14 +487,6 @@ const w=dom.window,d=w.document;
   d.querySelector("#p-auto [data-rdel]").click();
   ok(w.eval("cfg.rules.length")===0,"Automatik: Regel löschen");
   d.getElementById("discard").click();await new Promise(r=>setTimeout(r,60));
-  // Demo-Modus
-  w.showPage("settings");await new Promise(r=>setTimeout(r,60));
-  ok(!!d.getElementById("set_demo")&&!d.getElementById("set_demo").checked,"Demo: Schalter in den Einstellungen, standardmäßig aus");
-  global.DEMO_ON=false;
-  w.eval("cfg.demo=true");w.renderSettings();
-  w.renderStatus({...w.eval("lastStatus"),demo:true});
-  ok(/Demo-Modus/.test(d.getElementById("p-status").textContent)&&!!d.querySelector("[data-demo='0']"),"Demo: Banner mit „Demo beenden“");
-  w.eval("cfg.demo=false");
   // Konten
   global.ACCTS=[{name:"Stefan",role:"owner",role_label:"Besitzer"},{name:"Anna",role:"member",role_label:"Mitbewohner"}];
   w.showPage("accounts");await new Promise(r=>setTimeout(r,150));
@@ -456,20 +495,6 @@ const w=dom.window,d=w.document;
   d.getElementById("an_add").click();await new Promise(r=>setTimeout(r,100));
   ok(d.getElementById("p-accounts")!==null&&d.querySelectorAll("#p-accounts [data-acct]").length===2,"Konten: ungültige Eingabe legt nichts an");
   global.ACCTS=[];
-  // Suche (Strg+K)
-  d.getElementById("palbtn").click();
-  const pq=d.getElementById("palq");pq.value="reserve auf 40";pq.dispatchEvent(new w.Event("input"));
-  ok(d.getElementById("pal").classList.contains("on")&&/Reserve auf 40 % stellen/.test(d.getElementById("pallist").textContent),"Suche: Befehl „Reserve auf 40 %“ wird erkannt");
-  pq.value="statis";pq.dispatchEvent(new w.Event("input"));
-  ok(/Statistik/.test(d.getElementById("pallist").textContent)&&!/Reserve auf/.test(d.getElementById("pallist").textContent),"Suche: findet Seiten");
-  d.querySelector("#pallist [data-pal]").click();await new Promise(r=>setTimeout(r,60));
-  ok(!d.getElementById("pal").classList.contains("on")&&d.getElementById("p-stats").classList.contains("act"),"Suche: Auswahl öffnet die Seite und schließt die Suche");
-  d.dispatchEvent(new w.KeyboardEvent("keydown",{key:"k",ctrlKey:true,bubbles:true}));
-  ok(d.getElementById("pal").classList.contains("on"),"Suche: Strg+K öffnet");
-  pq.value="Wann wurde umgeladen?";pq.dispatchEvent(new w.Event("input"));
-  ok(/💬/.test(d.getElementById("pallist").textContent),"Suche: Fragen werden aus dem Protokoll beantwortet");
-  d.dispatchEvent(new w.KeyboardEvent("keydown",{key:"Escape",bubbles:true}));
-  ok(!d.getElementById("pal").classList.contains("on"),"Suche: Esc schließt");
   // klassische Ansicht
   w.showPage("settings");d.getElementById("set_classic").checked=true;d.getElementById("set_classic").dispatchEvent(new w.Event("change"));await new Promise(r=>setTimeout(r,200));
   ok(d.querySelectorAll("#p-status .mode").length===0&&[...d.querySelectorAll("#nav button")].some(b=>b.textContent.trim()==="Einstellungen")&&d.getElementById("p-control").classList.contains("act")&&d.querySelectorAll("#subnav button").length===3,"Klassische Ansicht: alte Menüs, keine Modi");

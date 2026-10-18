@@ -124,31 +124,3 @@ async def test_discover_endpunkt(tmp_path):
     async with TestClient(TestServer(appmain.build_app(ctrl, store, ha))) as c:
         j = await (await c.get("/api/discover")).json()
         assert j["units"][0]["name"] == "Akku Eins" and j["units"][0]["driver"] == "anker" and j["grid"] == []
-
-
-@pytest.mark.asyncio
-async def test_demo_modus(tmp_path):
-    store = ConfigStore(str(tmp_path / "demo.json"))
-    ctrl = Controller(None, store); ha = HA("ws://x", "t"); ctrl.ha = ha
-    async with TestClient(TestServer(appmain.build_app(ctrl, store, ha))) as c:
-        assert "demo" not in (await (await c.get("/api/status")).json())
-        cfg = await (await c.get("/api/config")).json()
-        cfg["demo"] = True
-        assert (await (await c.post("/api/config", json=cfg)).json())["ok"] and store.cfg["demo"] is True
-        st = await (await c.get("/api/status")).json()
-        assert st["demo"] is True and len(st["units"]) == 2 and len(st["trend"]["t"]) == 96 and st["meter_ok"] is True
-        s2 = await (await c.get("/api/stats")).json()
-        assert len(s2["days"]) == 14 and 0 < s2["total"]["autarky"] < 1
-        cfg["demo"] = False
-        await c.post("/api/config", json=cfg)
-        assert "demo" not in (await (await c.get("/api/status")).json())
-
-
-def test_demo_werte_sind_plausibel():
-    import demo
-    from datetime import datetime
-    noon = demo.status({}, datetime(2026, 6, 21, 12, 30))
-    night = demo.status({}, datetime(2026, 6, 21, 2, 0))
-    assert noon["pv_w"] > 2500 and night["pv_w"] == 0
-    assert noon["grid_w"] == 0 and night["house_w"] > 200
-    assert all(0 <= u["soc"] <= 100 for u in noon["units"] + night["units"])
