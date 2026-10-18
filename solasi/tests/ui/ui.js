@@ -2,7 +2,7 @@ const {JSDOM}=require("jsdom");const fs=require("fs");const path=require("path")
 const html=fs.readFileSync(path.join(APP,"static","index.html"),"utf8");
 const cfg=JSON.parse(require("child_process").execSync(`python3 -c "import json,controller;print(json.dumps(controller.DEFAULT_CONFIG))"`,{cwd:APP,env:{...process.env,SOLASI_DATA:require("os").tmpdir()}}).toString());
 cfg.grid.entity="sensor.grid";const saved=[];let replayBody=null;const calls=[];let failDevice=false;let mqttState="verbunden";
-const status={flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},safety:{state:"active",reason:"",since:null},pv_w:780,bat_w:-260,house_w:529,connected:true,enabled:true,dry_run:true,surplus_enabled:true,surplus_dry_run:true,meter_ok:true,grid_w:400,net_balance:400,net_dis:400,t_target:390,eco_active:false,avg_soc:60,blocked_w:0,want:"Entladen",surplus_w:1620,
+const status={mode_id:"balanced",mode_name:"Ausgewogen",mode_icon:"⚖️",mode_effect:{head:"Gibt ab bis 26 %, lädt bis 94 %",units:[{name:"Speicher A",soc:60,state:"ok",text:"darf abgeben"}],note:""},flows:{solar_house:520,solar_battery:260,battery_house:0,grid_house:9},safety:{state:"active",reason:"",since:null},pv_w:780,bat_w:-260,house_w:529,connected:true,enabled:true,dry_run:true,surplus_enabled:true,surplus_dry_run:true,meter_ok:true,grid_w:400,net_balance:400,net_dis:400,t_target:390,eco_active:false,avg_soc:60,blocked_w:0,want:"Entladen",surplus_w:1620,
  units:[{name:"Speicher A",pv:540,soc:80,set:0,real:0,plan:280,force:false,available:false,mode:"self_consumption",dir:"discharge"},{name:"Speicher B",soc:-1,set:0,real:0,plan:110,force:true,available:true,mode:"third_party_control",dir:"discharge"}],
  slots:[{name:"Wallbox",ent:"switch.wb",num:"number.wb",state:"on",own_w:1380,num_v:6}],
  events:[{ts:"12:00:01",level:"test",msg:"Test: Speicher A: 0 W → 280 W"},{ts:"12:00:00",level:"error",msg:"<b>x</b>"}]};
@@ -457,15 +457,28 @@ const w=dom.window,d=w.document;
   const pon=d.getElementById("ph_on");pon.checked=true;pon.dispatchEvent(new w.Event("change",{bubbles:true}));
   d.getElementById("ph_guess").click();
   ok(w.eval("cfg.phases.enabled")===true&&w.eval("cfg.phases.sensors.L2.power")==="sensor.em_b_power"&&w.eval("cfg.phases.sensors.L3.power")==="sensor.em_c_power","Phasen: Vorschläge ordnen Sensoren L1–L3 zu");
-  w.eval('lastStatus=Object.assign({},lastStatus,{phases:{enabled:true,phases:{L1:{w:1200,v:231,a:5.2},L2:{w:-300,v:230,a:null},L3:{w:150,v:229,a:0.7}},imbalance_w:1500,max_phase:"L1",fuse:{phase:"L1",a:17.2,pct:107,warn:true,loads:{L1:17.2,L2:1.3,L3:0.7}},fuse_a:16,warn_pct:90,feed:{phase:"L2",manual:false,detected:"L2",confidence:87,steps:14,slopes:{}}}})');
+  w.eval('lastStatus=Object.assign({},lastStatus,{phases:{enabled:true,phases:{L1:{w:1200,v:231,a:5.2},L2:{w:-300,v:230,a:null},L3:{w:3600,v:229,a:15.4}},loads:{L1:5.2,L2:1.3,L3:15.4},imbalance_w:3900,max_phase:"L3",fuse:{phase:"L3",a:15.4,pct:96,warn:true,loads:{L1:5.2,L2:1.3,L3:15.4}},fuse_a:16,warn_pct:90,feed_units:[{name:"HÜTTE",phase:"L2",manual:false,detected:"L2",confidence:87,steps:14,share:{L1:5,L2:90,L3:5}},{name:"DACH",phase:"",manual:false,detected:"",confidence:20,steps:4,share:{L1:30,L2:30,L3:40}}]}})');
   w.renderPhasesLive();
   const pt=d.getElementById("ph_live").textContent;
-  ok(/1200/.test(pt)&&/auf L2 ein/.test(pt)&&/87 % sicher/.test(pt)&&/1500 W/.test(pt)&&/107 %/.test(pt),"Phasen: Werte, Einspeise-Phase mit Sicherheit, Schieflast und Sicherung");
-  ok(d.querySelectorAll("#ph_live .kpi").length===3,"Phasen: drei Kacheln");
-  const pf=d.getElementById("ph_feed");pf.value="L3";pf.dispatchEvent(new w.Event("change",{bubbles:true}));
-  ok(w.eval("cfg.phases.feed")==="L3","Phasen: manuelle Phase wird gesetzt");
+  ok(/1200/.test(pt)&&/HÜTTE/.test(pt)&&/87 % sicher/.test(pt)&&/3900 W/.test(pt)&&/96 %/.test(pt),"Phasen: Werte, Einspeise-Phase je Speicher mit Sicherheit, Schieflast und Sicherung");
+  ok(/wird gelernt/.test(pt),"Phasen: noch nicht erkannter Speicher zeigt den Lernstand");
+  const tk=[...d.querySelectorAll("#ph_live .phk")];
+  ok(tk.length===3&&tk[0].classList.contains("ok")&&tk[1].classList.contains("ok")&&tk[2].classList.contains("bad"),"Phasen: Kacheln grün/gelb/rot nach Auslastung");
+  ok(tk[2].querySelector(".phbar i").style.width==="96.25%"||/^96/.test(tk[2].querySelector(".phbar i").style.width),"Phasen: Balken schlägt nur so weit aus wie die Auslastung");
+  const pf=d.querySelector('[data-phfeed="DACH"]');pf.value="L3";pf.dispatchEvent(new w.Event("change",{bubbles:true}));
+  ok(w.eval("cfg.phases.feed.DACH")==="L3","Phasen: manuelle Phase je Speicher wird gesetzt");
   d.getElementById("ph_reset").click();await new Promise(r=>setTimeout(r,50));
   ok(calls.includes("phases:reset"),"Phasen: „Neu messen“ ruft die API");
+  // Phasen-Leiste im Energiefluss der Übersicht
+  w.showPage("status");await new Promise(r=>setTimeout(r,150));w.renderStatus(w.eval("lastStatus"));
+  ok(!!d.querySelector('#p-status svg[aria-label="Phasen"]')&&d.querySelectorAll('#p-status svg[aria-label="Phasen"] text').length>=9,"Phasen-Leiste unter dem Energiefluss");
+  w.eval("cfg.flow.phases=false");w.renderStatus(w.eval("lastStatus"));
+  ok(!d.querySelector('#p-status svg[aria-label="Phasen"]'),"Phasen-Leiste lässt sich in der Darstellung abschalten");
+  w.eval("cfg.flow.phases=true");
+  // „So arbeitet SOLASI“ öffnet die Ziele
+  w.renderStatus(w.eval("lastStatus"));
+  const lk=d.querySelector('#p-status .modefx a[data-p="goals"]');lk.click();await new Promise(r=>setTimeout(r,150));
+  ok(d.getElementById("p-goals").classList.contains("act")&&!!d.getElementById("g_explain"),"Link „So arbeitet SOLASI“ öffnet die Erklärung");
   // Haus-Ansicht wählbar
   w.showPage("look");await new Promise(r=>setTimeout(r,100));
   const fv=d.getElementById("fl_view");fv.value="house";fv.dispatchEvent(new w.Event("change",{bubbles:true}));

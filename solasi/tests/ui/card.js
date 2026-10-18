@@ -276,6 +276,8 @@ ok(txt(mk({},st("Entladen",attrs))).includes("+180 l"),"Wasserzähler: Tagesverb
   const hs=eh.shadowRoot.querySelector('svg[aria-label="Energiefluss als Haus"]');
   ok(!!hs&&hs.textContent.includes("HAUS")&&hs.textContent.includes("NETZ")&&/SOLAR HÜTTE/.test(hs.textContent)&&/SOLAR DACH/.test(hs.textContent),"Haus-Ansicht: Haus, Netz und beide Solaranlagen beschriftet");
   ok(hs.querySelectorAll("animateMotion").length>=4,"Haus-Ansicht: Fluss läuft als Punkte entlang der Linien");
+  const ep=mk({},st("Entladen",{...attrs,units:U3,flow_cfg:{view:"flow"},phases:{enabled:true,phases:{L1:{w:100,v:230,a:0.5},L2:{w:900,v:230,a:3.9},L3:{w:2500,v:230,a:null}},loads:{L1:0.5,L2:3.9,L3:10.9},fuse_a:16,warn_pct:90,feed_units:[{name:"Anker Solix 4 HÜTTE",phase:"L2"}]}}));
+  ok(!!ep.shadowRoot.querySelector('svg[aria-label="Phasen"]')&&/L3/.test(ep.shadowRoot.querySelector('svg[aria-label="Phasen"]').textContent)&&/⚡/.test(ep.shadowRoot.querySelector('svg[aria-label="Phasen"]').textContent),"Karte: Phasen-Leiste unter dem Energiefluss mit Einspeise-Markierung");
   const e1=mk({},st("Entladen",{...attrs,units:[],pv_w:0,flow_cfg:{view:"house"}}));
   ok(!!e1.shadowRoot.querySelector('svg[aria-label="Energiefluss als Haus"]'),"Haus-Ansicht ohne Speicherliste zeichnet trotzdem");
 }

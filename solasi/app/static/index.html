@@ -177,6 +177,9 @@ body.first main{margin:0 auto}
 .hogprof{display:inline-flex;align-items:flex-end;gap:1px;height:18px;margin-left:4px}.hogprof i{display:block;width:3px;background:var(--muted);opacity:.55;border-radius:1px}
 .hogwd{display:inline-flex;gap:3px}.hogwd button{padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer}.hogwd button[aria-pressed=true]{background:var(--accent-d);color:#fff;border-color:transparent}
 .phrow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;padding:8px 0;border-bottom:1px solid var(--line)}.phrow label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}.phrow select{max-width:230px}
+.phk.ok{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}.phk.warn{border-color:color-mix(in srgb,var(--warn) 60%,var(--line))}.phk.bad{border-color:var(--bad)}
+.phbar{height:8px;background:var(--chip);border-radius:5px;overflow:hidden;margin:6px 0}.phbar i{display:block;height:100%;border-radius:5px;background:var(--muted)}.phk.ok .phbar i{background:var(--ok)}.phk.warn .phbar i{background:var(--warn)}.phk.bad .phbar i{background:var(--bad)}
+.phfeed{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
 .hogdev{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)}.hogdev code{flex:1;min-width:120px;overflow-wrap:anywhere;font-size:12px;color:var(--muted)}
 #p-hogs select,#p-hogs input:not([type=checkbox]),#p-phases select,#p-phases input:not([type=checkbox]){width:auto;max-width:100%;min-width:0;background:var(--chip);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:6px 9px;font:inherit}
 #p-hogs .hogdev input[data-hf=name]{flex:1;min-width:110px}
@@ -276,10 +279,10 @@ button.sec2{border:1px solid var(--line);background:var(--chip);border-radius:12
 .fx-tab{width:100%;border-collapse:collapse;font-size:13px}.fx-tab th,.fx-tab td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}.fx-tab th{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}.fx-tab tr.on td{background:var(--accent-soft)}
 .modefx{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:8px 2px 0;font-size:13px;color:var(--muted)}.modefx .fx{background:var(--chip);border-radius:999px;padding:2px 10px;font-weight:600;font-size:12.5px}.modefx .fx.low{color:#f59e0b}.modefx .fx.full{color:var(--ok,#34d399)}
 .modes{display:flex;gap:10px;overflow-x:auto;margin-bottom:14px;padding-bottom:3px}
-.mode{flex:1 0 148px;background:var(--card);border:1.5px solid var(--line);border-radius:15px;padding:9px 13px;display:flex;gap:10px;align-items:center;cursor:pointer;font:inherit;color:var(--fg);text-align:left;box-shadow:var(--shadow);position:relative;transition:border-color .15s,transform .1s}
-.mode:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}.mode:active{transform:scale(.98)}
-.mode b{display:block;font-size:13.5px}.mode small{color:var(--muted);font-size:11.5px;display:block;line-height:1.3}.mode .e{font-size:22px}
-.mode.on{border-color:var(--accent);background:linear-gradient(160deg,var(--accent-soft),var(--card))}
+.mode{flex:1 0 132px;background:transparent;border:1px solid var(--line);border-radius:12px;padding:6px 11px;display:flex;gap:8px;align-items:center;cursor:pointer;font:inherit;color:var(--fg);text-align:left;position:relative;transition:border-color .15s,background .15s,transform .1s}
+.mode:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--chip)}.mode:active{transform:scale(.98)}
+.mode b{display:block;font-size:13px;font-weight:650}.mode small{color:var(--muted);font-size:11px;display:block;line-height:1.25;opacity:.85}.mode .e{font-size:18px;opacity:.9}
+.mode.on{border-color:color-mix(in srgb,var(--accent) 70%,var(--line));background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .mode.add{flex:0 0 auto;border-style:dashed;color:var(--muted);justify-content:center;font-weight:700;box-shadow:none}
 .mode .x{position:absolute;top:2px;right:6px;color:var(--muted);font-size:13px;cursor:pointer;padding:2px}
 .hub{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));margin-bottom:14px}
@@ -913,8 +916,8 @@ function showPage(p){
 function closeSheet(){$("#side").classList.remove("open");$("#scrim").classList.remove("on")}
 document.addEventListener("click",e=>{
   if(e.target.closest("#moreBtn")){$("#side").classList.add("open");$("#scrim").classList.add("on");return}
-  const b=e.target.closest("#nav button[data-p],#tabbar button[data-p],#subnav button[data-p],.cat[data-p]");
-  if(b)showPage(b.dataset.p);
+  const b=e.target.closest("#nav button[data-p],#tabbar button[data-p],#subnav button[data-p],.cat[data-p],a[data-p]");
+  if(b){if(b.tagName==='A')e.preventDefault();showPage(b.dataset.p);if(b.dataset.scroll){setTimeout(()=>{const t=document.getElementById(b.dataset.scroll);if(t)t.scrollIntoView({behavior:'smooth',block:'start'});},60);}}
 });
 $("#scrim").addEventListener("click",closeSheet);
 $("#savebar").style.display="none";
@@ -998,6 +1001,7 @@ function renderLook(){
   const setFl=(k,v)=>{cfg.flow=Object.assign({},fl,{[k]:v});markDirty();renderLook();if(lastStatus)renderStatus(lastStatus);};
   $("#p-look").insertAdjacentHTML("beforeend",`<details class="fsec" open><summary>Energiefluss <span class="sub">gilt für alle Geräte, mit „Speichern“</span></summary><div class="fbody">
     <div class="f"><label for="fl_view">Ansicht</label><div><select id="fl_view">${[["flow","Kacheln mit Linien (wie bisher)"],["house","Haus in Schrägansicht"]].map(([k,l])=>`<option value="${k}" ${k===(fl.view||"flow")?"selected":""}>${l}</option>`).join("")}</select></div><div class="hint">Gilt auch für die Dashboard-Karte. Die Haus-Ansicht zeigt mehrere Solaranlagen und Speicher; die Vorlage unten gilt nur für die Kachel-Ansicht.</div></div>
+    <div class="f"><label class="tg"><input type="checkbox" id="fl_phases"${fl.phases===false?"":" checked"}><i></i>Phasen unter dem Energiefluss zeigen (wenn „Phasen“ aktiv ist)</label></div>
     <div class="f"><label for="fl_size">Größe</label><div><select id="fl_size">${[["auto","Automatisch (wächst mit der Breite)"],["compact","Kompakt"],["large","Groß"]].map(([k,l])=>`<option value="${k}" ${k===fl.size?"selected":""}>${l}</option>`).join("")}</select></div>
       <div class="hint">Auf breiten Anzeigen (PC, Tablet) wird der Energiefluss breiter und rückt die Kacheln auseinander. „Groß“ ist für Wanddisplays gedacht.</div></div>
     <div class="f"><label for="fl_layout">Vorlage</label><div><select id="fl_layout">${[["total","Gesamt-Solar oben"],["pairs","Paare (ohne Gesamt-Kachel)"],["compact","Kompakt (vier Kacheln)"]].map(([k,l])=>`<option value="${k}" ${k===fl.layout?"selected":""}>${l}</option>`).join("")}</select></div>
@@ -1011,13 +1015,14 @@ function renderLook(){
       <div class="hint">Bei zwei Anlagen steht die erste links, die zweite rechts.</div></div>`:""}
     <p><button type="button" id="fl_reset" style="background:var(--chip);color:var(--fg);border:0;border-radius:10px;padding:7px 14px;cursor:pointer">Standard wiederherstellen</button></p></div></details>`);
   $("#fl_view").addEventListener("change",e=>setFl("view",e.target.value));
+  $("#fl_phases").addEventListener("change",e=>setFl("phases",e.target.checked));
   $("#fl_layout").addEventListener("change",e=>setFl("layout",e.target.value));
   $("#fl_size").addEventListener("change",e=>setFl("size",e.target.value));
   $("#fl_gp").addEventListener("change",e=>setFl("grid_pos",e.target.value));
   $("#p-look").querySelectorAll("[data-fl]").forEach(c=>c.addEventListener("change",()=>setFl(c.dataset.fl,c.checked)));
   const fo=$("#fl_ord");if(fo)fo.addEventListener("click",e=>{const b=e.target.closest("[data-fm]");if(!b)return;
     const o=[...ord],i=o.indexOf(b.dataset.n),j=i+ +b.dataset.fm;if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];setFl("order",o);});
-  $("#fl_reset").addEventListener("click",()=>{cfg.flow={view:"flow",size:"auto",layout:"total",total:true,solar:true,bat:true,grid:true,house:true,grid_pos:"mid",passthrough:true,order:[]};markDirty();renderLook();if(lastStatus)renderStatus(lastStatus);});
+  $("#fl_reset").addEventListener("click",()=>{cfg.flow={view:"flow",phases:true,size:"auto",layout:"total",total:true,solar:true,bat:true,grid:true,house:true,grid_pos:"mid",passthrough:true,order:[]};markDirty();renderLook();if(lastStatus)renderStatus(lastStatus);});
   $("#look_dbg").addEventListener("change",e=>dbgSet(e.target.checked));
   $("#look_start").addEventListener("change",e=>{lookSet("start",e.target.value);toast("Startseite gespeichert")});
   $("#look_dens").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;lookSet("density",b.dataset.d);applyDensity();renderLook()});
@@ -1779,10 +1784,10 @@ const SF = (() => {
     return `<svg viewBox="${vb}" role="img" aria-label="Energiefluss als Haus">${CSS}<style>.sf-hl{font-weight:700;letter-spacing:.04em}.sf-hv{font-weight:800;fill:var(--sf-fg)}</style>${sunSvg}${ob}${base}${live}${lab}${chips}</svg>`;
   }
 
-  const FLOW_DEF = { view: "flow", size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
+  const FLOW_DEF = { view: "flow", phases: true, size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
   /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}],
          fl?:{layout: total|pairs|compact, total, solar, bat, grid, house, grid_pos: mid|side, order:[Namen]}} */
-  function flow(d) {
+  function flowCore(d) {
     const o = Object.assign({}, FLOW_DEF, d.fl || {});
     let U = (d.units || []).filter(u => u && u.name && !u.off && u.soc != null && u.soc >= 0);
     const ord = Array.isArray(o.order) ? o.order : [];
@@ -1817,6 +1822,33 @@ const SF = (() => {
       ${o.grid ? tile("grid", "Netz", wl(Math.abs(grid)), gridSub, "--sf-grid", ICON.grid("var(--sf-grid)"), P("grid")) : ""}
       ${o.house ? tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), P("home")) : ""}
     </svg>`;
+  }
+
+  /* Phasen-Leiste unter dem Energiefluss: je Phase Leistung, Strom und Auslastung als Balken (grün/gelb/rot).
+     d.phases: {phases:{L1:{w,v,a}}, loads:{L1:A}, fuse_a, warn_pct, feed_units:[{name, phase}]} */
+  function phaseStrip(d, o) {
+    const ph = d.phases;
+    if (!ph || !ph.enabled || o.phases === false || !ph.phases) return "";
+    const W = o.view === "house" ? 900 : flowW(d, o), gap = 12, cw = (W - 20 - gap * 2) / 3, H = 66, fuse = ph.fuse_a > 0 ? ph.fuse_a : 16, warn = ph.warn_pct || 90;
+    let out = "";
+    ["L1", "L2", "L3"].forEach((p, i) => {
+      const v = ph.phases[p] || {}, x = 10 + i * (cw + gap), a = ph.loads && ph.loads[p] != null ? ph.loads[p] : v.a;
+      const pct = a == null ? null : a / fuse * 100, col = pct == null ? "--sf-muted" : pct >= warn ? "--sf-bad" : pct >= Math.min(70, warn - 1) ? "--sf-warn" : "--sf-ok";
+      const feeds = (ph.feed_units || []).filter(f => f.phase === p).map(f => clip(shortNames((ph.feed_units || []).map(z => z.name))[ph.feed_units.indexOf(f)] || f.name, 8));
+      const bw = cw - 28, fillw = pct == null ? 0 : Math.max(3, Math.min(100, pct) / 100 * bw);
+      out += `<rect x="${x}" y="4" width="${cw.toFixed(1)}" height="${H - 8}" rx="14" style="fill:var(--sf-card);stroke:var(${col});stroke-opacity:.6;stroke-width:1.4"/>
+        <text x="${(x + 14).toFixed(1)}" y="24" class="sf-l">${p}</text>
+        <text x="${(x + 14).toFixed(1)}" y="44" class="sf-c" style="font-size:17px">${v.w == null ? "–" : fmt(Math.abs(v.w)) + " W"}${v.w != null && v.w < -5 ? " ↑" : ""}</text>
+        <text x="${(x + cw - 14).toFixed(1)}" y="24" class="sf-t">${feeds.length ? "⚡ " + esc(feeds.join(", ")) : ""}</text>
+        <text x="${(x + cw - 14).toFixed(1)}" y="44" class="sf-s" text-anchor="end">${a == null ? "" : nf1(a) + " A · " + Math.round(pct) + " %"}</text>
+        <rect x="${(x + 14).toFixed(1)}" y="${H - 16}" width="${bw.toFixed(1)}" height="5" rx="2.5" style="fill:var(--sf-line);fill-opacity:.6"/>
+        <rect x="${(x + 14).toFixed(1)}" y="${H - 16}" width="${fillw.toFixed(1)}" height="5" rx="2.5" style="fill:var(${col})"/>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Phasen" style="display:block;width:100%;margin-top:4px">${CSS}${out}</svg>`;
+  }
+  function flow(d) {
+    const o = Object.assign({}, FLOW_DEF, d.fl || {});
+    return flowCore(d) + phaseStrip(d, o);
   }
 
   /* Überschrift aus den echten Flüssen; nur ohne Batterie-Messwert aus dem Sollwert.
@@ -2037,7 +2069,7 @@ let flowRz=0;
 addEventListener("resize",()=>{clearTimeout(flowRz);flowRz=setTimeout(()=>{const b=Math.round(flowWidth()/40);if(b!==flowPx&&curPage==="status"&&lastStatus){flowPx=b;renderStatus(lastStatus)}},200)});
 function flowData(s){
   const f=s.flows;
-  return {fl:(cfg&&cfg.flow)||null,w:flowWidth(),pv:s.pv_w,house:s.house_w,bat:s.bat_w,grid:s.grid_w,soc:s.avg_soc,target:s.t_target,kwh:s.kwh,cap:s.cap_kwh,
+  return {fl:(cfg&&cfg.flow)||null,phases:s.phases||null,w:flowWidth(),pv:s.pv_w,house:s.house_w,bat:s.bat_w,grid:s.grid_w,soc:s.avg_soc,target:s.t_target,kwh:s.kwh,cap:s.cap_kwh,
     limited:!!s.limited,
     units:(s.units||[]).map(u=>({name:u.name,soc:u.soc,kwh:u.kwh,pv:u.pv,bat:u.bat,locked:!!u.locked,full:!!u.full,paused:!!u.paused})),
     f:f?{sh:f.solar_house,sb:f.solar_battery,bh:f.battery_house,gh:f.grid_house}:null};
@@ -2247,7 +2279,7 @@ function modesHtml(s){
     <button type="button" class="mode add" data-modeadd="1">＋ Eigener Modus</button></div>${modeFxHtml(s)}`;}
 function modeFxHtml(s){
   const fx=s&&s.mode_effect;if(!fx)return "";
-  return `<div class="modefx"><b>Wirkung:</b> ${esc(fx.head)}${(fx.units||[]).map(u=>`<span class="fx ${u.state}" title="${esc(u.text)}">${esc(u.name)} ${u.soc} % · ${u.state==="low"?"gesperrt":u.state==="full"?"voll":"darf abgeben"}</span>`).join("")}<a href="#" data-p="goals" style="color:var(--accent-d);font-weight:700">So arbeitet SOLASI</a></div>`;}
+  return `<div class="modefx"><b>Wirkung:</b> ${esc(fx.head)}${(fx.units||[]).map(u=>`<span class="fx ${u.state}" title="${esc(u.text)}">${esc(u.name)} ${u.soc} % · ${u.state==="low"?"gesperrt":u.state==="full"?"voll":"darf abgeben"}</span>`).join("")}<a href="#" data-p="goals" data-scroll="g_explain" style="color:var(--accent-d);font-weight:700">So arbeitet SOLASI</a></div>`;}
 async function activateMode(id){
   if(dirty&&!confirm("Du hast ungespeicherte Änderungen. Sie gehen beim Wechsel des Modus verloren. Fortfahren?"))return;
   try{
@@ -2313,7 +2345,7 @@ function renderGoals(){
 function modeExplainHtml(){
   const fx=lastStatus&&lastStatus.mode_effect,on=modeId(lastStatus);
   const rows=goalsData.modes.map(m=>{const d=m.derived||{};return `<tr${m.id===on?' class="on"':""}><td>${esc(m.icon||"")} ${esc(m.name)}</td><td>${m.reserve}</td><td>${m.precision}</td><td>${m.care}</td><td>${d["soc.min"]} %</td><td>${d["soc.max"]} %</td><td>${d["soc.eco_threshold"]} %</td><td>${d["control.offset_discharge"]} W</td></tr>`}).join("");
-  return `<div class="card" style="margin-top:14px"><h3>So arbeitet SOLASI</h3>
+  return `<div class="card" id="g_explain" style="margin-top:14px"><h3>So arbeitet SOLASI</h3>
     ${fx?`<div class="sub" style="margin-bottom:8px"><b>${esc(fx.head)}.</b></div>${(fx.units||[]).map(u=>`<div class="sub">🔋 ${esc(u.text)}</div>`).join("")}<div class="hint sub" style="margin:8px 0">${esc(fx.note)}</div>`:""}
     <div style="overflow-x:auto"><table class="fx-tab"><thead><tr><th>Modus</th><th>Reserve</th><th>Genauigkeit</th><th>Schonen</th><th>Min-Ladestand</th><th>Max-Ladestand</th><th>Eco ab</th><th>Sicherheitsabstand</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="hint sub" style="margin-top:10px;line-height:1.7">Ein Modus setzt nur Grenzen und Empfindlichkeit, er schaltet nichts von selbst ein. So wird gerechnet:<br>
@@ -2522,7 +2554,7 @@ async function openHogs(){
 // ---- Phasen ----
 let phSensors=null;
 const PHN=["L1","L2","L3"],PHK=[["power","Leistung (W)"],["voltage","Spannung (V)"],["current","Strom (A)"]];
-function phCfg(){cfg.phases=cfg.phases||{enabled:false,invert:false,fuse_a:0,warn_pct:90,feed:"",sensors:{}};PHN.forEach(p=>{cfg.phases.sensors=cfg.phases.sensors||{};cfg.phases.sensors[p]=Object.assign({power:"",voltage:"",current:""},cfg.phases.sensors[p]||{});});return cfg.phases;}
+function phCfg(){cfg.phases=cfg.phases||{enabled:false,invert:false,fuse_a:0,warn_pct:90,feed:{},sensors:{}};if(typeof cfg.phases.feed==="string")cfg.phases.feed=cfg.phases.feed?{"*":cfg.phases.feed}:{};PHN.forEach(p=>{cfg.phases.sensors=cfg.phases.sensors||{};cfg.phases.sensors[p]=Object.assign({power:"",voltage:"",current:""},cfg.phases.sensors[p]||{});});return cfg.phases;}
 function renderPhases(){
   const el=$("#p-phases");if(!el)return;const pc=phCfg(),ss=phSensors||[];
   const opt=(kind,cur)=>`<option value="">–</option>${ss.filter(x=>x.kind===kind||x.entity===cur).map(x=>`<option value="${esc(x.entity)}"${x.entity===cur?" selected":""}>${esc(x.name)} (${esc(x.value)} ${esc(x.unit||"")})</option>`).join("")}${cur&&!ss.some(x=>x.entity===cur)?`<option value="${esc(cur)}" selected>${esc(cur)}</option>`:""}`;
@@ -2543,23 +2575,24 @@ function renderPhasesLive(){
   const box=$("#ph_live");if(!box)return;const pc=phCfg(),v=lastStatus&&lastStatus.phases;
   if(!pc.enabled){box.innerHTML="";return;}
   if(!v){box.innerHTML=`<div class="card" style="margin-bottom:12px"><div class="sub">Noch keine Werte. Prüfe die Sensoren unten und speichere; die Anzeige kommt mit dem nächsten Regelzyklus.</div></div>`;return;}
-  const mx=Math.max(500,...PHN.map(p=>Math.abs((v.phases[p]||{}).w||0)));
-  const fz=v.fuse;
-  const tiles=PHN.map(p=>{const x=v.phases[p]||{},w=x.w,load=fz&&fz.loads?fz.loads[p]:null,pct=load!=null&&v.fuse_a?Math.round(load/v.fuse_a*100):null,isFeed=v.feed&&v.feed.phase===p;
-    return `<div class="kpi" style="${pct!=null&&pct>=v.warn_pct?"border-color:var(--bad)":""}"><span>${p}${isFeed?` · ⚡ Einspeisung`:""}</span><b>${w==null?"–":Math.round(w)}<em>W</em></b>
-      <div class="hogbar" style="margin:6px 0"><i style="width:${w==null?0:Math.round(Math.abs(w)/mx*100)}%;${w!=null&&w<0?"background:var(--sun)":""}"></i></div>
-      <small>${x.v!=null?Math.round(x.v)+" V":"– V"} · ${x.a!=null?x.a.toFixed(1)+" A":(load!=null?load.toFixed(1)+" A (berechnet)":"– A")}${pct!=null?` · ${pct} % der Sicherung`:""}</small></div>`;}).join("");
-  const f=v.feed||{},conf=f.confidence||0;
-  const feedTxt=f.phase?`Deine Speicher speisen auf <b>${f.phase}</b> ein${f.manual?" (von dir festgelegt)":` – ${conf} % sicher`}.`:`Noch nicht erkannt. SOLASI braucht dafür einige Leistungsänderungen der Speicher (bisher ${f.steps||0} von etwa 12) – sie ergeben sich im normalen Betrieb von selbst.`;
+  const fz=v.fuse,fuse=v.fuse_a>0?v.fuse_a:16,warn=v.warn_pct||90,fu=v.feed_units||[];
+  const tiles=PHN.map(p=>{const x=v.phases[p]||{},w=x.w,a=v.loads&&v.loads[p]!=null?v.loads[p]:x.a,pct=a==null?null:a/fuse*100;
+    const cls=pct==null?"":pct>=warn?"bad":pct>=Math.min(70,warn-1)?"warn":"ok";
+    const feeds=fu.filter(f=>f.phase===p).map(f=>esc(f.name));
+    return `<div class="kpi phk ${cls}"><span>${p}${feeds.length?` · ⚡ ${feeds.join(", ")}`:""}</span><b>${w==null?"–":Math.round(Math.abs(w))}<em>W${w!=null&&w<-5?" (Einspeisung)":""}</em></b>
+      <div class="phbar"><i style="width:${pct==null?0:Math.max(2,Math.min(100,pct))}%"></i></div>
+      <small>${x.v!=null?Math.round(x.v)+" V · ":""}${a!=null?a.toFixed(1)+" A"+(x.a==null?" (berechnet)":""):"– A"}${pct!=null?` · ${Math.round(pct)} % von ${fuse} A`:""}</small></div>`;}).join("");
+  const rows=fu.length?fu.map(f=>{const sh=f.share||{},part=PHN.filter(p=>sh[p]>=20).map(p=>`${p} ${sh[p]} %`).join(" · ");
+    const txt=f.phase?`<b>${f.phase}</b>${f.manual?" (von dir festgelegt)":` · ${f.confidence} % sicher`}${!f.manual&&part&&PHN.filter(p=>sh[p]>=20).length>1?` <span class="sub">(verteilt: ${part})</span>`:""}`:`wird gelernt (${Math.min(f.steps||0,12)} von etwa 12 Leistungsänderungen)`;
+    return `<div class="phfeed"><div><b>${esc(f.name)}</b><div>${txt}</div></div>${f.phase&&!f.manual?`<div class="hogbar" style="width:90px;height:7px"><i style="width:${f.confidence}%"></i></div>`:""}
+      <select data-phfeed="${esc(f.name)}" aria-label="Phase von ${esc(f.name)}"><option value="">Automatisch</option>${PHN.map(p=>`<option${(pc.feed||{})[f.name]===p?" selected":""}>${p}</option>`).join("")}</select></div>`;}).join(""):`<div class="sub">Keine Speicher mit Leistungswert gefunden.</div>`;
   box.innerHTML=`<div class="kpis">${tiles}</div>
   <div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Schieflast &amp; Sicherung</h2>
     <div class="sub">${v.imbalance_w!=null?`Unterschied zwischen höchster und niedrigster Phase: <b>${v.imbalance_w} W</b>${v.max_phase?` (am höchsten: ${v.max_phase})`:""}.`:"Zu wenige Phasenwerte für die Schieflast."}
-    ${fz?(fz.warn?` <b style="color:var(--bad)">⚠ ${fz.phase} ist mit ${fz.a} A zu ${fz.pct} % ausgelastet.</b>`:` Höchste Auslastung: ${fz.phase} mit ${fz.pct} %.`):(v.fuse_a?"":" Trage unten deine Sicherung ein, um eine Auslastungswarnung zu bekommen.")}</div></div>
-  <div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Einspeise-Phase</h2><div class="sub" style="margin-bottom:8px">${feedTxt}</div>
-    ${f.phase&&!f.manual?`<div class="hogbar" style="height:8px;margin-bottom:8px"><i style="width:${conf}%"></i></div>`:""}
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><label>Phase <select id="ph_feed"><option value="">Automatisch erkennen</option>${PHN.map(p=>`<option${pc.feed===p?" selected":""}>${p}</option>`).join("")}</select></label>
-    <button type="button" class="ghost" id="ph_reset">Neu messen</button></div>
-    <div class="sub" style="margin-top:8px">So funktioniert es: Ändert sich die Ausgangsleistung der Speicher, ändert sich auf der Einspeise-Phase der Netzbezug um genau das Gegenteil. SOLASI vergleicht diese Sprünge je Phase, ohne etwas zu schalten. Ein manuell gesetzter Wert geht vor.</div></div>`;
+    ${fz?(fz.warn?` <b style="color:var(--bad)">⚠ ${fz.phase} ist mit ${fz.a} A zu ${fz.pct} % ausgelastet.</b>`:` Höchste Auslastung: ${fz.phase} mit ${fz.pct} %.`):(v.fuse_a?"":" Die Balken gehen von 16-A-Sicherungen aus – trage unten deine Sicherung ein, dann stimmen sie und du bekommst eine Warnung.")}</div></div>
+  <div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Einspeise-Phase je Speicher</h2>${rows}
+    <div style="margin-top:8px"><button type="button" class="ghost" id="ph_reset">Neu messen</button></div>
+    <div class="sub" style="margin-top:8px">So funktioniert es: Ändert ein Speicher seine Ausgangsleistung, sinkt auf der Phase, in die er einspeist, der Netzbezug um genau diesen Betrag. SOLASI wertet die Sprünge aller Speicher gemeinsam aus, deshalb findet es auch heraus, wenn sie auf verschiedenen Phasen einspeisen. Ohne etwas zu schalten – es braucht nur ein paar Leistungsänderungen im normalen Betrieb. Ein manuell gesetzter Wert geht vor.</div></div>`;
 }
 document.addEventListener("change",e=>{
   const t=e.target;if(!t.closest||!t.closest("#p-phases"))return;const pc=phCfg();
@@ -2568,7 +2601,7 @@ document.addEventListener("change",e=>{
   if(t.id==="ph_inv"){pc.invert=t.checked;markDirty();return;}
   if(t.id==="ph_fuse"){pc.fuse_a=+t.value||0;markDirty();return;}
   if(t.id==="ph_warn"){pc.warn_pct=+t.value||90;markDirty();return;}
-  if(t.id==="ph_feed"){pc.feed=t.value;markDirty();return;}
+  if(t.dataset.phfeed){pc.feed=(pc.feed&&typeof pc.feed==="object")?pc.feed:{};if(t.value)pc.feed[t.dataset.phfeed]=t.value;else delete pc.feed[t.dataset.phfeed];markDirty();return;}
 });
 document.addEventListener("click",async e=>{
   if(e.target.closest("#ph_guess")){const pc=phCfg();(phSensors||[]).forEach(x=>{if(x.phase&&!pc.sensors[x.phase][x.kind])pc.sensors[x.phase][x.kind]=x.entity;});markDirty();renderPhases();return;}

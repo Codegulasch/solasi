@@ -1,5 +1,12 @@
 # Änderungen
 
+## 2.2.1
+- **Phasen-Anzeige:** Die Balken zeigen jetzt die Auslastung der Sicherung (grün bis 70 %, gelb darüber, rot ab deiner Warnschwelle) und schlagen nur so weit aus. Ohne eingetragene Sicherung wird mit 16 A gerechnet.
+- **Phasen im Energiefluss und auf der Karte:** Unter dem Fluss steht eine Leiste mit L1–L3 (Watt, Ampere, Auslastung, ⚡ welcher Speicher auf der Phase einspeist). In Darstellung abschaltbar.
+- **Einspeise-Phase je Speicher:** SOLASI lernt jetzt für jeden Speicher einzeln, auf welche Phase er einspeist, auch wenn die Speicher auf verschiedenen Phasen einspeisen. Manuell festlegbar je Speicher.
+- **Sensor-Vorschläge:** Phasen werden aus mehr Namensformen erkannt (Phase A, Channel C, Kanal 3, L3, `…_phase_c_active_power`).
+- **Modus-Buttons** dezenter. Der Link „So arbeitet SOLASI“ öffnet jetzt die Erklärung (gleiches gilt für andere Links im Text, z. B. in der Automatik).
+
 ## 2.2.0
 - **Haus-Ansicht:** Unter Einstellungen → Darstellung lässt sich der Energiefluss als Haus in Schrägansicht anzeigen (gilt auch für die Dashboard-Karte). Das Haus trägt die erste Solaranlage auf dem Dach, weitere Anlagen stehen aufgeständert vor dem Haus; jeder Speicher ist ein Schrank mit Ladestand, das Netz ein Mast. Der Fluss läuft als gleichmäßig wandernde Punkte entlang der Wege, mit Watt-Angabe je Weg.
 - **Phasen (3-phasiger Zähler):** Neue Seite unter Betrieb. Leistung, Spannung und Strom je Phase (z. B. Shelly 3EM), Schieflast, Auslastung der Sicherung mit Warnung. Der Gesamtzähler bleibt unverändert.

@@ -138,7 +138,7 @@ DEFAULT_CONFIG = {
              "accent": "", "gradient": True, "order": []},
     # Anordnung der Blöcke in Übersicht und Statistik (leer = Standardreihenfolge, gilt für alle Geräte)
     # Energiefluss: Vorlage (total, pairs, compact), einzelne Kacheln, Platz des Netzes, Reihenfolge der Anlagen (Namen)
-    "flow": {"view": "flow", "size": "auto", "layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
+    "flow": {"view": "flow", "phases": True, "size": "auto", "layout": "total", "total": True, "solar": True, "bat": True, "grid": True, "house": True,
              "grid_pos": "mid", "passthrough": True, "order": []},
     "ui": {"status_order": [], "status_hidden": [], "stats_order": [], "stats_hidden": []},
     # Ziele und Modi (siehe goals.py): Regler in Alltagssprache, aus denen die Einzelwerte berechnet werden
@@ -179,6 +179,7 @@ def clean_flow(raw):
     raw = raw if isinstance(raw, dict) else {}
     d = DEFAULT_CONFIG["flow"]
     out = {"view": raw.get("view") if raw.get("view") in ("flow", "house") else d["view"],
+           "phases": bool(raw.get("phases", d["phases"])),
            "size": raw.get("size") if raw.get("size") in ("auto", "compact", "large") else d["size"],
            "layout": raw.get("layout") if raw.get("layout") in ("total", "pairs", "compact") else d["layout"],
            "grid_pos": raw.get("grid_pos") if raw.get("grid_pos") in ("mid", "side") else d["grid_pos"],
@@ -795,13 +796,19 @@ class Controller:
             return
         vals = phases_mod.read(pc, self.ha)
         res = phases_mod.analyse(pc, vals)
-        out = snap.get("out_w") if snap.get("has_out") else None
-        self.feed_det.update(time.time(), out, {p: vals[p]["w"] for p in phases_mod.PH})
-        det = self.feed_det.result()
-        manual = pc.get("feed") or ""
-        self.phases_view = {"enabled": True, "phases": vals, **res,
-                            "feed": {"phase": manual or det["phase"], "manual": bool(manual), "detected": det["phase"],
-                                     "confidence": 100 if manual else det["confidence"], "steps": det["steps"], "slopes": det["slopes"]},
+        outs = {u["k"]: u["ac"] for u in snap.get("units", []) if u.get("ac") is not None and not u.get("obs")}
+        if not outs and snap.get("has_out"):
+            outs = {"Speicher": snap.get("out_w")}
+        self.feed_det.update(time.time(), outs, {p: vals[p]["w"] for p in phases_mod.PH})
+        det = self.feed_det.result()["units"]
+        man = pc.get("feed") or {}
+        fu = []
+        for name in outs:
+            d1 = det.get(name, {"phase": "", "confidence": 0, "steps": 0, "share": {}})
+            m = man.get(name) or man.get("*") or ""
+            fu.append({"name": name, "phase": m or d1["phase"], "manual": bool(m), "detected": d1["phase"],
+                       "confidence": 100 if m else d1["confidence"], "steps": d1["steps"], "share": d1["share"]})
+        self.phases_view = {"enabled": True, "phases": vals, **res, "feed_units": fu,
                             "fuse_a": pc.get("fuse_a", 0), "warn_pct": pc.get("warn_pct", 90)}
         f = res.get("fuse")
         if f and f["warn"] and time.monotonic() - self._fuse_warned > 1800:
@@ -1538,7 +1545,7 @@ class Controller:
             "trend": self.trend_series(),
             "kill_switch": "switch.solasi_not_aus" if self.mqtt.active else "",
             "meters": self.meter_view()["items"], "today": self.meter_view()["today"],
-            "flow_cfg": clean_flow(self.cfg.get("flow")),
+            "flow_cfg": clean_flow(self.cfg.get("flow")), "phases": st.get("phases"),
             "card_cfg": clean_card(self.cfg.get("card")),
             "meters_cfg": {"show_day": self.meter_view()["show_day"], "extra": self.meter_view()["extra"], "order": self.meter_view()["order"],
                            "compare": self.meter_view()["compare"]},

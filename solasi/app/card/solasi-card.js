@@ -541,10 +541,10 @@ const SF = (() => {
     return `<svg viewBox="${vb}" role="img" aria-label="Energiefluss als Haus">${CSS}<style>.sf-hl{font-weight:700;letter-spacing:.04em}.sf-hv{font-weight:800;fill:var(--sf-fg)}</style>${sunSvg}${ob}${base}${live}${lab}${chips}</svg>`;
   }
 
-  const FLOW_DEF = { view: "flow", size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
+  const FLOW_DEF = { view: "flow", phases: true, size: "auto", layout: "total", total: true, solar: true, bat: true, grid: true, house: true, grid_pos: "mid", passthrough: true, order: [] };
   /* d: {pv, house, bat (+ entlädt), grid (+ Bezug), soc, f:{sh, sb, bh, gh}, units?:[{name, soc, kwh, pv, bat}],
          fl?:{layout: total|pairs|compact, total, solar, bat, grid, house, grid_pos: mid|side, order:[Namen]}} */
-  function flow(d) {
+  function flowCore(d) {
     const o = Object.assign({}, FLOW_DEF, d.fl || {});
     let U = (d.units || []).filter(u => u && u.name && !u.off && u.soc != null && u.soc >= 0);
     const ord = Array.isArray(o.order) ? o.order : [];
@@ -579,6 +579,33 @@ const SF = (() => {
       ${o.grid ? tile("grid", "Netz", wl(Math.abs(grid)), gridSub, "--sf-grid", ICON.grid("var(--sf-grid)"), P("grid")) : ""}
       ${o.house ? tile("home", "Haus", wl(d.house), d.house != null ? "Verbrauch" : "", "--sf-home", ICON.home("var(--sf-home)"), P("home")) : ""}
     </svg>`;
+  }
+
+  /* Phasen-Leiste unter dem Energiefluss: je Phase Leistung, Strom und Auslastung als Balken (grün/gelb/rot).
+     d.phases: {phases:{L1:{w,v,a}}, loads:{L1:A}, fuse_a, warn_pct, feed_units:[{name, phase}]} */
+  function phaseStrip(d, o) {
+    const ph = d.phases;
+    if (!ph || !ph.enabled || o.phases === false || !ph.phases) return "";
+    const W = o.view === "house" ? 900 : flowW(d, o), gap = 12, cw = (W - 20 - gap * 2) / 3, H = 66, fuse = ph.fuse_a > 0 ? ph.fuse_a : 16, warn = ph.warn_pct || 90;
+    let out = "";
+    ["L1", "L2", "L3"].forEach((p, i) => {
+      const v = ph.phases[p] || {}, x = 10 + i * (cw + gap), a = ph.loads && ph.loads[p] != null ? ph.loads[p] : v.a;
+      const pct = a == null ? null : a / fuse * 100, col = pct == null ? "--sf-muted" : pct >= warn ? "--sf-bad" : pct >= Math.min(70, warn - 1) ? "--sf-warn" : "--sf-ok";
+      const feeds = (ph.feed_units || []).filter(f => f.phase === p).map(f => clip(shortNames((ph.feed_units || []).map(z => z.name))[ph.feed_units.indexOf(f)] || f.name, 8));
+      const bw = cw - 28, fillw = pct == null ? 0 : Math.max(3, Math.min(100, pct) / 100 * bw);
+      out += `<rect x="${x}" y="4" width="${cw.toFixed(1)}" height="${H - 8}" rx="14" style="fill:var(--sf-card);stroke:var(${col});stroke-opacity:.6;stroke-width:1.4"/>
+        <text x="${(x + 14).toFixed(1)}" y="24" class="sf-l">${p}</text>
+        <text x="${(x + 14).toFixed(1)}" y="44" class="sf-c" style="font-size:17px">${v.w == null ? "–" : fmt(Math.abs(v.w)) + " W"}${v.w != null && v.w < -5 ? " ↑" : ""}</text>
+        <text x="${(x + cw - 14).toFixed(1)}" y="24" class="sf-t">${feeds.length ? "⚡ " + esc(feeds.join(", ")) : ""}</text>
+        <text x="${(x + cw - 14).toFixed(1)}" y="44" class="sf-s" text-anchor="end">${a == null ? "" : nf1(a) + " A · " + Math.round(pct) + " %"}</text>
+        <rect x="${(x + 14).toFixed(1)}" y="${H - 16}" width="${bw.toFixed(1)}" height="5" rx="2.5" style="fill:var(--sf-line);fill-opacity:.6"/>
+        <rect x="${(x + 14).toFixed(1)}" y="${H - 16}" width="${fillw.toFixed(1)}" height="5" rx="2.5" style="fill:var(${col})"/>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Phasen" style="display:block;width:100%;margin-top:4px">${CSS}${out}</svg>`;
+  }
+  function flow(d) {
+    const o = Object.assign({}, FLOW_DEF, d.fl || {});
+    return flowCore(d) + phaseStrip(d, o);
   }
 
   /* Überschrift aus den echten Flüssen; nur ohne Batterie-Messwert aus dem Sollwert.
@@ -808,7 +835,7 @@ const SF = (() => {
   function flowData(a, c) {
     const f = a.flows;
     return {
-      fl: flowCfg(a, c), w: c && c._w, pv: num(a.pv_w), house: num(a.house_w), bat: num(a.battery_w), grid: num(a.grid_w) ?? 0, soc: num(a.avg_soc), target: num(a.target_w),
+      fl: flowCfg(a, c), phases: a.phases || null, w: c && c._w, pv: num(a.pv_w), house: num(a.house_w), bat: num(a.battery_w), grid: num(a.grid_w) ?? 0, soc: num(a.avg_soc), target: num(a.target_w),
       kwh: num(a.kwh), cap: num(a.cap_kwh),
       limited: !!a.limited,
       units: (a.units || []).map(u => ({ name: u.name, soc: u.soc, kwh: u.kwh, pv: u.pv, bat: u.bat, locked: !!u.locked, full: !!u.full, paused: !!u.paused })),
