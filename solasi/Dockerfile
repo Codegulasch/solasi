@@ -5,4 +5,4 @@ ARG BUILD_VERSION=""
 ENV SOLASI_VERSION=${BUILD_VERSION}
 COPY app /app
 WORKDIR /app
-CMD ["python", "-u", "/app/main.py"]
+CMD ["python", "-u", "/app/boot.py"]

@@ -9,6 +9,7 @@ from aiohttp import web
 
 import copy
 import accounts as acc
+import update as upd
 
 import discover
 import goals
@@ -30,6 +31,26 @@ CONFIG_PATH = os.environ.get("SOLASI_CONFIG", "/data/settings.json")
 PORT = int(os.environ.get("PORT", "8099"))
 DIRECT_PORT = int(os.environ.get("SOLASI_DIRECT_PORT", "8100"))
 HA_API_URL = os.environ.get("HA_API_URL", "http://supervisor/core/api")
+
+
+RESTART_CODE = 75           # boot.py startet SOLASI bei diesem Code neu (lokales Update, Zurücksetzen)
+STOP_EVENT = None
+RESTART = {"requested": False}
+CONFIRM_AFTER_S = 60        # so lange muss ein lokal eingespielter Stand laufen, bis er als stabil gilt
+
+
+def schedule_restart(delay=1.0):
+    """Beendet SOLASI geordnet (Speicher werden freigegeben) und meldet dem Startprogramm, dass neu gestartet werden soll."""
+    RESTART["requested"] = True
+    loop = asyncio.get_event_loop()
+    if STOP_EVENT is not None:
+        loop.call_later(delay, STOP_EVENT.set)
+
+
+async def confirm_later():
+    await asyncio.sleep(CONFIRM_AFTER_S)
+    if upd.confirm():
+        log.info("Lokaler Stand läuft stabil und ist bestätigt")
 
 
 def read_version():
@@ -173,6 +194,52 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
         return web.FileResponse(os.path.join(HERE, "static", "index.html"),
                                 headers={"Cache-Control": "no-store"})
 
+    @routes.get("/api/update")
+    async def update_get(_):
+        return web.json_response({**upd.status(), "direct": direct, "restart_code": RESTART_CODE})
+
+    def _update_allowed(request):
+        """Code einspielen darf nur der Besitzer über Home Assistant (Ingress), nie über den direkten Port."""
+        if direct:
+            return web.json_response({"ok": False, "error": "Updates sind nur über die Home-Assistant-Oberfläche möglich, nicht über den direkten Zugang"}, status=403)
+        return None
+
+    @routes.post("/api/update/upload")
+    async def update_upload(request):
+        denied = _update_allowed(request)
+        if denied:
+            return denied
+        if request.content_length and request.content_length > upd.MAX_ZIP:
+            return web.json_response({"ok": False, "error": "Die Datei ist größer als 25 MB"}, status=413)
+        data = await request.read()
+        info, err = upd.validate(data)
+        if not info:
+            return web.json_response({"ok": False, "error": err}, status=400)
+        stage, err = await upd.stage_and_test(data, info)
+        if not stage:
+            return web.json_response({"ok": False, "error": err}, status=400)
+        upd.install(stage, info)
+        ctrl.event("info", f"Lokales Update {info['version']} eingespielt ({len(info['files'])} Dateien), SOLASI startet neu")
+        schedule_restart(1.5)
+        return web.json_response({"ok": True, "version": info["version"], "files": len(info["files"]), "restart": True})
+
+    @routes.post("/api/update/rollback")
+    async def update_rollback(request):
+        denied = _update_allowed(request)
+        if denied:
+            return denied
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        to = "previous" if body.get("to") == "previous" else "image"
+        ok, text = upd.rollback(to)
+        if not ok:
+            return web.json_response({"ok": False, "error": text}, status=400)
+        ctrl.event("info", f"Lokales Update: {text}")
+        schedule_restart(1.5)
+        return web.json_response({"ok": True, "text": text, "restart": True})
+
     @routes.get("/api/status")
     async def status(_):
         st = dict(ctrl.status)
@@ -181,6 +248,8 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
         st["dry_run"] = store.cfg["dry_run"]
         st["safety"] = dict(ctrl.safety)
         st["events"] = list(ctrl.events)[:80]
+        st["app"] = {"version": VERSION, "image_version": os.environ.get("SOLASI_IMAGE_VERSION") or VERSION,
+                     "overlay": os.environ.get("SOLASI_OVERLAY") == "1"}
         st["mode_id"] = goals.active_mode(store.cfg)
         m = goals.mode_by_id(store.cfg, st["mode_id"]) if st["mode_id"] else None
         st["mode_name"] = m["name"] if m else ""
@@ -532,7 +601,8 @@ def build_app(ctrl, store, ha, accounts=None, direct=False):
     async def entities(_):
         return web.json_response(ha.entities())
 
-    app = web.Application(middlewares=[make_direct_middleware(accounts)] if direct else [guard])
+    app = web.Application(middlewares=[make_direct_middleware(accounts)] if direct else [guard],
+                          client_max_size=26 * 1024 * 1024)
     app.add_routes(routes)
     return app
 
@@ -598,6 +668,8 @@ async def main():
     log.info("Direkter Zugang (mit Anmeldung) auf Port %d", DIRECT_PORT)
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
+    global STOP_EVENT
+    STOP_EVENT = stop
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:
             loop.add_signal_handler(sig, stop.set)
@@ -607,6 +679,8 @@ async def main():
     ctrl.card_version = VERSION
     ctrl.mqtt.start()
     tasks = [asyncio.create_task(ha.run()), asyncio.create_task(ctrl.run())]
+    if os.environ.get("SOLASI_OVERLAY") == "1":
+        tasks.append(asyncio.create_task(confirm_later()))
     try:
         await stop.wait()
         log.info("Beende SOLASI …")
@@ -624,3 +698,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    if RESTART["requested"]:
+        raise SystemExit(RESTART_CODE)

@@ -2,6 +2,12 @@
 
 🇬🇧 [English version](CHANGELOG.en.md)
 
+## 2.4.0
+- **Lokales Update (Beta):** Unter System → *Update (Beta)* (nur im Experten-Modus) lädst du das Repo-Zip hoch, ohne es auf GitHub zu veröffentlichen. SOLASI prüft die Datei (Aufbau, Dateitypen, Syntax, Probe-Import aller Module in einem eigenen Prozess), spielt den Code in den Datenordner ein und startet neu. Den Vorgänger behält SOLASI als Rückfall.
+- **Sicherheitsnetz:** Ein neues Startprogramm (`boot.py`) startet SOLASI vom lokalen Stand. Stürzt ein frisch eingespielter Stand in der ersten Minute ab, geht SOLASI sofort auf den Stand im Add-on zurück; die Oberfläche zeigt, was passiert ist. Kommt ein echtes Add-on-Update mit gleicher oder höherer Version, wird der lokale Stand verworfen.
+- **Zugang:** Einspielen geht nur für den Besitzer über die Home-Assistant-Oberfläche, nicht über den direkten Port.
+- **Grenzen:** `config.yaml`, Dockerfile und Python-Pakete lassen sich so nicht ändern. **Diese Version muss einmal normal installiert werden** (Startprogramm und Dockerfile ändern sich), ab dann geht es per Upload.
+
 ## 2.3.2
 - **Korrektur Entladesperre:** Die Uhrzeit ließ sich nicht eingeben, weil das Feld bei jeder Aktualisierung neu gezeichnet wurde. Es bleibt jetzt erhalten.
 - **Dashboard-Karte:** „Antippen öffnet SOLASI“ versucht den Add-on-Namen weiter abzurufen, wenn der Start nicht gelang, und die Seite „Dashboard-Karte“ zeigt, ob der Pfad bereit ist. Neu: Feld „Pfad zum Öffnen“ in der Karte (z. B. `/hassio/ingress/<add-on-name>`) als Ausweg.

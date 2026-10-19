@@ -35,6 +35,7 @@ const dom=new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"h
       "api/accounts":()=>({users:global.ACCTS||[],roles:{owner:"Besitzer",member:"Mitbewohner",viewer:"Nur lesen"}}),
       "api/report":()=>({title:"SOLASI Wochenbericht",text:"Verbrauch 70 kWh.",weekly:false}),
       "api/phases/discover":()=>({sensors:[{entity:"sensor.em_a_power",name:"3EM Phase A Power",kind:"power",phase:"L1",value:"120",unit:"W"},{entity:"sensor.em_b_power",name:"3EM Phase B Power",kind:"power",phase:"L2",value:"80",unit:"W"},{entity:"sensor.em_c_power",name:"3EM Phase C Power",kind:"power",phase:"L3",value:"40",unit:"W"}]}),
+      "api/update":()=>({image_version:"2.3.2",running_version:"2.3.2",overlay:!!global.UPD_OV,overlay_active:false,overlay_version:global.UPD_OV?"2.3.3":"",confirmed:false,installed_at:"19.10.2026 18:40",previous_version:global.UPD_OV?"2.3.2.1":"",failure:global.UPD_FAIL?{reason:"Der lokale Stand 2.3.3 beendete sich nach 4 s mit Code 1",at:"19.10. 18:41:00"}:null,direct:false}),
       "api/locks":()=>{const b=JSON.parse(o.body);calls.push("lock:"+b.unit+":"+b.on+":"+(b.until||""));status.locks=status.locks||{};if(b.on)status.locks[b.unit]={until:0};else delete status.locks[b.unit];return {ok:true,locks:status.locks};},
       "api/charge/estimate":()=>({estimate:{kwh:2.5,hours:3.1,power_w:800,rows:[]}}),
       "api/charge/start":()=>{const b=JSON.parse(o.body);if(!(b.target>0))return {ok:false,error:"Ungültiges Ziel"};calls.push("charge:start:"+b.target+":"+b.power_w+":"+(b.units||[]).join("|"));status.charge={active:true,job:{target:b.target,power_w:b.power_w,units:b.units,hours:b.hours,started:Date.now()/1000,source:"Oberfläche",start_soc:{"Speicher A":10}},units:[{name:"Speicher A",soc:10,start:10}],alloc:{"Speicher A":800},estimate:{kwh:2.5,hours:3.1,power_w:800}};return {ok:true,...status.charge};},
@@ -501,6 +502,23 @@ const w=dom.window,d=w.document;
   ok(calls.includes("charge:stop")&&d.getElementById("chgchip").style.display==="none"&&d.getElementById("chg_form").style.display==="","Laden: Beenden stellt Formular und Kopfzeile zurück");
   const dord=d.getElementById("chg_dorder");dord.value="parallel";dord.dispatchEvent(new w.Event("change",{bubbles:true}));
   ok(w.eval("cfg.charge.order")==="parallel","Laden: Standard-Reihenfolge wird in die Einstellungen übernommen");
+  // Update (lokal)
+  { const nav=()=>[...d.querySelectorAll("#nav button")].some(b=>b.dataset.p==="update");
+    w.eval('expert=false;renderNav()');
+    ok(!nav(),"Update: Menüpunkt nur im Experten-Modus");
+    const ex=d.getElementById("q_expert");ex.checked=true;ex.dispatchEvent(new w.Event("change",{bubbles:true}));
+    ok(nav(),"Update: Menüpunkt erscheint im Experten-Modus");
+    global.UPD_OV=false;w.showPage("update");await new Promise(r=>setTimeout(r,300));
+    const t=d.getElementById("p-update").textContent;
+    ok(d.getElementById("p-update").classList.contains("act")&&/Update lokal einspielen/.test(t)&&/2\.3\.2/.test(t)&&!!d.getElementById("upd_file"),"Update: Seite mit Versionen und Upload");
+    ok(d.getElementById("upd_back_img").disabled&&d.getElementById("upd_back_prev").disabled,"Update: Zurücksetzen gesperrt, solange es keinen lokalen Stand gibt");
+    global.UPD_OV=true;global.UPD_FAIL=true;w.showPage("status");w.showPage("update");await new Promise(r=>setTimeout(r,300));
+    ok(!d.getElementById("upd_back_img").disabled&&!d.getElementById("upd_back_prev").disabled&&/zurückgenommen/.test(d.getElementById("p-update").textContent),"Update: lokaler Stand, Vorgänger und gescheiterter Versuch werden angezeigt");
+    global.UPD_OV=false;global.UPD_FAIL=false;
+    await w.updUpload({name:"foto.png"});
+    ok(/keine Zip/.test(d.getElementById("upd_msg").textContent),"Update: Nicht-Zip wird abgelehnt");
+    ex.checked=false;ex.dispatchEvent(new w.Event("change",{bubbles:true}));w.showPage("status");
+  }
   // Entladesperre
   w.showPage("charge");await new Promise(r=>setTimeout(r,300));
   { const ti=d.querySelector("#chg_locks [data-lkt]");ti.value="07:30";w.renderChargeLive();

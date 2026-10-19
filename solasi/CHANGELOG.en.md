@@ -2,6 +2,12 @@
 
 🇩🇪 [Deutsche Version](CHANGELOG.md)
 
+## 2.4.0
+- **Local update (beta):** Under System → *Update (Beta)* (expert mode only) you upload the repo zip without publishing it on GitHub. SOLASI checks the file (structure, file types, syntax, a trial import of all modules in a separate process), installs the code into its data folder and restarts. SOLASI keeps the previous version as a fallback.
+- **Safety net:** A new launcher (`boot.py`) starts SOLASI from the local version. If a freshly installed version crashes within the first minute, SOLASI immediately falls back to the version shipped with the add-on, and the interface shows what happened. If a real add-on update with the same or a higher version arrives, the local version is discarded.
+- **Access:** Installing is possible only for the owner through the Home Assistant interface, not through the direct port.
+- **Limits:** `config.yaml`, the Dockerfile and Python packages cannot be changed this way. **This version has to be installed once the normal way** (launcher and Dockerfile change); after that, uploads work.
+
 ## 2.3.2
 - **Fix for Entladesperre** (discharge lock): The time could not be entered because the field was redrawn on every refresh. It is now preserved.
 - **Dashboard-Karte** (dashboard card): "Tap opens SOLASI" keeps trying to retrieve the add-on name if the start failed, and the "Dashboard-Karte" page shows whether the path is ready. New: a "Pfad zum Öffnen" (path to open) field in the card (e.g. `/hassio/ingress/<add-on-name>`) as a fallback.

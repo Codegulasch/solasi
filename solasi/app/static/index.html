@@ -376,6 +376,7 @@ body.dens-large{font-size:16.5px}
       <section class="page" id="p-replay"></section>
       <section class="page" id="p-selftest"></section>
       <section class="page" id="p-card"></section>
+      <section class="page" id="p-update"></section>
       <section class="page" id="p-mqtt"></section>
       <section class="page" id="p-log"><div class="card"><div class="log" id="log"></div></div></section>
       <div class="savebar" id="savebar"><span class="msg" id="savemsg">Änderungen gelten erst nach „Speichern“.</span>
@@ -864,6 +865,7 @@ const IC={
   log:'<path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/>',
   card:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
   mqtt:'<path d="M3 11 12 3l9 8v9H3z"/>',
+  update:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
   setup:'<path d="m5 12 4 4 10-10"/>',
   control:'<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-.9c.6.5 1.3.9 2 1.2l.4 2.6h4l.4-2.6c.7-.3 1.4-.7 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
@@ -872,10 +874,10 @@ const svgi=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]||""}</svg>`;
 const isClassic=()=>lookGet("classic","0")==="1";
 const NAVS=[["Betrieb",[["status","Übersicht"],["units","Speicher"],["charge","Laden"],["surplus","Überschuss"],["meters","Zähler"],["phases","Phasen"],["auto","Automatik"]]],
   ["Auswertung",[["stats","Statistik"],["hogs","Stromfresser"],["replay","Was-wäre-wenn"]]],
-  ["System",[["selftest","Gesundheit"],["log","Protokoll"],["card","Dashboard-Karte"],["mqtt","Entitäten (MQTT)"]]]];
+  ["System",[["selftest","Gesundheit"],["log","Protokoll"],["card","Dashboard-Karte"],["mqtt","Entitäten (MQTT)"],["update","Update (Beta)"]]]];
 const NAV_FOOT_NEW=[["settings","Einstellungen"],["setup","Einrichtung"]],NAV_FOOT_OLD=[["setup","Einrichtung"],["control","Einstellungen"]];
 const TITLES={tile:"Kachel-Statistik",status:"Übersicht",units:"Speicher",surplus:"Überschuss",meters:"Zähler",phases:"Phasen",charge:"Laden aus dem Netz",stats:"Statistik",hogs:"Stromfresser",replay:"Was-wäre-wenn",selftest:"Gesundheit",log:"Protokoll",
-  card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung",settings:"Einstellungen",goals:"Ziele & Verhalten",auto:"Automatik",accounts:"Konten & Zugang"};
+  card:"Dashboard-Karte",mqtt:"Entitäten (MQTT)",update:"Update (Beta)",setup:"Einrichtung",control:"Regelung",extras:"Sicherheit & Meldungen",look:"Darstellung",settings:"Einstellungen",goals:"Ziele & Verhalten",auto:"Automatik",accounts:"Konten & Zugang"};
 const SET_SUB_NEW=[["settings","Übersicht"],["goals","Ziele"],["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]],
   SET_SUB_OLD=[["control","Regelung"],["extras","Sicherheit & Meldungen"],["look","Darstellung"]];
 const SETTINGS_PAGES=["charge","phases","hogs","units","goals","auto","control","surplus","extras","meters","look"];
@@ -884,7 +886,7 @@ const TAB_ITEMS=[["status","Übersicht"],["units","Speicher"],["stats","Statisti
 let curPage="status";
 function renderNav(){
   let h="";
-  NAVS.forEach(([sec,items])=>{h+=`<div class="sec">${sec}</div>`+items.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")});
+  NAVS.forEach(([sec,items])=>{h+=`<div class="sec">${sec}</div>`+items.filter(([id])=>id!=="update"||expert||curPage==="update").map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")});
   h+=`<div class="sep"></div>`+navFoot().map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("");
   $("#nav").innerHTML=h;
   $("#tabbar").innerHTML=TAB_ITEMS.map(([id,l])=>`<button type="button" data-p="${id}">${svgi(id)}${l}</button>`).join("")+`<button type="button" id="moreBtn">${svgi("more")}Mehr</button>`;
@@ -905,6 +907,7 @@ function showPage(p){
   document.body.classList.toggle("first",!!(firstRun&&p==="setup"));
   closeSheet();window.scrollTo(0,0);
   if(p==="card")loadCard();
+  if(p==="update")openUpdate();
   if(p==="mqtt")loadMqtt();
   if(p==="selftest")loadSelfcheck();
   if(p==="stats")loadStats();
@@ -931,7 +934,7 @@ $("#scrim").addEventListener("click",closeSheet);
 $("#savebar").style.display="none";
 $("#q_expert").checked=expert;
 $("#q_expert").addEventListener("change",e=>{expert=e.target.checked;try{localStorage.setItem("solasi_expert",expert?"1":"0")}catch(x){}
-  if(cfg)renderForms();toast(expert?"Experten-Modus an":"Experten-Modus aus");});
+  if(cfg)renderForms();renderNav();showPage(curPage);toast(expert?"Experten-Modus an":"Experten-Modus aus");});
 renderNav();
 
 
@@ -2100,6 +2103,7 @@ function renderBadges(s){
   const stopped=s.safety&&s.safety.state==="stopped";
   kb.textContent=stopped?"▶ Fortsetzen":"⛔ Not-Aus";kb.classList.toggle("resume",!!stopped);
   const mc=$("#modechip");if(mc){mc.style.display=isClassic()?"none":"";$("#modechiptxt").textContent=s.mode_name?`${s.mode_icon||"🎯"} ${s.mode_name}`:"🎛️ Eigene Einstellung";mc.className="pill"+(s.mode_name?" ok":"");}
+  const bt=document.querySelector(".brand .betatag");if(bt){const a=s.app||{};bt.textContent=a.overlay?"Beta · lokal "+a.version:"Beta";}
   const lc=$("#lkchip");if(lc){const ks=Object.keys(s.locks||{});lc.style.display=ks.length?"":"none";if(ks.length)$("#lkchiptxt").textContent="🔒 Entladen gesperrt: "+ks.join(", ");}
   const cc=$("#chgchip");if(cc){const ch=s.charge&&s.charge.active&&s.charge.job;cc.style.display=ch?"":"none";if(ch){const al=Object.values(s.charge.alloc||{}).reduce((a,b)=>a+b,0);$("#chgchiptxt").textContent=`🔌 Laden bis ${ch.target} %${al?` · ${al} W`:""}`;}}
   if(stopped){mp.className="pill stop";$("#modetext").textContent="Gestoppt"}
@@ -2723,6 +2727,74 @@ document.addEventListener("click",async e=>{
     if(lastStatus&&lastStatus.charge){lastStatus.charge.active=false;lastStatus.charge.job=null;}renderChargeLive();if(lastStatus)renderBadges(lastStatus);}
 });
 function openCharge(){renderCharge();}
+
+
+// ---- Update (lokal einspielen) ----
+let updInfo=null,updBusy=false,updMsg="";
+async function openUpdate(){
+  renderUpdate();
+  try{updInfo=await (await fetch("api/update")).json();}catch(e){updInfo=null;}
+  if(curPage==="update")renderUpdate();
+}
+function renderUpdate(){
+  const el=$("#p-update");if(!el)return;const u=updInfo||{};
+  const run=u.running_version||"–",img=u.image_version||"–";
+  const fail=u.failure?`<div class="banner off" style="margin-bottom:12px"><b>Letzter Versuch zurückgenommen:</b> ${esc(u.failure.reason||"Der lokale Stand ist abgestürzt")} (${esc(u.failure.at||"")}). SOLASI läuft wieder mit dem Stand aus dem Add-on.</div>`:"";
+  el.innerHTML=`${fail}<div class="card" style="margin-bottom:12px"><h2 style="margin:0 0 6px">Update lokal einspielen <span class="betatag">Beta</span></h2>
+    <div class="sub">Lade das Repo-Zip von SOLASI hoch, ohne es auf GitHub zu veröffentlichen. SOLASI prüft die Datei, spielt den Code ein und startet neu. Läuft der neue Stand nicht, geht SOLASI von allein auf den Stand im Add-on zurück. Nicht ersetzt werden <code>config.yaml</code>, das Dockerfile und Python-Pakete – dafür braucht es ein richtiges Add-on-Update. Die Version in der Zip muss höher sein als die im Add-on (${esc(img)}).</div>
+    <div class="row" style="margin-top:10px"><span>Läuft gerade</span><b>${esc(run)}${u.overlay_active?" (lokaler Stand)":""}</b></div>
+    <div class="row"><span>Im Add-on installiert</span><b>${esc(img)}</b></div>
+    ${u.overlay?`<div class="row"><span>Lokaler Stand</span><b>${esc(u.overlay_version)} <span class="tag ${u.confirmed?"ok":"warn"}">${u.confirmed?"bestätigt":"noch nicht bestätigt"}</span></b></div>${u.installed_at?`<div class="row"><span>Eingespielt</span><span>${esc(u.installed_at)}</span></div>`:""}`:""}
+    ${u.previous_version?`<div class="row"><span>Vorgänger</span><b>${esc(u.previous_version)}</b></div>`:""}
+    ${u.direct?`<div class="sub" style="margin-top:8px;color:var(--bad)">Über den direkten Zugang kannst du nichts einspielen. Öffne SOLASI über Home Assistant.</div>`:""}</div>
+  <div class="card" style="margin-bottom:12px"><div id="upd_drop" class="udev" style="text-align:center;padding:22px;border:2px dashed var(--line,#8886);border-radius:14px;cursor:pointer">
+      <b>solasi_repo.zip hierher ziehen</b><div class="sub">oder tippen, um eine Datei zu wählen</div>
+      <input type="file" id="upd_file" accept=".zip,application/zip" style="display:none"></div>
+    <div class="sub" id="upd_msg" style="margin-top:10px;min-height:20px">${esc(updMsg)}</div></div>
+  <div class="card"><h3>Zurücksetzen</h3><div class="sub">Das Zurücksetzen startet SOLASI neu.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button type="button" class="ghost" id="upd_back_img"${u.overlay&&!u.direct?"":" disabled"}>Auf den Stand im Add-on zurück</button>
+      <button type="button" class="ghost" id="upd_back_prev"${u.previous_version&&!u.direct?"":" disabled"}>Vorgänger ${esc(u.previous_version||"")} wiederherstellen</button></div></div>`;
+}
+function updSay(t,bad){updMsg=t;const m=$("#upd_msg");if(m){m.textContent=t;m.style.color=bad?"var(--bad)":"";}}
+async function updUpload(file){
+  if(updBusy||!file)return;
+  if(!/\.zip$/i.test(file.name)){updSay("Das ist keine Zip-Datei.",true);return;}
+  updBusy=true;updSay(`Lade ${file.name} hoch und prüfe sie … (das kann eine halbe Minute dauern)`);
+  try{
+    const r=await fetch("api/update/upload",{method:"POST",headers:{"Content-Type":"application/zip"},body:file});
+    const j=await r.json();
+    if(!j.ok){updSay("Abgelehnt: "+(j.error||"unbekannter Fehler"),true);updBusy=false;return;}
+    updSay(`Version ${j.version} eingespielt (${j.files} Dateien). SOLASI startet neu …`);
+    updWaitRestart(j.version);
+  }catch(e){updSay("Keine Verbindung zu SOLASI.",true);updBusy=false;}
+}
+function updWaitRestart(version){
+  let n=0;const t=setInterval(async()=>{
+    n++;
+    try{const j=await (await fetch("api/update",{cache:"no-store"})).json();
+      if(j.running_version===version){clearInterval(t);updSay(`Version ${version} läuft. Seite wird neu geladen …`);setTimeout(()=>location.reload(),800);return;}
+      if(n>20&&j.running_version!==version){clearInterval(t);updBusy=false;updInfo=j;
+        updSay(j.failure?`Der neue Stand ist nicht angelaufen und wurde zurückgenommen: ${j.failure.reason}`:`Es läuft weiter Version ${j.running_version}. Prüfe das Protokoll.`,true);renderUpdate();}
+    }catch(e){/* SOLASI startet gerade neu */}
+    if(n>60){clearInterval(t);updBusy=false;updSay("SOLASI antwortet nicht. Lade die Seite in einer Minute neu.",true);}
+  },2000);
+}
+document.addEventListener("click",async e=>{
+  if(e.target.closest("#upd_drop")&&e.target.id!=="upd_file"){const f=$("#upd_file");if(f)f.click();return;}
+  const b=e.target.closest("#upd_back_img,#upd_back_prev");
+  if(b&&!b.disabled&&!updBusy){
+    const prev=b.id==="upd_back_prev";
+    updBusy=true;updSay("Setze zurück und starte neu …");
+    try{const j=await (await fetch("api/update/rollback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:prev?"previous":"image"})})).json();
+      if(!j.ok){updSay(j.error||"Zurücksetzen nicht möglich",true);updBusy=false;return;}
+      setTimeout(()=>{const t=setInterval(async()=>{try{await fetch("api/update",{cache:"no-store"});clearInterval(t);location.reload();}catch(x){}},2500);},3000);
+    }catch(x){updSay("Keine Verbindung zu SOLASI.",true);updBusy=false;}
+  }
+});
+document.addEventListener("change",e=>{if(e.target.id==="upd_file"){updUpload(e.target.files[0]);}});
+document.addEventListener("dragover",e=>{if(e.target.closest&&e.target.closest("#upd_drop"))e.preventDefault();});
+document.addEventListener("drop",e=>{const d=e.target.closest&&e.target.closest("#upd_drop");if(d){e.preventDefault();updUpload(e.dataTransfer.files[0]);}});
 
 // ---- Konten & Rollen ----
 let meInfo={name:"Home Assistant",role:"owner",direct:false},acctData=null;
